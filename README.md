@@ -1,4 +1,4 @@
-# Customer Analytics Models
+# Models for Customer Analytics
 
 ## Models to Implement
 

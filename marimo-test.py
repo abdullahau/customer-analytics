@@ -35,7 +35,7 @@ def __(pl):
                                      'units': pl.Int16,
                                      'price': pl.Float32,
                                      'brand': pl.Categorical})
-    grocery_lf.head().collect()
+    grocery_lf.collect_schema()
     return (grocery_lf,)
 
 
@@ -46,7 +46,7 @@ def __(pl):
                              separator=",",
                              schema={'sku_id': pl.Categorical,
                                      'weight': pl.Int16})
-    sku_lf.head().collect()
+    sku_lf.collect_schema()
     return (sku_lf,)
 
 
@@ -60,11 +60,11 @@ def __(pl):
                                   'Week': pl.Int16,
                                   'Day': pl.Int16,
                                   'Units': pl.Int16})
-    kiwi_lf.head().collect()
+    kiwi_lf.collect_schema()
     return (kiwi_lf,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def __(mo):
     mo.md(r"""### Reusable Functions""")
     return
@@ -79,7 +79,7 @@ def __(pl):
             .select(['week', 'units', 'price', 'brand'])
             .with_columns(((pl.col('units') * pl.col('price')).cast(pl.Float64)).alias('spend'))
         )
-        
+
         if brand == 'Category': # Return LazyFrame of total category
             summary = summary.group_by('week')
         elif brand == 'All': # Return LazyFrame of all brands
@@ -88,11 +88,11 @@ def __(pl):
             summary = summary.filter(
                 pl.col('brand') == brand
             ).group_by('week', 'brand')
-            
+
         summary = summary.agg(
             pl.col("spend").sum().cast(pl.Float64).alias('Weekly Spend') 
         ).sort('week')
-        
+
         return summary
     return (weekly_spend_summary,)
 
@@ -111,19 +111,19 @@ def __(pl, sku_lf):
                 )
                 .select(['week', 'units', 'brand', 'weight'])
             )
-            
+
             if brand != 'All': 
                 brand = [brand] if type(brand) == str else brand
                 lf = lf.filter(
                     pl.col('brand').is_in(*[brand])
                 )
-                
+
             summary = lf.with_columns(
                 (((pl.col('units') * pl.col('weight'))/1000).cast(pl.Float64)).alias('volume')
             ).group_by('week', 'brand').agg(
                 pl.col("volume").sum().cast(pl.Float64).alias('Weekly Volume')
             ).sort('week')
-            
+
         return summary
     return (weekly_vol_summary,)
 
@@ -132,7 +132,7 @@ def __(pl, sku_lf):
 def __(alt, np):
     # Altair Weekly Line Plot
     def weekly_plot(dataframe, y, color=None, title="", y_axis_label="", pct=False, legend=False):
-        
+
         # Configure the color encoding only if color is provided
         if color is not None:
             color_encoding = alt.Color(
@@ -141,7 +141,7 @@ def __(alt, np):
             )
         else:
             color_encoding = alt.Color()  # No color encoding    
-        
+
         chart = alt.Chart(dataframe).mark_line(strokeWidth=1).encode(
             x = alt.X(
                 'week',
@@ -181,7 +181,7 @@ def __(grocery_lf, pl, weekly_spend_summary):
             .group_by(['year', 'brand'])
             .agg(pl.col("Weekly Spend").sum().cast(pl.Float64).alias('Yearly Sales'))
         ).sort('year')
-        
+
         return summary
     return (annual_sales_summary,)
 
@@ -255,7 +255,7 @@ def __(alt, pl):
     return (freq_dist_plot,)
 
 
-@app.cell
+@app.cell(hide_code=True)
 def __(mo):
     mo.md("""## Preliminaries""")
     return
@@ -267,7 +267,7 @@ def __(mo):
     return
 
 
-@app.cell
+@app.cell(disabled=True)
 def __(grocery_lf, pl, weekly_spend_summary):
     # Weekly Sales Pivot Table - Polars DataFrame
     # For visualizing and inspecting only

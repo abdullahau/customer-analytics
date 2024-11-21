@@ -1,7 +1,7 @@
 import marimo
 
 __generated_with = "0.9.20"
-app = marimo.App(width="medium", layout_file="layouts/sBG-model.grid.json")
+app = marimo.App(layout_file="layouts/sBG-model.grid.json")
 
 
 @app.cell(hide_code=True)
@@ -40,21 +40,25 @@ def __(mo):
                            value='Years',
                            label='Choose Renewal Period:')
 
-
     mo.vstack([upload, period])
     return period, upload
 
 
-@app.cell
+@app.cell(hide_code=True)
 def __(io, mo, np, period, upload):
-    cohort_period, cohort_alive = np.loadtxt(io.StringIO(upload.contents().decode()),
+    try:
+        file = io.StringIO(upload.contents().decode())
+    except AttributeError:
+        file = 'data/hardie-sample-retention.csv'
+
+    cohort_period, cohort_alive = np.loadtxt(file,
                               dtype='f8',
                               delimiter=',',
                               unpack=True,
                               skiprows=1)
 
     mo.md(f"#### **{period.value}**: {list(cohort_period)}\n #### **Customers Alive**: {list(cohort_alive)}")
-    return cohort_alive, cohort_period
+    return cohort_alive, cohort_period, file
 
 
 @app.cell(hide_code=True)

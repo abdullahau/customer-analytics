@@ -273,6 +273,3 @@ def panel_summary(lf=grocery_lf, brand=None):
         lf = (lf.filter(pl.col("brand") == brand))
     
     pass
-
-
-        

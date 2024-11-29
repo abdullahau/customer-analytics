@@ -1,0 +1,34 @@
+"Kiwi Bubbles" is a masked name for a shelf-stable juice drink, aimed primarily at children, which is sold as a multipack with several single-serve containers bundled together. 
+
+Prior to national launch, it underwent a year-long test conducted in two of IRI's BehaviorScan markets. 
+
+The file kiwibubbles_tran.txt contains purchasing data for the new product, drawn from 1300 panelists in Market 1 and 1499 panelists in Market 2. (We only have purchasing data for the new product.)
+
+In Market 1, 205 panelists made at least one purchase of the new product during the 52 week test period; in Market 2, 139 panelists made at least one purchase of the new product during the 52 week test period.
+
+The file structure for kiwibubbles_tran.txt is:
+
+   Panelist ID 
+   Market      
+   Week        
+   Day         
+   Units       
+
+The value of the "Market" field is either 1 or 2. The "Week" field gives us the week number in which the purchase occurred, the "Day" field tells us the day of the week (1-7) in which the purchase occurred, and the "Units" field tells us how many units of the new product were purchased on that particular purchase occasion.
+
+The file kiwibubbles_mktmix.txt contains market-level (not store-level) information on the marketing activity over the 52 weeks the new product was in the test market. We have a standard scanner data measure of promotional activity (i.e., %ACV with any promotion) and measures of advertising (GRPs) and coupon activity. To account for carryover effects, the advertising and coupon measures are expressed as standard exponentially-smoothed "stock" variables. 
+
+The file structure for kiwibubbles_tran.txt is:
+
+   Week        
+   Market      
+   Coupon Stock
+   Advertising Stock
+   %ACV Any Promotion
+
+
+Location of the ZIP file containing kiwibubbles_tran.txt, kiwibubbles_mktmix.txt, and kiwibubbles_details.txt (this file):
+
+   http://brucehardie.com/datasets/kiwibubbles.zip
+
+

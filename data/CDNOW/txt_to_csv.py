@@ -1,6 +1,6 @@
 import re
 
-with open('CDNOW_master.txt', 'r') as readfile, open('CDNOW_master.csv', 'w') as writefile:
+with open('CDNOW_sample.txt', 'r') as readfile, open('CDNOW_sample.csv', 'w') as writefile:
     for line in readfile:
         # Remove leading and trailing spaces
         line = line.strip()

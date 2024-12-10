@@ -1,6 +1,8 @@
 import polars as pl
 import numpy as np
 
+# Dataset Sample & Its Summaries
+
 CDNOW_sample = (
     pl.scan_csv(source='data/CDNOW/CDNOW_sample.csv',
                 has_header=False,
@@ -19,37 +21,36 @@ CDNOW_sample = (
     .with_columns((pl.col("CustID").cum_count().over("CustID") - 1).cast(pl.UInt16).alias("DoR"))      
 )
 
-sample_TransMAT = (
+TransMAT = (
     CDNOW_sample
     .collect()
     .pivot(on='DoR', index='CustID', values='PurchDay', aggregate_function='max', maintain_order=True)
     .fill_null(0)
+    .to_numpy()    
 )
 
-sample_QuantMAT = (
+QuantMAT = (
     CDNOW_sample
     .collect()
     .pivot(on='DoR', index='CustID', values='Quant', aggregate_function='sum', maintain_order=True)
     .fill_null(0)
+    .to_numpy()    
 )
 
-sample_SpendMAT = (
+SpendMAT = (
     CDNOW_sample
     .collect()
     .pivot(on='DoR', index='CustID', values='Spend Scaled', aggregate_function='sum', maintain_order=True)
     .fill_null(0)
+    .to_numpy()
 )
 
 
 # The number of repeat transactions made by each customer in each period
 calwk = 273 # 39 week calibration period
-NumHH = len(sample_TransMAT)
+NumHH = len(TransMAT)
 
 # The number of repeat transactions made by each customer in each period
-TransMAT = sample_TransMAT.to_numpy()
-QuantMAT = sample_QuantMAT.to_numpy()
-SpendMAT = sample_SpendMAT.to_numpy()
-
 p1x = np.sum(((TransMAT[:,2:] > 0) & (TransMAT[:,2:] <= calwk)), axis=1, keepdims=True)
 p2x = np.sum(((TransMAT[:,2:] > 0) & (TransMAT[:,2:] > calwk)), axis=1, keepdims=True)
 
@@ -81,5 +82,60 @@ for i in range(NumHH):
     tx[i] = TransMAT[i, 1+p1x[i,0]] - TransMAT[i, 1]
 tx = tx/7
 # effective calibration period (in weeks)
-T = (calwk - TransMAT[:, 1])/7
-T.reshape(-1, 1)
+T = ((calwk - TransMAT[:, 1])/7).reshape(-1,1)
+
+# Master Dataset Summaries
+CDNOW_master = (
+    pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
+                has_header=False, 
+                separator=',', 
+                schema={'CustID': pl.Int32,     # customer id
+                        'Date': pl.String,      # transaction date
+                        'Quant': pl.Int16,      # number of CDs purchased
+                        'Spend': pl.Float64})   # dollar value (excl. S&H)
+    .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
+    .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
+    .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
+    .group_by('CustID', 'Date')
+    .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max()) # Multiple transactions by a customer on a single day are aggregated into one
+    .sort('CustID', 'Date')
+    .with_columns((pl.col("CustID").cum_count().over("CustID") - 1).cast(pl.UInt16).alias("DoR"))    
+)
+
+master_TransMAT = (
+    CDNOW_master
+    .collect()
+    .pivot(on='DoR', index='CustID', values='PurchDay', aggregate_function='max', maintain_order=True)
+    .fill_null(0)
+    .to_numpy()    
+)
+
+master_QuantMAT = (
+    CDNOW_master
+    .collect()
+    .pivot(on='DoR', index='CustID', values='Quant', aggregate_function='sum', maintain_order=True)
+    .fill_null(0)
+    .to_numpy()    
+)
+
+master_SpendMAT = (
+    CDNOW_master
+    .collect()
+    .pivot(on='DoR', index='CustID', values='Spend Scaled', aggregate_function='sum', maintain_order=True)
+    .fill_null(0)
+    .to_numpy()
+)
+
+NumCust = len(master_TransMAT)
+MaxPurchNum = master_TransMAT.shape[1] - 1
+
+# What is the total number of CDs purchased each week?
+TotQuant = np.zeros((78,1))
+for i in range(1, 79):
+    weekQuant = np.zeros((NumCust,1))
+    for j in range(1, MaxPurchNum+1):
+        isbuyer = np.where((master_TransMAT[:,j] > (7*(i-1))) & (master_TransMAT[:,j] <= (7*i)))[0]
+        weekQuant[isbuyer] += master_QuantMAT[isbuyer,j].reshape(-1,1)
+    TotQuant[i-1] = np.sum(weekQuant)
+
+print(TotQuant)

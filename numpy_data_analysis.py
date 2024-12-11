@@ -138,4 +138,40 @@ for i in range(1, 79):
         weekQuant[isbuyer] += master_QuantMAT[isbuyer,j].reshape(-1,1)
     TotQuant[i-1] = np.sum(weekQuant)
 
-print(TotQuant)
+# How many people made their first-ever (“trial”) purchase each week?
+NumTriers = np.zeros((12,1))
+for i in range(12):
+    istrier = np.where((master_TransMAT[:,1] > (7*i)) & (master_TransMAT[:,1] <= (7*(i+1))))[0]
+    NumTriers[i] = len(istrier)
+
+# What is the total number of CDs purchased by triers in their trial week?
+TrialQuant = np.zeros((12,1))
+for i in range(12):
+    istrier = np.where((master_TransMAT[:, 1] > 7 * i) & (master_TransMAT[:, 1] <= 7 * (i + 1)))[0]    
+    for j in range(len(istrier)):
+        not_done = True
+        k = 1
+        while not_done:
+            TrialQuant[i] += master_QuantMAT[istrier[j],k]     
+            not_done = (master_TransMAT[istrier[j], k+1] > (7 * i)) & (master_TransMAT[istrier[j], k+1] <= (7 * (i + 1)))     
+            k += 1
+
+# What is the distribution of the number of units purchased in each of the first 12 weeks?
+weekQuant = np.zeros((NumCust, 12), dtype=np.int32)
+for i in range(12):
+    for k in range(1, MaxPurchNum+1):
+        isbuyer = np.where((master_TransMAT[:,k] > (7*i)) & (master_TransMAT[:,k] <= (7*(i+1))))[0]
+        weekQuant[isbuyer, i] += master_QuantMAT[isbuyer,k]
+
+MaxQuant = np.max(weekQuant)     
+QuantDist = np.zeros((MaxQuant, 12), dtype=np.int32)
+for i in range(12):
+    counts, _ = np.histogram(weekQuant[:, i], bins=np.arange(1, MaxQuant + 2))
+    QuantDist[:,i] = counts
+
+TableOne = np.zeros((11,12), dtype=np.int32)
+TableOne[1:10,:] = QuantDist[0:9,:]
+TableOne[10,:] = np.sum(QuantDist[9:,:], axis=0)
+TableOne[0,:] = np.cumsum(NumTriers) - np.sum(TableOne[1:,:], axis=0)
+
+print(TableOne)

@@ -129,6 +129,14 @@ master_SpendMAT = (
 NumCust = len(master_TransMAT)
 MaxPurchNum = master_TransMAT.shape[1] - 1
 
+# Compute total spend for each customer - Vectorized Method in Numpy - Using Masks
+# Step 1: Calculate x (number of valid transactions)
+x = np.sum(((master_TransMAT[:, 2:] > 0) & (master_TransMAT[:, 2:] <= 273)), axis=1, dtype='int16')
+# Step 2: Create a mask to include only valid columns for each customer
+mask = ((master_TransMAT[:, 2:] > 0) & (master_TransMAT[:, 2:] <= 273))  # Exclude ID Column & Trial
+RptSpend = np.sum(master_SpendMAT[:,2:] * mask, axis=1, dtype='float64')
+
+
 # What is the total number of CDs purchased each week?
 TotQuant = np.zeros((78,1))
 for i in range(1, 79):
@@ -173,5 +181,3 @@ TableOne = np.zeros((11,12), dtype=np.int32)
 TableOne[1:10,:] = QuantDist[0:9,:]
 TableOne[10,:] = np.sum(QuantDist[9:,:], axis=0)
 TableOne[0,:] = np.cumsum(NumTriers) - np.sum(TableOne[1:,:], axis=0)
-
-print(TableOne)

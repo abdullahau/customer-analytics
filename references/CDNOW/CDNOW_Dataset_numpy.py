@@ -1,10 +1,18 @@
 import polars as pl
 import numpy as np
 
+import os 
+# Get the current directory of the script
+current_dir = os.path.dirname(__name__) 
+# Constructs the relative path
+# '..' in the path moves up one directory level from the script's location to the root directory
+sampledata_file_path = os.path.join(current_dir, '..', '..', 'data', 'CDNOW', 'CDNOW_sample.csv')
+masterdata_file_path = os.path.join(current_dir, '..', '..', 'data', 'CDNOW', 'CDNOW_master.csv')
+
 # Dataset Sample & Its Summaries
 
 CDNOW_sample = (
-    pl.scan_csv(source='data/CDNOW/CDNOW_sample.csv',
+    pl.scan_csv(source=sampledata_file_path,
                 has_header=False,
                 separator=',',
                 schema={'CustID': pl.Int32,
@@ -86,7 +94,7 @@ T = ((calwk - TransMAT[:, 1])/7).reshape(-1,1)
 
 # Master Dataset Summaries
 CDNOW_master = (
-    pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
+    pl.scan_csv(source = masterdata_file_path, 
                 has_header=False, 
                 separator=',', 
                 schema={'CustID': pl.Int32,     # customer id

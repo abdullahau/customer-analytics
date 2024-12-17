@@ -39,3 +39,5 @@ What the analysis summarize:
 ## Overview
 
 ![Reference](references/Price-Implied-Expectations-through-Unit-Economics-Simulation.png)
+
+![Workflow Lifetimes Library — CLV Model](references/Workflow-Lifetimes-Library-CLV-Model.png)

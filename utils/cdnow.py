@@ -80,27 +80,9 @@ def rfm_summary(dataset, calwk=273):
     rfm_data = (
         m_x
         .join(other=ttlrp, on="ID", how="left")
-        .rename({'P1X': 'x'})
-        .select('ID', 'x', 't_x', 'T')
     )
     
     return rfm_data
-
-
-def rfm_summary_detailed(dataset, calwk=273):
-    freq_x = frequency(dataset, calwk)
-    pSpendQuant = spend_quant(dataset, freq_x)
-    m_x = avg_spend(pSpendQuant, freq_x)
-    ttlrp = t_x_T(dataset, freq_x, calwk)
-
-    rfm_data = (
-        m_x
-        .join(other=ttlrp, on="ID", how="left")
-        .rename({'P1X': 'x'})
-    )
-    
-    return rfm_data
-
 
 def frequency(dataset, calwk=273):
     # The number of repeat transactions made by each customer in each period

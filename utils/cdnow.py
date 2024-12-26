@@ -80,6 +80,12 @@ def rfm_summary(dataset, calwk=273):
     rfm_data = (
         m_x
         .join(other=ttlrp, on="ID", how="left")
+        .with_columns(
+            pl.when(pl.col('P1X') > 0)
+            .then(pl.col('P1X Spend') / pl.col('P1X'))
+            .otherwise(0)
+            .alias('zbar')
+        )        
     )
     
     return rfm_data

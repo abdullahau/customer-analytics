@@ -84,7 +84,7 @@ def __(cohort_alive, cohort_period, mo, period, train_range):
 
 @app.cell(hide_code=True)
 def __(minimize, np):
-    def sBG(alive: np.array, period: np.array, guess=[1,1]) -> tuple(float, float):
+    def sBG(alive: np.array, period: np.array, guess=[1,1]) -> tuple(float, float): # type: ignore
 
         def log_likelihood(x):
             gamma, delta = x[0], x[1]

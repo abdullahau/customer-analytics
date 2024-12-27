@@ -1,6 +1,6 @@
 import re
 
-with open('CDNOW_sample.txt', 'r') as readfile, open('CDNOW_sample.csv', 'w') as writefile:
+with open('Donation-Incidence/1995_cohort_binary.txt', 'r', encoding='utf-16') as readfile, open('Donation-Incidence/1995_cohort_binary.csv', 'w') as writefile:
     for line in readfile:
         # Remove leading and trailing spaces
         line = line.strip()

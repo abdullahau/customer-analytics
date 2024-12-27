@@ -82,9 +82,9 @@ def rfm_summary(dataset, calwk=273):
         .join(other=ttlrp, on="ID", how="left")
         .with_columns(
             pl.when(pl.col('P1X') > 0)
-            .then(pl.col('P1X Spend') / pl.col('P1X'))
+            .then(pl.col('P1X Spend') / pl.col('P1X')) # average spend per repeat transaction
             .otherwise(0)
-            .alias('zbar')
+            .alias('zbar') 
         )        
     )
     

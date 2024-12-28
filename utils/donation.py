@@ -25,23 +25,25 @@ def rfm_data(data, calib_p = 6):
             pl.sum_horizontal(pl.all().exclude(['ID', '1995', *[str(i) for i in calib_columns]])).alias('P2X'),
             pl.max_horizontal(
                 *[pl.when(pl.col(year) == 1).then(int(year) - 1995).otherwise(None) for year in calib_columns]
-            ).alias("t_x")
+            ).alias("t_x"),
+            pl.lit(calib_p).alias('np1x'), # n transaction opportunities in calibration period
+            pl.lit(len(year_columns) - calib_p).alias('np2x') # n transaction opportunities  in validation period
         ).fill_null(0)
-        .select('ID', 'P1X', 't_x', 'P2X')
+        .select('ID', 'P1X', 't_x', 'np1x', 'P2X', 'np2x')
     )
 
 def p1x_data(rfm_data):
     return (
         rfm_data
-        .group_by('P1X','t_x')
+        .group_by('P1X','t_x', 'np1x')
         .agg(pl.len().alias('Count'))
-        .sort(['P1X', 't_x'], descending=True)         
+        .sort(['t_x', 'P1X'], descending=True)         
     )
 
 def p2x_data(rfm_data):
     return (
         rfm_data
-        .group_by('P2X')
+        .group_by('P2X', 'np2x')
         .agg(pl.len().alias('Count'))
         .sort(['P2X'], descending=True)         
     )

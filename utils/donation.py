@@ -10,6 +10,8 @@ year_columns = [str(1995 + i) for i in range(12)]
 def donation_data():
     return (
             pl.scan_csv(filepath,
+                        has_header=False,
+                        separator=',',                        
                         schema={'ID': pl.Int32, **{str(i): pl.Int8 for i in year_columns}})
     )
 

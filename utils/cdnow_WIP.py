@@ -9,7 +9,7 @@ sampledata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_s
 masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_master.csv')
 
 class CDNOW(object):
-    def __init__(self,master=True, calwk=273, remove_unauthorized=False) -> None:
+    def __init__(self, master=True, calwk=273, remove_unauthorized=False) -> None:
         self.calwk = calwk
         self.data = self.__select_data(master, remove_unauthorized)
         
@@ -64,6 +64,7 @@ class CDNOW(object):
 
 
     def rfm_summary(self):
+        'Return a dataframe with recency (t_x), frequency (x), monetary value (m_x), total repeat spend, and quant in calibration and validation period'
         # The number of repeat transactions made by each customer in each period
         freq_x = self.__frequency()
         
@@ -83,7 +84,7 @@ class CDNOW(object):
                 pl.when(pl.col('P1X') > 0)
                 .then(pl.col('P1X Spend') / pl.col('P1X')) # average spend per repeat transaction
                 .otherwise(0)
-                .alias('zbar') 
+                .alias('zbar') # customer’s observed average transaction value, an imperfect estimate of their (unobserved) mean transaction value
             )        
         )
         

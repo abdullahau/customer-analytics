@@ -9,7 +9,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sampledata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_sample.csv')
 masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_master.csv')
 
-class RFMData(object):
+class RFM(object):
     def __init__(self, data: Union[pl.LazyFrame, pl.DataFrame], calwk: int) -> None:
         '''
         data : ~Union[polars.Dataframe, polars.LazyFrame]
@@ -157,7 +157,7 @@ class RFMData(object):
     __t_x_T = t_x_T
     
 
-class CDNOW(RFMData):
+class CDNOW(RFM):
     def __init__(self, master:bool = True, remove_unauthorized:bool = False, calwk:int = 273):
         self.data = self.__select_data(master=master, remove_unauthorized=remove_unauthorized)
         self.calwk = calwk
@@ -214,4 +214,5 @@ class CDNOW(RFMData):
 if __name__ == "__main__":
     cdnow = CDNOW(master=False, calwk=273)
     print(cdnow)
-    print(cdnow.data.schema)
+    print(cdnow.data.collect())
+    print(pl.date(1996,12,31))

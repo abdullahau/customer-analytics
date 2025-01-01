@@ -12,16 +12,21 @@ masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_m
 class RFMData(object):
     def __init__(self, data: Union[pl.LazyFrame, pl.DataFrame], calwk: int) -> None:
         '''
-        Create an RFM summary using a transaction log of LazyFrame/DataFrame data type with the following schema:
-        'ID'[Union[pl.Int32, pl.Categorical, pl.String]]  - Customer IDs linked to the transaction, 
-        'Date'[pl.Date] - Transaction Date, 
-        'Quant'[pl.Int16] - Purchase Quantity, 
-        'Spend'[pl.Float64] - Purchase Spend
+        data : ~Union[polars.Dataframe, polars.LazyFrame]
+            Transaction log (unique transaction on each row) of LazyFrame/DataFrame data type with the following schema:
+                * `ID`[Union[pl.Int32, pl.Categorical, pl.String]]: Customer identifier linked to the transaction
+                * `Date`[pl.String]: Transaction date
+                * `Quant`[pl.Int16]: Purchase quantity
+                * `Spend`[pl.Float64]: Purchase spend
         
         Note: Aggregate transactions by the same customer on the same day.
+        
         '''
         self.data = data
         self.calwk = calwk
+    
+    def __data_prep(self):
+        pass
 
     def rfm_summary(self) -> Union[pl.LazyFrame, pl.DataFrame]:
         'Return a LazyFrame/DataFrame with recency (t_x), frequency (x), monetary value (m_x), total repeat spend, and quant in calibration and validation period'

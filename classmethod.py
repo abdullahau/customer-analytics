@@ -8,9 +8,10 @@ class Circle(object):
         self.radius = radius
     
     def area(self):
-        p = self.__perimeter()
+        # Given that the perimeter method is modified and used in a subclass, we use the double under to create a class local reference to ensure modified perimeter from subclass is not used
+        p = self.__perimeter() 
         r = p / math.pi / 2.0
-        return math.pi * r ** 2.0
+        return math.pi * r ** 2.0  
     
     def perimeter(self):
         return 2.0 * math.pi * self.radius
@@ -29,7 +30,7 @@ class Circle(object):
         'Convert angle in degree to a percentage grade'
         return math.tan(math.radians(angle)) * 100.0   # variables used here do not require information about the instance
     
-    __perimeter = perimeter
+    __perimeter = perimeter # Class local reference
 
 
 class Tire(Circle):
@@ -68,11 +69,3 @@ grade = Circle.angle_to_grade(30)
 print('Angle:', 30)
 print('Grade:', grade)
 print('Type:', type(grade))
-
-
-if __name__ == "__main__":
-    print(2.0 * math.pi * 15 * 1.25)
-    print(2.0 * math.pi * 15)
-    print(math.pi * 15 ** 2.0)
-    
-    print(math.pi * 15 ** 2.0)

@@ -5,7 +5,7 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 filepath = os.path.join(current_dir, '..', 'data', 'Donation-Incidence', '1995_cohort_binary.csv')
 
-class Donation():
+class Donation(object):
     def __init__(self, calib_p=6) -> None:
         start_year, duration = 1995, 11
         self.years = [str(start_year + i) for i in range(duration+1)]
@@ -36,7 +36,7 @@ class Donation():
         )        
 
     def p1x_data(self) -> pl.LazyFrame:
-        rfm_summary = self.rfm_data()
+        rfm_summary = self.__rfm_data()
         return (
             rfm_summary
             .group_by('P1X','t_x', 'np1x')
@@ -44,11 +44,13 @@ class Donation():
             .sort(['t_x', 'P1X'], descending=True)         
         )
 
-    def p2x_data(self):
-        rfm_summary = self.rfm_data()
+    def p2x_data(self) -> pl.LazyFrame:
+        rfm_summary = self.__rfm_data()
         return (
             rfm_summary
             .group_by('P2X', 'np2x')
             .agg(pl.len().alias('Count'))
             .sort(['P2X'], descending=True)         
         )
+    
+    __rfm_data = rfm_data

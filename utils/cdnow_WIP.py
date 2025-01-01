@@ -1,7 +1,6 @@
 import polars as pl
 import os 
 
-
 # Get the current directory of the script
 current_dir = os.path.dirname(os.path.abspath(__file__))
 # Constructs the relative path
@@ -9,13 +8,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 sampledata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_sample.csv')
 masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_master.csv')
 
-class CDNOW():
+class CDNOW(object):
     def __init__(self,master=True, calwk=273, remove_unauthorized=False) -> None:
         self.calwk = calwk
-        self.data = self.__select_data__(master, remove_unauthorized)
+        self.data = self.__select_data(master, remove_unauthorized)
         
         
-    def __select_data__(self, master=True, remove_unauthorized=False) -> pl.LazyFrame:
+    def __select_data(self, master=True, remove_unauthorized=False) -> pl.LazyFrame:
         if master:
             data = (
                 pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
@@ -66,16 +65,16 @@ class CDNOW():
 
     def rfm_summary(self):
         # The number of repeat transactions made by each customer in each period
-        freq_x = self.frequency()
+        freq_x = self.__frequency()
         
         # The number of CDs purchased and total spend across these repeat transactions
-        pSpendQuant = self.spend_quant(freq_x)
+        pSpendQuant = self.__spend_quant(freq_x)
 
         # The average spend per repeat transaction
-        m_x = self.avg_spend(pSpendQuant, freq_x)
+        m_x = self.__avg_spend(pSpendQuant, freq_x)
         
         # time of last calibration period repeat purchase (in weeks) - Recency
-        ttlrp = self.t_x_T(freq_x)
+        ttlrp = self.__t_x_T(freq_x)
 
         rfm_data = (
             m_x
@@ -91,7 +90,7 @@ class CDNOW():
         return rfm_data
 
     def frequency(self):
-        # The number of repeat transactions made by each customer in each period
+        'Frequency (x) - The number of repeat transactions made by each customer in calibration and validation period'
         freq_x = (
             self.data
             .group_by('ID', maintain_order=True)
@@ -111,7 +110,8 @@ class CDNOW():
         return freq_x
 
     def spend_quant(self, freq_x):
-        # The number of CDs purchased and total spend across these repeat transactions
+        'The number of CDs purchased and total spend across repeat transactions in calibration and validation periods'
+        
         pSpendQuant = (
             self.data
             .join(freq_x, on='ID', how='left')
@@ -144,7 +144,7 @@ class CDNOW():
 
 
     def avg_spend(self, pSpendQuant, freq_x):
-        # The average spend per repeat transaction
+        'Monetary Value (m_{x}) - The average spend per repeat transaction for the calibration and validation periods'
         m_x = (
             pSpendQuant
             .join(freq_x, on='ID', how='left')
@@ -157,7 +157,8 @@ class CDNOW():
         return m_x 
 
     def t_x_T(self, freq_x):
-        # time of last calibration period repeat purchase (in weeks) - Recency
+        'Recency (t_{x}) - Time of last calibration period repeat purchase (in weeks)'
+        
         ttlrp = (
             self.data
             .join(freq_x, on='ID', how='left')
@@ -183,3 +184,8 @@ class CDNOW():
         )      
         
         return ttlrp
+    
+    __frequency = frequency
+    __spend_quant = spend_quant
+    __avg_spend = avg_spend
+    __t_x_T = t_x_T

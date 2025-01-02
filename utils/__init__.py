@@ -1,5 +1,5 @@
 from .plotting import (ChartTemp, layered_line_prop)
-from .cdnow import (CDNOW_sample, CDNOW_master, rfm_summary)
+from .RFM import (RFM)
 from .donation import (Donation)
 from .bandwidth import (modified_silverman)
-from .cdnow_WIP import (CDNOW)
+from .CDNOW import (CDNOW)

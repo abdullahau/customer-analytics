@@ -2,31 +2,61 @@ import polars as pl
 import os 
 from typing import Union
 
-# Get the current directory of the script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-# Constructs the relative path
-# '..' in the path moves up one directory level from the script's location to the root directory
-sampledata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_sample.csv')
-masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_master.csv')
-
 class RFM(object):
-    def __init__(self, data: Union[pl.LazyFrame, pl.DataFrame], calwk: int) -> None:
+    def __init__(self, 
+                 data: Union[pl.LazyFrame, pl.DataFrame], 
+                 dateformat: str, 
+                 calib_p: int) -> None:
         '''
+        Initialize the RFM object with the given data, date format, and calibration period.
+        
+        Parameters
+        ----------        
         data : ~Union[polars.Dataframe, polars.LazyFrame]
             Transaction log (unique transaction on each row) of LazyFrame/DataFrame data type with the following schema:
                 * `ID`[Union[pl.Int32, pl.Categorical, pl.String]]: Customer identifier linked to the transaction
-                * `Date`[pl.String]: Transaction date
+                * `Date`[pl.String]: Transaction date (as string type for conversion and processing as pl.Expr (date))
                 * `Quant`[pl.Int16]: Purchase quantity
                 * `Spend`[pl.Float64]: Purchase spend
         
-        Note: Aggregate transactions by the same customer on the same day.
+        dateformat : str
+            string containing the date format in the transaction log data, eg. "%Y%m%d"
+        
+        calib_p : int
+            Calibration period (in days) - split data into calibration and validation (longitudinal holdout) period  
         
         '''
-        self.data = data
-        self.calwk = calwk
+        self._data = None  # Use a private attribute to store the data
+        self.dateformat = dateformat
+        self.calib_p = calib_p
+        self.data = data  # Triggers the setter to preprocess data
     
-    def __data_prep(self):
-        pass
+    @property
+    def data(self) -> Union[pl.LazyFrame, pl.DataFrame]:
+        return self._data
+    
+    @data.setter
+    def data(self, data):
+        self._data = self.__data_prep(data)
+    
+    def __data_prep(self, data):
+        '''
+        1) Convert date to pl.Date format using the `dateformat`provided
+        2) Compute purchase day since the start of observation
+        3) Scale spend by 100 so that 2 d.p. (cents) floats are cast as pl.Int64 for better performance and precision 
+        4) Group data by 'ID' and 'Date' to aggregate multiple transactions by the same customer on the same day.
+        5) Compute Depth of Repeat (DoR) for each transaction by a customer ('Transaction' time/level: starts with 0 as trial, 1 as 1st repeat, 2 as 2nd repeat and so on)
+        '''
+        return (
+            data
+            .with_columns(pl.col('Date').str.to_date(self.dateformat))
+            .with_columns(((pl.col('Date') - pl.col('Date').min()).dt.total_days() + 1).cast(pl.UInt16).alias('PurchDay'))
+            .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
+            .group_by('ID', 'Date')
+            .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max())                  # Multiple transactions by a customer on a single day are aggregated into one
+            .sort('ID', 'Date')
+            .with_columns((pl.col("ID").cum_count().over("ID") - 1).cast(pl.UInt16).alias("DoR"))  # DoR = Depth of Repeat ('Transaction' time: starts with 0 as trial, 1 as 1st repeat and so on)          
+        )
 
     def rfm_summary(self) -> Union[pl.LazyFrame, pl.DataFrame]:
         'Return a LazyFrame/DataFrame with recency (t_x), frequency (x), monetary value (m_x), total repeat spend, and quant in calibration and validation period'
@@ -62,12 +92,12 @@ class RFM(object):
             .group_by('ID', maintain_order=True)
             .agg(
                 pl.col('PurchDay')
-                .filter((pl.col('PurchDay') <= self.calwk) & (pl.col('DoR') > 0))
+                .filter((pl.col('PurchDay') <= self.calib_p) & (pl.col('DoR') > 0))
                 .count()
                 .alias('P1X'), # Period 1: Calibration Period
 
                 pl.col('PurchDay')
-                .filter((pl.col('PurchDay') > self.calwk) & (pl.col('DoR') > 0))
+                .filter((pl.col('PurchDay') > self.calib_p) & (pl.col('DoR') > 0))
                 .count()
                 .alias('P2X')  # Period 2: Longitudinal Holdout Period      
             )
@@ -77,7 +107,6 @@ class RFM(object):
 
     def spend_quant(self, freq_x: Union[pl.LazyFrame, pl.DataFrame]) -> Union[pl.LazyFrame, pl.DataFrame]:
         'The number of CDs purchased and total spend across repeat transactions in calibration and validation periods'
-        
         pSpendQuant = (
             self.data
             .join(freq_x, on='ID', how='left')
@@ -123,8 +152,10 @@ class RFM(object):
         return m_x 
 
     def t_x_T(self, freq_x: Union[pl.LazyFrame, pl.DataFrame]) -> Union[pl.LazyFrame, pl.DataFrame]:
-        'Recency (t_{x}) - Time of last calibration period repeat purchase (in weeks)'
-        
+        '''
+        Recency (t_{x}) - Time of last calibration period repeat purchase (in weeks)
+        T - Effective calibration period (in weeks)
+        '''
         ttlrp = (
             self.data
             .join(freq_x, on='ID', how='left')
@@ -144,7 +175,7 @@ class RFM(object):
             .with_columns(
                 (pl.col('PurchDay')/7).alias('p1rec'), # Calendar week of the last observed purchase - Calendar Recency
                 ((pl.col('PurchDay') - pl.col('Trial Day')) / 7).alias('t_x'), # Time to Last Repeat Purchase from Trial - Model Recency
-                ((self.calwk - pl.col('Trial Day'))/7).alias('T') # effective calibration period (in weeks)            
+                ((self.calib_p - pl.col('Trial Day'))/7).alias('T') # effective calibration period (in weeks)            
             )
             .drop('PurchDay', 'Trial Day')
         )      
@@ -155,64 +186,3 @@ class RFM(object):
     __spend_quant = spend_quant
     __avg_spend = avg_spend
     __t_x_T = t_x_T
-    
-
-class CDNOW(RFM):
-    def __init__(self, master:bool = True, remove_unauthorized:bool = False, calwk:int = 273):
-        self.data = self.__select_data(master=master, remove_unauthorized=remove_unauthorized)
-        self.calwk = calwk
-        
-    def __select_data(self, master:bool=True, remove_unauthorized:bool=False) -> Union[pl.LazyFrame, pl.DataFrame]:
-        if master:
-            data = (
-                pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
-                            has_header=False, 
-                            separator=',', 
-                            schema={'ID': pl.Int32,     # customer id
-                                    'Date': pl.String,      # transaction date
-                                    'Quant': pl.Int16,      # number of CDs purchased
-                                    'Spend': pl.Float64})   # dollar value (excl. S&H)
-                .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
-                .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
-                .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
-                .group_by('ID', 'Date')
-                .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max()) # Multiple transactions by a customer on a single day are aggregated into one
-                .sort('ID', 'Date')
-                .with_columns((pl.col("ID").cum_count().over("ID") - 1).cast(pl.UInt16).alias("DoR"))  # DoR = Depth of Repeat ('Transaction' time: starts with 0 as trial, 1 as 1st repeat and so on)
-            )
-            
-            if remove_unauthorized:
-                unauthorized_resellers = (
-                    data.filter(pl.col('DoR') != 0)
-                    .group_by('ID').agg(pl.col('Spend Scaled').sum())
-                    .filter(pl.col('Spend Scaled') > 400000).collect()
-                )
-
-                data = data.filter(~pl.col('ID').is_in(unauthorized_resellers.select('ID')))    
-        else: 
-            data = (
-                pl.scan_csv(source=sampledata_file_path,
-                            has_header=False,
-                            separator=',',
-                            schema={'CustID': pl.Int32,
-                                    'ID': pl.Int32,
-                                    'Date': pl.String,
-                                    'Quant': pl.Int16,
-                                    'Spend': pl.Float64})
-                .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
-                .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
-                .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
-                .group_by('ID', 'Date')
-                .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max())
-                .sort('ID', 'Date')
-                .with_columns((pl.col("ID").cum_count().over("ID") - 1).cast(pl.UInt16).alias("DoR"))      
-                .drop('CustID')                
-            )   
-        return data
-        
-
-if __name__ == "__main__":
-    cdnow = CDNOW(master=False, calwk=273)
-    print(cdnow)
-    print(cdnow.data.collect())
-    print(pl.date(1996,12,31))

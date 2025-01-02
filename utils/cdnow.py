@@ -12,14 +12,9 @@ masterdata_file_path = os.path.join(current_dir, '..', 'data', 'CDNOW', 'CDNOW_m
 
 class CDNOW(RFM):
     def __init__(self, master:bool = True, calib_p:int = 273, remove_unauthorized=False):
-        # Set attributes
-        self.dateformat = "%Y%m%d"
-        self.startdate = pl.date(1996, 12, 31)
-        self.calib_p = calib_p
-        
         # Select and preprocess the data
         data = self.__select_data(master=master)
-        super().__init__(data=data, dateformat=self.dateformat, calib_p=calib_p)  # Call the superclass initializer
+        super().__init__(data=data, dateformat="%Y%m%d", calib_p=calib_p)  # Call the superclass initializer
         
         # Filter unauthorized resellers
         if remove_unauthorized:

@@ -181,6 +181,36 @@ class RFM(object):
         
         return ttlrp
     
+    def repeat_sales(self) -> pl.DataFrame:
+        'Returns actual weekly & cumulative repeat sales dataframe with a week 1 set to 0 weekly and cumulative sales'
+        data = (
+            self.data
+            .filter(pl.col('DoR') != 0)
+            .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+            .group_by('Week')
+            .agg(pl.len().cast(pl.Float32).alias('Weekly Sales'))
+            .sort('Week')
+            .with_columns(pl.col('Weekly Sales').cum_sum().cast(pl.Float32).alias('Cum Sales'))
+            .collect()             
+        )
+        
+        return pl.concat([
+            pl.DataFrame({'Week': 1, 'Weekly Sales': 0, 'Cum Sales': 0}, 
+                         schema={'Week': pl.UInt16, 'Weekly Sales': pl.Float32, 'Cum Sales': pl.Float32}),
+            data])
+    
+    def time_to_trail_purch(self) -> Union[pl.LazyFrame, pl.DataFrame]:
+        'Returns Time of trial purchase (in weeks)'
+        tofp = (
+            self.data
+            .filter(pl.col('DoR') == 0)
+            .with_columns((pl.col('PurchDay') / 7).alias('Time of First Purch'))
+            .group_by('Time of First Purch').agg(pl.len().alias('Count'))
+            .sort('Time of First Purch')
+        )
+        
+        return tofp
+
     __frequency = frequency
     __spend_quant = spend_quant
     __avg_spend = avg_spend

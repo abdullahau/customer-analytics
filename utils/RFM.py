@@ -1,5 +1,4 @@
 import polars as pl
-import os 
 from typing import Union
 
 class RFM(object):

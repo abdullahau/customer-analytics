@@ -2,7 +2,7 @@ class ParetoNBD(object):
     def __init__(self, n,) -> None:
         pass
     
-    def param_est(self):
+    def parameter_estimate(self):
         pass
     
     def agg_repeat_trans(self):

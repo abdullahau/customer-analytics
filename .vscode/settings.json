@@ -4,6 +4,7 @@
         "barchart",
         "bgnbd",
         "bincount",
+        "calib",
         "calwk",
         "CDNOW",
         "cumsum",
@@ -17,5 +18,9 @@
         "Purch",
         "silverman",
         "unpivot"
+    ],
+    "cSpell.ignoreWords": [
+        "logitp",
+        "logitt"
     ]
 }

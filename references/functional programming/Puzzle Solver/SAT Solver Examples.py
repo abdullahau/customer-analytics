@@ -1,3 +1,5 @@
+# https://rhettinger.github.io/einstein.html
+
 import pycosat
 from pprint import pprint
 from sat_utils import *

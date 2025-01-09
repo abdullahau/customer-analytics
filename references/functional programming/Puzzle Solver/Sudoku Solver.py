@@ -1,3 +1,5 @@
+# https://rhettinger.github.io/einstein.html
+
 from sat_utils import solve_one, one_of, basic_fact
 from sys import intern
 from pprint import pprint

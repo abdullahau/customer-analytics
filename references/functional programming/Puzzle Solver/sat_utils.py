@@ -1,3 +1,5 @@
+# https://rhettinger.github.io/einstein.html
+
 'Utility functions to humanize interaction with pycosat'
 
 __author__ = 'Raymond Hettinger'

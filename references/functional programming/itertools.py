@@ -4,6 +4,27 @@
 import itertools
 import operator
 
+# iter() - built-in function that returns an iterator object (objects that actually perform the iteration on iterables)
+# iter(object, sentinel [optional]) 
+# 'object' - can be a list, set, tuple, etc.
+# 'sentinel [optional]' - a special value that is used to represent the end of a sequence
+
+
+phones = ['apple', 'samsung', 'oneplus']
+phones_iter = iter(phones)
+
+print(next(phones_iter))   
+print(next(phones_iter))    
+print(next(phones_iter))  
+print(next(phones_iter))  
+
+# Output:
+# apple
+# samsung
+# oneplus
+# Error: StopIteration
+
+
 # compress: filtering sequences - takes iterable and boolean selector and outputs items of the iterable where the corresponding element in the selector is True.
 dates = [
     "2020-01-01",
@@ -78,3 +99,16 @@ pairs = pairwise(players)
 for i,j in pairs:
     print(i, j)
 
+# islice - Make an iterator that returns selected elements from the iterable. 
+# Works like sequence slicing but does not support negative values for start, stop, or step.
+# .islice(iterable, start, stop[, step])
+
+# Slicing the range function
+for i in itertools.islice(range(20), 5): # iterator with first 5 (stop index) items from the iterable
+    print(i)
+     
+     
+li = [2, 4, 5, 7, 8, 10, 20] 
+ 
+# Slicing the list
+print(list(itertools.islice(li, 1, 6, 2))) # iterator selecting from the start of the 1st index to the 6th index with 2 steps between each element

@@ -1,4 +1,7 @@
 # https://rhettinger.github.io/einstein.html
+# https://en.wikipedia.org/wiki/Boolean_satisfiability_problem
+# https://en.wikipedia.org/wiki/Propositional_calculus
+# https://dsearls.org/
 
 'Utility functions to humanize interaction with pycosat'
 

@@ -3,9 +3,7 @@ great-tables
 ipykernel
 ipython
 ipywidgets
-jupyter_client
-jupyter_core
-jupyterlab_widgets==3.0.13
+jupyterlab
 Lifetimes
 marimo
 matplotlib

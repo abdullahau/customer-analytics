@@ -22,3 +22,4 @@ scikit-optimize
 scipy
 statsmodels
 vegafusion
+jinja2

@@ -210,6 +210,12 @@ class RFM(object):
         )
         
         return tofp
+    
+    def repeat_frequency(self, calib=True):
+        'Returns repeat frequency distribution for calibration period (if calib = True) or holdout period (if calib = False)'
+        freq_x = self.__frequency()
+        period = 'P1X' if calib else 'P2X'
+        return freq_x.group_by(period).agg(pl.len().alias('Repeat Frequency')).sort(period)        
 
     __frequency = frequency
     __spend_quant = spend_quant

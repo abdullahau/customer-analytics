@@ -43,6 +43,160 @@ jupyter:
 
 ### Imports
 
+Packages:
+
 ```{python}
-from utils import Stan, StanQuap
+import polars as pl
+import numpy as np
+from scipy.optimize import minimize
+from scipy.special import gammaln, hyp2f1, gamma, factorial
+from utils import CDNOW, Stan, StanQuap
+import altair as alt
+```
+
+Data:
+
+```{python}
+calib_p = 273 # 39 week calibration period
+
+data = CDNOW(master=False, calib_p=calib_p)
+
+rfm_data = data.rfm_summary()
+
+# Time of trial purchase (in weeks)
+tofp = data.time_to_trail_purch()
+
+# actual weekly & cumulative repeat sales data
+actual_repeat_sales = data.repeat_sales()
+
+forecast_horizon_week = (calib_p * 2) // 7
+forecast_horizon_day = forecast_horizon_week * 7
+forecast_horizon_day
+t = np.arange(forecast_horizon_day, dtype=np.int16) + 1
+
+tofp_array = tofp.collect().to_numpy()
+num_triers = tofp_array[:, 1]
+trial_weeks = tofp_array[:, 0]
+trial_days = np.arange(np.max(trial_weeks)*7, dtype=np.int16) + 1
+```
+
+## Analytical MLE
+
+```{python}
+def bgnbd_est(rfm_data, guess={'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}):
+    def log_likelihood(x):
+        r, alpha, a, b = x
+        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+
+        # Logarithm calculations with numerical stability
+        log_alpha = np.log(np.clip(alpha, 1e-10, None))  # Avoid log(0) by clipping to a small value
+        log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
+
+        # Components of the log-likelihood
+        D_1 = (
+            gammaln(r + p1x)
+            - gammaln(r)
+            + gammaln(a + b)
+            + gammaln(b + p1x)
+            - gammaln(b)
+            - gammaln(a + b + p1x)
+        )
+        D_2 = r * log_alpha - (r + p1x) * log_alpha_t_x
+        C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
+        C_4 = a / (b + p1x - 1)
+
+        # Handle cases where p1x > 0 and apply log to valid values
+        log_term = np.log(np.clip(C_3 + C_4, 1e-10, None))
+        result = D_1 + D_2 + np.where(p1x > 0, log_term, np.log(np.clip(C_3, 1e-10, None)))
+
+        return -np.sum(result)
+
+    # Bounds for the optimization
+    bnds = [(1e-6, np.inf) for _ in range(4)]
+
+    # Optimization using minimize
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 20000},
+    )
+
+result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, a, b = result.x
+ll = result.fun
+
+print(
+f"""r = {r:0.4f}
+α = {alpha:0.4f}
+a = {a:0.4f}
+b = {b:0.4f}
+Log-Likelihood = {-ll:0.4f}"""
+)
+```
+
+## Stan Model
+
+```{python}
+stan_code = '''
+data {
+  int<lower=0> N;             // Number of customers
+  array[N] int<lower=0> X;          // Number of transactions per customer
+  vector<lower=0>[N] T;       // Total observation time per customer
+  vector<lower=0>[N] t_x;     // Time of last transaction (0 if X=0)
+}
+
+parameters {
+  real<lower=0> r;            // Gamma shape for transaction rate (λ)
+  real<lower=0> alpha;        // Gamma scale for λ
+  real<lower=0> a;            // Beta shape 1 for dropout probability (p)
+  real<lower=0> b;            // Beta shape 2 for p
+}
+
+model {
+  // Weakly informative priors (adjust based on domain knowledge)
+  r ~ gamma(1, 0.1);
+  alpha ~ gamma(1, 0.1);
+  a ~ gamma(1, 0.1);
+  b ~ gamma(1, 0.1);
+
+  for (i in 1:N) {
+    if (X[i] == 0) {
+      // Likelihood for X=0: (alpha/(alpha + T[i]))^r
+      real log_term = r * (log(alpha) - log(alpha + T[i]));
+      target += log_term;
+    } else {
+      // Term 1: B(a, b + X[i])/B(a, b) * gamma(r + X[i])/gamma(r) * (alpha/(alpha + T[i]))^{r + X[i]}
+      real log_term1 = lbeta(a, b + X[i]) - lbeta(a, b)
+                      + lgamma(r + X[i]) - lgamma(r)
+                      + r * log(alpha) - (r + X[i]) * log(alpha + T[i]);
+
+      // Term 2: B(a + 1, b + X[i] - 1)/B(a, b) * gamma(r + X[i])/gamma(r) * (alpha/(alpha + t_x[i]))^{r + X[i]}
+      real log_term2 = lbeta(a + 1, b + X[i] - 1) - lbeta(a, b)
+                      + lgamma(r + X[i]) - lgamma(r)
+                      + r * log(alpha) - (r + X[i]) * log(alpha + t_x[i]);
+
+      // Sum both terms (log-space)
+      target += log_sum_exp(log_term1, log_term2);
+    }
+  }
+}
+'''
+
+d = rfm_data.select("P1X", "t_x", "T").collect()
+
+inits = {'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}
+
+data = {
+    'N': len(d),
+    'X': d.select('P1X').to_numpy().flatten().tolist(),
+    'T': d.select('T').to_numpy().flatten().tolist(),
+    't_x': d.select('t_x').to_numpy().flatten().tolist()
+}
+
+stan_model = StanQuap('stan_models/bg-nbd', stan_code, data=data, algorithm='LBFGS', jacobian=False, inits=inits)
+stan_model.opt_model.optimized_params_pd
+# samples = Stan('stan_models/bg-nbd', stan_code, force_compile=True).sample(data=data)
+# samples.summary()
 ```

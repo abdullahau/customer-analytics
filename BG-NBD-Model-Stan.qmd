@@ -43,87 +43,73 @@ jupyter:
 
 ### Imports
 
-Packages:
+#### Packages
 
 ```{python}
 import polars as pl
 import numpy as np
 from scipy.optimize import minimize
-from scipy.special import gammaln, hyp2f1, gamma, factorial
 from utils import CDNOW, Stan, StanQuap
-import altair as alt
 ```
 
-Data:
+#### Data
 
 ```{python}
 calib_p = 273 # 39 week calibration period
 
 data = CDNOW(master=False, calib_p=calib_p)
 
-rfm_data = data.rfm_summary()
-
-# Time of trial purchase (in weeks)
-tofp = data.time_to_trail_purch()
-
-# actual weekly & cumulative repeat sales data
-actual_repeat_sales = data.repeat_sales()
-
-forecast_horizon_week = (calib_p * 2) // 7
-forecast_horizon_day = forecast_horizon_week * 7
-forecast_horizon_day
-t = np.arange(forecast_horizon_day, dtype=np.int16) + 1
-
-tofp_array = tofp.collect().to_numpy()
-num_triers = tofp_array[:, 1]
-trial_weeks = tofp_array[:, 0]
-trial_days = np.arange(np.max(trial_weeks)*7, dtype=np.int16) + 1
+rfm_data = data.rfm_summary().select("P1X", "t_x", "T").collect().to_numpy()
+p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
 ```
 
 ## Analytical MLE
 
+### Standard SciPy Implementation
+
 ```{python}
-def bgnbd_est(rfm_data, guess={'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}):
-    def log_likelihood(x):
-        r, alpha, a, b = x
-        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+from scipy.special import gammaln, hyp2f1, gamma, factorial
 
-        # Logarithm calculations with numerical stability
-        log_alpha = np.log(np.clip(alpha, 1e-10, None))  # Avoid log(0) by clipping to a small value
-        log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
+def bgnbd_ll(x, p1x, t_x, T):
+    r, alpha, a, b = x
 
-        # Components of the log-likelihood
-        D_1 = (
-            gammaln(r + p1x)
-            - gammaln(r)
-            + gammaln(a + b)
-            + gammaln(b + p1x)
-            - gammaln(b)
-            - gammaln(a + b + p1x)
-        )
-        D_2 = r * log_alpha - (r + p1x) * log_alpha_t_x
-        C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
-        C_4 = a / (b + p1x - 1)
+    # Logarithm calculations with numerical stability
+    log_alpha = np.log(np.clip(alpha, 1e-10, None))  # Avoid log(0) by clipping to a small value
+    log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
 
-        # Handle cases where p1x > 0 and apply log to valid values
-        log_term = np.log(np.clip(C_3 + C_4, 1e-10, None))
-        result = D_1 + D_2 + np.where(p1x > 0, log_term, np.log(np.clip(C_3, 1e-10, None)))
+    # Components of the log-likelihood
+    D_1 = (
+        gammaln(r + p1x)
+        - gammaln(r)
+        + gammaln(a + b)
+        + gammaln(b + p1x)
+        - gammaln(b)
+        - gammaln(a + b + p1x)
+    )
+    D_2 = r * log_alpha - (r + p1x) * log_alpha_t_x
+    C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
+    C_4 = a / (b + p1x - 1)
 
-        return -np.sum(result)
+    # Handle cases where p1x > 0 and apply log to valid values
+    log_term = np.log(np.clip(C_3 + C_4, 1e-10, None))
+    result = D_1 + D_2 + np.where(p1x > 0, log_term, np.log(np.clip(C_3, 1e-10, None)))
 
+    return -np.sum(result)
+
+def bgnbd_est():
+    guess={'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}
     # Bounds for the optimization
     bnds = [(1e-6, np.inf) for _ in range(4)]
 
     # Optimization using minimize
     return minimize(
-        log_likelihood,
+        bgnbd_ll,
         x0=list(guess.values()),
-        bounds=bnds,
-        method="Nelder-Mead",
-        options={"maxiter": 20000},
+        method="BFGS",
+        args=(p1x, t_x, T)
     )
 
-result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+result = bgnbd_est()
 r, alpha, a, b = result.x
 ll = result.fun
 
@@ -133,6 +119,92 @@ f"""r = {r:0.4f}
 a = {a:0.4f}
 b = {b:0.4f}
 Log-Likelihood = {-ll:0.4f}"""
+)
+
+index = index=["r", "α", "a", "b"]
+params = result.x
+var_mat = result.hess_inv
+se = np.sqrt(np.diag(var_mat))
+plo = params - 1.96 * se
+phi = params + 1.96 * se
+pl.DataFrame(
+    {
+        "Parameter": index,
+        "Coef": params,
+        "SE (Coef)": se,
+        "5.5%": plo,
+        "94.5%": phi,
+    }
+)
+```
+
+### **Cameron Davidson-Pilon's `lifetimes`** Implementation
+
+Source: [BetaGeoFitter](https://github.com/CamDavidsonPilon/lifetimes/blob/master/lifetimes/fitters/beta_geo_fitter.py), [fit function](https://github.com/CamDavidsonPilon/lifetimes/blob/master/lifetimes/fitters/__init__.py)
+
+```{python}
+import autograd.numpy as np
+from autograd.scipy.special import gammaln, beta, gamma
+from autograd import value_and_grad, hessian
+
+def negative_log_likelihood(log_params, freq, rec, T):
+    params = np.exp(log_params)
+    r, alpha, a, b = params
+
+    A_1 = gammaln(r + freq) - gammaln(r) + r * np.log(alpha)
+    A_2 = gammaln(a + b) + gammaln(b + freq) - gammaln(b) - gammaln(a + b + freq)
+    A_3 = -(r + freq) * np.log(alpha + T)
+    A_4 = np.log(a) - np.log(b + np.maximum(freq, 1) - 1) - (r + freq) * np.log(rec + alpha)
+
+    max_A_3_A_4 = np.maximum(A_3, A_4)
+
+    ll = (A_1 + A_2 + np.log(np.exp(A_3 - max_A_3_A_4) + np.exp(A_4 - max_A_3_A_4) * (freq > 0)) + max_A_3_A_4)
+
+    return -ll.sum()
+
+def BetaGeoFitter(guess={'r': 0.1, 'alpha': 0.1, 'a': 0.0, 'b': 0.1}):
+    
+    # Bounds for the optimization
+    # bnds = [(1e-6, np.inf) for _ in range(4)]
+
+    # Optimization using minimize
+    return minimize(
+        value_and_grad(negative_log_likelihood),
+        jac=True,
+        method=None,
+        args=(p1x, t_x, T),
+        tol=1e-7, 
+        x0=list(guess.values()),
+        options={'disp': True}
+    )
+
+result = BetaGeoFitter()
+r, alpha, a, b = np.exp(result.x)
+ll = result.fun
+
+print(
+f"""r = {r:0.4f}
+α = {alpha:0.4f}
+a = {a:0.4f}
+b = {b:0.4f}
+Log-Likelihood = {-ll:0.4f}"""
+)
+
+index = index=["r", "α", "a", "b"]
+params = np.exp(result.x)
+hessian_mat = hessian(negative_log_likelihood)(result.x, p1x, t_x, T)
+var_mat = (params ** 2) * np.linalg.inv(hessian_mat) # Variance-Covariance Matrix
+se = np.sqrt(np.diag(var_mat))  # Standard Error
+plo = params - 1.96 * se
+phi = params + 1.96 * se
+pl.DataFrame(
+    {
+        "Parameter": index,
+        "Coef": params,
+        "SE (Coef)": se,
+        "5.5%": plo,
+        "94.5%": phi,
+    }
 )
 ```
 
@@ -197,6 +269,9 @@ data = {
 
 stan_model = StanQuap('stan_models/bg-nbd', stan_code, data=data, algorithm='LBFGS', jacobian=False, inits=inits)
 stan_model.opt_model.optimized_params_pd
-# samples = Stan('stan_models/bg-nbd', stan_code, force_compile=True).sample(data=data)
-# samples.summary()
+```
+
+```{python}
+theta_unc = stan_model.bs_model.param_unconstrain(stan_model.opt_model.optimized_params_np[1:])
+stan_model.bs_model.log_density_hessian(theta_unc, jacobian=False)
 ```

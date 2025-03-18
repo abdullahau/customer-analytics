@@ -1,4 +1,28 @@
 {
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnType": true,
+        "editor.formatOnSave": true
+    },
+    "editor.inlineSuggest.enabled": true,
+    "editor.lineHeight": 17,
+    "breadcrumbs.enabled": false,
+    "files.autoSave": "afterDelay",
+    "notebook.output.scrolling": true,
+    "jupyter.themeMatplotlibPlots": true,
+    "jupyter.widgetScriptSources": [
+        "unpkg.com",
+        "jsdelivr.com"
+    ],
+
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.fixAll": ["source.unusedImports"],
+    "editor.defaultFormatter": "charliermarsh.ruff",
+        
+    "python.defaultInterpreterPath": "/Users/rehabnaeem/Documents/Coding-Projects/.venv/bin/python3.13",
+    "marimo.pythonPath": "/Users/rehabnaeem/Documents/Coding-Projects/.venv/bin/python3.13",
+    "python-envs.defaultEnvManager": "ms-python.python:venv",
+    "python-envs.defaultPackageManager": "ms-python.python:pip",    
     "cSpell.words": [
         "absab",
         "barchart",

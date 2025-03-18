@@ -43,4 +43,6 @@ jupyter:
 
 ### Imports
 
-
+```{python}
+from utils import Stan, StanQuap
+```

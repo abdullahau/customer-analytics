@@ -103,10 +103,10 @@ class StanQuap(object):
         )
         return log_dens, gradient, hessian
 
-    def vcov_matrix(self, param_types=None, eps=1e-6):
+    def vcov_matrix(self, eps=1e-7):
         _, _, hessian_unc = self.log_density_hessian()
         vcov_unc = np.linalg.inv(-hessian_unc)
-        cov_matrix = self.transform_vcov(vcov_unc, param_types, eps)
+        cov_matrix = self.transform_vcov(vcov_unc, eps)
         return cov_matrix
 
     def laplace_sample(self, data: dict = None, draws: int = 100_000, opt_args=None):
@@ -200,28 +200,7 @@ class StanQuap(object):
             }
         return laplace_obj.draws()
 
-    def compute_jacobian_analytical(self, param_types):
-        """
-        Analytical computation of the Jacobian matrix for transforming
-        variance-covariance matrix from unconstrained to constrained space.
-        """
-        dim = len(self.params_unc)
-        J = np.zeros((dim, dim))  # Initialize Jacobian matrix
-
-        for i in range(dim):
-            if param_types[i] == "uncons":  # Unconstrained (Identity transformation)
-                J[i, i] = 1
-            elif param_types[i] == "pos_real":  # Positive real (Exp transformation)
-                J[i, i] = np.exp(self.params_unc[i])
-            elif param_types[i] == "prob":  # Probability (Logit transformation)
-                x = 1 / (1 + np.exp(-self.params_unc[i]))  # Sigmoid function
-                J[i, i] = x * (1 - x)
-            else:
-                raise ValueError(f"Unknown parameter type: {param_types[i]}")
-
-        return J
-
-    def compute_jacobian_numerical(self, eps=1e-6):
+    def compute_jacobian_numerical(self, eps=1e-7):
         """
         Analytical computation of the Jacobian matrix for transforming
         variance-covariance matrix from unconstrained to constrained space.
@@ -242,26 +221,22 @@ class StanQuap(object):
 
         return J
 
-    def transform_vcov(self, vcov_unc, param_types=None, eps=1e-6):
+    def transform_vcov(self, vcov_unc, eps=1e-7):
         """
         Transform the variance-covariance matrix from the unconstrained space to the constrained space.
         Args:
         - vcov_unc (np.array): variance-covariance matrix in the unconstrained space.
-        - param_types (list) [Required for analytical solution]: List of strings specifying the type of each parameter.
           Options: 'uncons' (unconstrained), 'pos_real' (positive real), 'prob' (0 to 1).
         - eps (float) [Required for numerical solution]: Small perturbation for numerical differentiation.
         Returns:
         - vcov_con (np.array): variance-covariance matrix in the constrained space.
         """
-        if param_types is None:
-            J = self.compute_jacobian_numerical(eps)
-        else:
-            J = self.compute_jacobian_analytical(param_types)
+        J = self.compute_jacobian_numerical(eps)
         vcov_con = J.T @ vcov_unc @ J
         return vcov_con
 
-    def precis(self, param_types=None, prob=0.89, eps=1e-6):
-        vcov_mat = self.vcov_matrix(param_types, eps)
+    def precis(self, prob=0.89, eps=1e-7):
+        vcov_mat = self.vcov_matrix(eps)
         pos_mu = np.array(self._flatten_dict_values(self.opt_params))
         pos_sigma = np.sqrt(np.diag(vcov_mat))
         plo = (1 - prob) / 2
@@ -316,6 +291,7 @@ def precis(samples, prob=0.89, index_name="Parameter", np_axis=0):
         }
     )
     return res.set_index(f"{index_name}")
+
 
 def bw_nrd0(x):
     """

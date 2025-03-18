@@ -256,22 +256,191 @@ model {
 }
 '''
 
-d = rfm_data.select("P1X", "t_x", "T").collect()
-
 inits = {'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}
 
 data = {
-    'N': len(d),
-    'X': d.select('P1X').to_numpy().flatten().tolist(),
-    'T': d.select('T').to_numpy().flatten().tolist(),
-    't_x': d.select('t_x').to_numpy().flatten().tolist()
+    'N': len(rfm_data),
+    'X': p1x.flatten().astype(int).tolist(),
+    'T': T.flatten().tolist(),
+    't_x': t_x.flatten().tolist()
 }
 
-stan_model = StanQuap('stan_models/bg-nbd', stan_code, data=data, algorithm='LBFGS', jacobian=False, inits=inits)
+stan_model = StanQuap('stan_models/bg-nbd', stan_code, data=data, algorithm='LBFGS', jacobian=False, inits=inits, tol_rel_grad=1e-7)
+stan_model.opt_model.optimized_params_pd
+stan_model.precis()
+```
+
+```{python}
+theta_unc = stan_model.bs_model.param_unconstrain(stan_model.opt_model.optimized_params_np[1:])
+stan_model.bs_model.log_density_hessian(theta_unc, jacobian=False)
+```
+
+```{python}
+stan_code = '''
+data {
+  int<lower=0> N;                 // Number of customers
+  array[N] int<lower=0> X;        // Number of transactions per customer
+  vector[N] T;                    // Total time observed per customer
+  vector[N] Tx;                   // Time of last purchase
+}
+
+parameters {
+  real<lower=0> alpha;      // Purchase rate (Poisson process)
+  real<lower=0> r;          // Shape parameter of Gamma for lambda
+  real<lower=0> a;          // Beta-Geometric parameter (shape a)
+  real<lower=0> b;          // Beta-Geometric parameter (shape b)
+}
+
+model {
+  // Priors
+  alpha ~ gamma(1, 0.1);   // Prior for lambda scale
+  r ~ gamma(1, 0.1);        // Prior for r
+  a ~ gamma(1, 0.1);    // Prior for a
+  b ~ gamma(1, 0.1);    // Prior for b
+
+  for (n in 1:N) {
+    real x = X[n];
+    real tx = Tx[n];
+    real t = T[n];
+
+    if (x > 0) {
+      real d1 = lgamma(r + x) - lgamma(r) + lgamma(a + b) + lgamma(b + x) - lgamma(b) - lgamma(a + b + x);
+      real d2 = r * log(alpha) - (r + x) * log(alpha + tx);
+      real c3 = pow((alpha + tx) / (alpha + t), r + x);
+      real c4 = a / (b + x - 1);
+
+      target += d1 + d2 + log(c3 + c4);
+    } else {
+      real d1 = lgamma(r + x) - lgamma(r) + lgamma(a + b) + lgamma(b + x) - lgamma(b) - lgamma(a + b + x);
+      real d2 = r * log(alpha) - (r + x) * log(alpha + tx);
+      real c3 = pow((alpha + tx) / (alpha + t), r + x);
+
+      target += d1 + d2 + log(c3);
+    }
+  }
+}
+'''
+inits = {'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}
+
+data = {
+    'N': len(rfm_data),
+    'X': p1x.flatten().astype(int).tolist(),
+    'T': T.flatten().tolist(),
+    'Tx': t_x.flatten().tolist()
+}
+
+stan_model = StanQuap('stan_models/bg-nbd-1', stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, inits=inits)
+stan_model.precis(eps=1e-7)
+```
+
+```{python}
+stan_model.opt_model.optimized_params_pd
+```
+
+```{python}
+stan_code = '''
+data {
+  int<lower=0> N;               // Number of customers
+  array[N] int<lower=0> X;      // Number of transactions per customer
+  vector[N] T;                  // Total time observed per customer
+  vector[N] Tx;                 // Time of last purchase
+}
+
+parameters {
+  real log_r;
+  real log_alpha;
+  real log_a;
+  real log_b;
+}
+
+transformed parameters {
+  real<lower=0> r = exp(log_r);
+  real<lower=0> alpha = exp(log_alpha);
+  real<lower=0> a = exp(log_a);
+  real<lower=0> b = exp(log_b);
+}
+
+model {
+  // Weakly informative priors in log-space for numerical stability
+  log_r ~ normal(0, 2);
+  log_alpha ~ normal(0, 2);
+  log_a ~ normal(0, 2);
+  log_b ~ normal(0, 2);
+
+  for (n in 1:N) {
+    real x = X[n];
+    real tx = Tx[n];
+    real t = T[n];
+
+    if (x > 0) {
+      real d1 = lgamma(r + x) - lgamma(r);
+      real d2 = lgamma(a + b) + lgamma(b + x) - lgamma(b) - lgamma(a + b + x);
+      real d3 = r * log(alpha) - (r + x) * log(alpha + tx);
+      real c3 = (alpha + tx) / (alpha + t);
+      real c4 = a / (b + x - 1);
+
+      // Log-Sum-Exp for numerical stability
+      real max_term = fmax(log(c3), log(c4));
+      target += d1 + d2 + d3 + log_sum_exp(log(c3) - max_term, log(c4) - max_term) + max_term;
+    } 
+    else {
+      real d1 = r * log(alpha) - r * log(alpha + t);
+      target += d1;
+    }
+  }
+}
+'''
+data = {
+    'N': len(rfm_data),
+    'X': p1x.flatten().astype(int).tolist(),
+    'T': T.flatten().tolist(),
+    'Tx': t_x.flatten().tolist()
+}
+
+stan_model = StanQuap('stan_models/bg-nbd-2', stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, generated_var=['r', 'alpha', 'a', 'b'])
+np.exp(stan_model.precis(eps=1e-7))
+```
+
+```{python}
 stan_model.opt_model.optimized_params_pd
 ```
 
 ```{python}
 theta_unc = stan_model.bs_model.param_unconstrain(stan_model.opt_model.optimized_params_np[1:])
 stan_model.bs_model.log_density_hessian(theta_unc, jacobian=False)
+```
+
+```{python}
+def bgnbd_ll(x, p1x, t_x, T):
+    r, alpha, a, b = x
+
+    # Logarithm calculations with numerical stability
+    log_alpha = np.log(np.clip(alpha, 1e-10, None))  # Avoid log(0) by clipping to a small value
+    log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
+
+    # Components of the log-likelihood
+    D_1 = (
+        gammaln(r + p1x)
+        - gammaln(r)
+        + gammaln(a + b)
+        + gammaln(b + p1x)
+        - gammaln(b)
+        - gammaln(a + b + p1x)
+    )
+    D_2 = r * log_alpha - (r + p1x) * log_alpha_t_x
+    C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
+    C_4 = a / (b + p1x - 1)
+
+    # Handle cases where p1x > 0 and apply log to valid values
+    log_term = np.log(np.clip(C_3 + C_4, 1e-10, None))
+    result = D_1 + D_2 + np.where(p1x > 0, log_term, np.log(np.clip(C_3, 1e-10, None)))
+
+    return -np.sum(result)
+
+x = [stan_model.opt_model.optimized_params_pd['r'][0], 
+ stan_model.opt_model.optimized_params_pd['alpha'][0], 
+stan_model.opt_model.optimized_params_pd['a'][0],
+stan_model.opt_model.optimized_params_pd['b'][0]]
+
+bgnbd_ll(x, p1x, t_x, T)
 ```

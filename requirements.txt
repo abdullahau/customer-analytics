@@ -1,3 +1,6 @@
+stan
+bridgestan
+xarray
 altair
 great-tables
 ipykernel

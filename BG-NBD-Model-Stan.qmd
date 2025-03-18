@@ -1,0 +1,46 @@
+---
+title: BG/NBD Model - Stan Implementation
+author: Abdullah Mahmood
+date: last-modified
+format:
+  html:
+    theme: cosmo
+    highlight-style: atom-one
+    mainfont: Palatino
+    fontcolor: black
+    monobackgroundcolor: white
+    monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+    fontsize: 13pt
+    linestretch: 1.4
+    number-sections: true
+    number-depth: 4
+    toc: true
+    toc-location: right
+    toc-depth: 4
+    code-fold: false
+    code-copy: true
+    cap-location: bottom
+    format-links: false
+    embed-resources: true
+    anchor-sections: true
+    html-math-method:
+      method: mathjax
+      url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+editor: source
+jupyter:
+  jupytext:
+    formats: ipynb,qmd
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+      jupytext_version: 1.16.7
+  kernelspec:
+    display_name: main
+    language: python
+    name: main
+---
+
+### Imports
+
+

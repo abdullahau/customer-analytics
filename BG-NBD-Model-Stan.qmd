@@ -41,6 +41,8 @@ jupyter:
     name: main
 ---
 
+In this notebook we show how to fit a BG/NBD model in Stan. We compare the results with the [`lifetimes`](https://github.com/CamDavidsonPilon/lifetimes) package. The model is presented in the paper: Fader, P. S., Hardie, B. G., & Lee, K. L. (2005). [“Counting your customers” the easy way: An alternative to the Pareto/NBD model. Marketing science, 24(2), 275-284.](http://www.brucehardie.com/papers/bgnbd_2004-04-20.pdf)
+
 ### Imports
 
 #### Packages
@@ -50,6 +52,7 @@ import polars as pl
 import numpy as np
 from scipy.optimize import minimize
 from utils import CDNOW, Stan, StanQuap
+import arviz as az
 ```
 
 #### Data
@@ -62,6 +65,44 @@ data = CDNOW(master=False, calib_p=calib_p)
 rfm_data = data.rfm_summary().select("P1X", "t_x", "T").collect().to_numpy()
 p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
 ```
+
+Recall from the paper the following definitions:
+
+-   `p1x` represents the number of repeat purchases the customer has made. This means that it’s one less than the total number of purchases. This is actually slightly wrong. It’s the count of time periods the customer had a purchase in. So if using days as units, then it’s the count of days the customer had a purchase on.
+-   `T` represents the age of the customer in whatever time units chosen (weekly, in the above dataset). This is equal to the duration between a customer’s first purchase and the end of the period under study.
+-   `t_x` represents the age of the customer when they made their most recent purchases. This is equal to the duration between a customer’s first purchase and their latest purchase. (Thus if they have made only 1 purchase, the recency is 0.)
+
+## Model Specification
+
+The BG/NBD model is a probabilistic model that describes the buying behavior of a customer in the non-contractual setting. It is based on the following assumptions for each customer:
+
+### Frequency Process
+
+1.  While active, the time between transactions is distributed exponential with transaction rate, i.e.
+
+$$
+f(t_{j} \mid t_{j-1}; \lambda) = \lambda \exp(-\lambda (t_{j} - t_{j - 1})), \quad t_{j} \geq t_{j - 1} \geq 0
+$$
+
+2.  Heterogeneity in $\lambda$ follows a gamma distribution with pdf
+
+$$
+f(\lambda \mid r, \alpha) = \frac{\alpha^{r}\lambda^{r - 1}\exp(-\lambda \alpha)}{\Gamma(r)}, \quad \\lambda  > 0
+$$
+
+### Dropout Process
+
+3.  After any transaction, a customer becomes inactive with probability $p$.
+
+4.  Heterogeneity in $p$ follows a beta distribution with pdf
+
+$$
+f(p \mid a, b) = \frac{\Gamma(a + b)}{\Gamma(a) \Gamma(b)} p^{a - 1}(1 - p)^{b - 1}, \quad 0 \leq p \leq 1
+$$
+
+5.  The transaction rate $\lambda$ and the dropout probability $p$ vary independently across customers.
+
+Instead of estimating $\lambda$ and $p$ for each specific customer, we do it for a randomly chosen customer, i.e. we work with the expected values of the parameters. Hence, we are interesting in finding the posterior distribution of the parameters $r$, $\alpha$, $a$, and $b$.
 
 ## Analytical MLE
 
@@ -211,13 +252,15 @@ pl.DataFrame(
 
 ## Stan Model
 
+### Parameters as per Peter Fader & Bruce Hardie
+
 ```{python}
 stan_code = '''
 data {
-    int<lower=0> N;                // Number of customers
-    array[N] int<lower=0> X;       // Number of transactions per customer
-    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)  
-    vector<lower=0>[N] T;          // Total observation time per customer (Time Since first trial)
+    int<lower=0> N;               // Number of customers
+    array[N] int<lower=0> X;      // Number of transactions per customer
+    vector<lower=0>[N] T;         // Total observation time per customer
+    vector<lower=0>[N] Tx;        // Time of last transaction (0 if X=0)
 }
 
 parameters {
@@ -228,45 +271,45 @@ parameters {
 }
 
 model {
-  // Weakly informative priors
-  r ~ weibull(2, 1);
-  alpha ~ weibull(2, 10);
-  a ~ uniform(0, 5);
-  b ~ uniform(0, 5);
+    // Weakly informative priors on log parameters
+    r ~ weibull(2, 1);
+    alpha ~ weibull(2, 10);
+    a ~ uniform(0, 5);
+    b ~ uniform(0, 5);
 
-  for (n in 1:N) {
-    int x = X[n];
-    real tx = Tx[n];
-    real t = T[n];
-
-    if (x == 0) {
-      // Likelihood for X=0: (alpha/(alpha + t))^r
-      target += r * (log(alpha) - log(alpha + t));
-    } else {
-      // Term 1: B(a, b + x)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + t))^(r + x)
-      real beta_term1 = lbeta(a, b + x) - lbeta(a, b);
-      real gamma_term = lgamma(r + x) - lgamma(r);
-      real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
-
-      // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
-      real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
-      real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
-
-      // Log-sum-exp for numerical stability
-      target += log_sum_exp(term1, term2);
+    for (n in 1:N) {
+        int x = X[n];
+        real tx = Tx[n];
+        real t = T[n];
+    
+        if (x == 0) {
+              // Likelihood for X=0: (alpha/(alpha + t))^r
+              target += r * (log(alpha) - log(alpha + t));
+        } else {
+              // Term 1: B(a, b + x)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + t))^(r + x)
+              real beta_term1 = lbeta(a, b + x) - lbeta(a, b);
+              real gamma_term = lgamma(r + x) - lgamma(r);
+              real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
+            
+              // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
+              real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
+              real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
+            
+              // Log-sum-exp for numerical stability
+              target += log_sum_exp(term1, term2);
+        }
     }
-  }
 }
 '''
+
 data = {
-    'N': len(rfm_data),
+    'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
-    't_x': t_x.flatten().tolist(),
-    'T': T.flatten().tolist()
+    'T': T.flatten().tolist(),
+    'Tx': t_x.flatten().tolist()
 }
 
-stan_model = StanQuap('stan_models/bg-nbd', stan_code, data=data, algorithm='BFGS', jacobian=False, tol_rel_grad=1e-7)
-stan_model.precis(eps=1e-6)
+stan_model = StanQuap(stan_file='stan_models/bg-nbd', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000)
 
 index = index=["r", "α", "a", "b"]
 params = np.array(list(stan_model.opt_model.stan_variables().values()))
@@ -286,24 +329,129 @@ pl.DataFrame(
 ```
 
 ```{python}
-stan_model.precis(eps=1e-6)
-stan_model.opt_model.optimized_params_pd
+x = [stan_model.opt_model.optimized_params_pd['r'][0],
+     stan_model.opt_model.optimized_params_pd['alpha'][0],
+     stan_model.opt_model.optimized_params_pd['a'][0],
+     stan_model.opt_model.optimized_params_pd['b'][0]]
+
+print("Log-Likelihood:")
+print(bgnbd_ll(x, p1x, t_x, T))
+# print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
+```
+
+### Modified Parameters
+
+```{python}
+stan_code = '''
+data {
+    int<lower=0> N;               // Number of customers
+    array[N] int<lower=0> X;      // Number of transactions per customer
+    vector<lower=0>[N] T;         // Total observation time per customer
+    vector<lower=0>[N] Tx;        // Time of last transaction (0 if X=0)
+}
+
+parameters {
+    real<lower=0> r;                         // Shape parameter for the Gamma prior on purchase rate
+    real<lower=0> alpha;                     // Scale parameter for purchase rate
+    real<lower=0, upper=1> phi_dropout;      // Mixture weight for dropout process (Uniform prior)
+    real<lower=1> kappa_dropout;             // Scale parameter for dropout (Pareto prior)
+}
+
+transformed parameters {
+    real a = phi_dropout * kappa_dropout;       // Dropout shape parameter (controls early dropout likelihood)
+    real b = (1 - phi_dropout) * kappa_dropout; // Dropout scale parameter (controls later dropout likelihood)
+}
+
+model {
+    // Priors:
+    r ~ weibull(2, 1);                // Prior on r (purchase rate shape parameter)
+    alpha ~ weibull(2, 10);           // Prior on alpha (purchase rate scale parameter)
+    phi_dropout ~ uniform(0,1);       // Mixture component for dropout process
+    kappa_dropout ~ pareto(1,1);      // Scale of dropout process
+
+    for (n in 1:N) {
+        int x = X[n];                 // Number of transactions for customer n
+        real tx = Tx[n];              // Time of last transaction
+        real t = T[n];                // Total observation time
+
+        if (x == 0) {
+            // Likelihood for customers with zero transactions:
+            // Probability of no purchases during (0, T): (alpha/(alpha + t))^r
+            // Likelihood for X=0: (alpha/(alpha + t))^r
+            target += r * (log(alpha) - log(alpha + t));
+        } else {
+            // Term 1: Probability of surviving until T and making x purchases
+            // Term 1: B(a, b + x)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + t))^(r + x)
+            real beta_term1 = lbeta(a, b + x) - lbeta(a, b);  // Beta function term
+            real gamma_term = lgamma(r + x) - lgamma(r);       // Gamma function term
+            real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
+            
+            // Term 2: Probability of surviving until Tx, then dropping out
+            // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
+            real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
+            real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
+            
+            // Log-sum-exp for numerical stability
+            target += log_sum_exp(term1, term2);
+        }
+    }
+}
+'''
+
+data = {
+    'N': len(p1x),
+    'X': p1x.flatten().astype(int).tolist(),
+    'T': T.flatten().tolist(),
+    'Tx': t_x.flatten().tolist()
+}
+
+stan_model = StanQuap(stan_file='stan_models/bg-nbd-1', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000, generated_var=['a', 'b'])
+
+index = index=["r", "α", 'phi', 'kappa', "a", "b"]
+params = np.array(list(stan_model.opt_model.stan_variables().values()))
+var_mat = var_mar = stan_model.vcov_matrix() # Variance-Covariance Matrix
+se = np.sqrt(np.diag(var_mat))  # Standard Error
+se =  np.concatenate((se, np.array([se[-2] * se[-1] , (1 - se[-2]) * se[-1]])))
+plo = params - 1.96 * se
+phi = params + 1.96 * se
+pl.DataFrame(
+    {
+        "Parameter": index,
+        "Coef": params,
+        "SE (Coef)": se,
+        "5.5%": plo,
+        "94.5%": phi,
+    }
+)
 ```
 
 ```{python}
-x = [stan_model.opt_model.optimized_params_pd['r'][0], 
- stan_model.opt_model.optimized_params_pd['alpha'][0], 
-stan_model.opt_model.optimized_params_pd['a'][0],
-stan_model.opt_model.optimized_params_pd['b'][0]]
+x = [stan_model.opt_model.optimized_params_pd['r'][0],
+     stan_model.opt_model.optimized_params_pd['alpha'][0],
+     stan_model.opt_model.optimized_params_pd['a'][0],
+     stan_model.opt_model.optimized_params_pd['b'][0]]
 
-bgnbd_ll(x, p1x, t_x, T)
+print("Log-Likelihood:")
+print(bgnbd_ll(x, p1x, t_x, T))
+# print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
+```
+
+### MCMC Model Fitting
+
+```{python}
+mcmc = stan_model.stan_model.sample(data=data)
+mcmc.summary()
 ```
 
 ```{python}
-x = np.array([stan_model.opt_model.optimized_params_pd['r'][0], 
- stan_model.opt_model.optimized_params_pd['alpha'][0], 
-stan_model.opt_model.optimized_params_pd['a'][0],
-stan_model.opt_model.optimized_params_pd['b'][0]])
+mcmc.diagnose()
+```
 
-negative_log_likelihood(np.log(x), p1x, t_x, T)
+```{python}
+inf_data = az.from_cmdstanpy(mcmc)
+az.plot_trace(inf_data);
+```
+
+```{python}
+az.plot_posterior(inf_data, var_names=['r', 'alpha', 'a', 'b'], color="C0");
 ```

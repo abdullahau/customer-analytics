@@ -46,15 +46,31 @@ model {
 }
 
 generated quantities {
-    vector[N] log_lik;
-    
+    array[N] int X_rep;
+    vector[N] Tx_rep;
+
     for (n in 1:N) {
-        if (X[n] == 0) {
-            log_lik[n] = r * (log(alpha) - log(alpha + T[n]));
-        } else {
-            log_lik[n] = (lgamma(r + X[n]) - lgamma(r)) 
-                         + (lbeta(a, b + X[n]) - lbeta(a, b))
-                         + r * log(alpha) - (r + X[n]) * log(alpha + T[n]);
+        real lambda_n = gamma_rng(r, alpha);
+        real p_n = beta_rng(a, b);
+        real current_time = 0;
+        int x = 0;
+        real tx = 0;
+        int active = 1;
+
+        while (active && current_time < T[n]) {
+            real wait = exponential_rng(lambda_n);
+            if (current_time + wait > T[n]) {
+                break;
+            } else {
+                current_time += wait;
+                x += 1;
+                tx = current_time;
+                if (bernoulli_rng(p_n)) {
+                    active = 0;
+                }
+            }
         }
+        X_rep[n] = x;
+        Tx_rep[n] = tx;
     }
 }

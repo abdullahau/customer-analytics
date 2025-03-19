@@ -12,12 +12,10 @@ format:
     monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
     fontsize: 13pt
     linestretch: 1.4
-    number-sections: true
-    number-depth: 4
     toc: true
     toc-location: right
     toc-depth: 4
-    code-fold: false
+    code-fold: true
     code-copy: true
     cap-location: bottom
     format-links: false
@@ -48,20 +46,22 @@ In this notebook we show how to fit a BG/NBD model in Stan. We compare the resul
 #### Packages
 
 ```{python}
+from utils import CDNOW, Stan, StanQuap
+from scipy.optimize import minimize
+import arviz as az
 import polars as pl
 import numpy as np
-from scipy.optimize import minimize
-from utils import CDNOW, Stan, StanQuap
-import arviz as az
+
+
+import matplotlib.pyplot as plt
+%config InlineBackend.figure_formats = ['svg']
 ```
 
 #### Data
 
 ```{python}
-calib_p = 273 # 39 week calibration period
-
-data = CDNOW(master=False, calib_p=calib_p)
-
+# | code-fold: false
+data = CDNOW(master=False, calib_p=273) # 39 week calibration period
 rfm_data = data.rfm_summary().select("P1X", "t_x", "T").collect().to_numpy()
 p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
 ```
@@ -164,15 +164,15 @@ Log-Likelihood = {-ll:0.4f}"""
 )
 
 index = index=["r", "α", "a", "b"]
-params = result.x
+scipy_params = result.x
 var_mat = result.hess_inv
 se = np.sqrt(np.diag(var_mat))
-plo = params - 1.96 * se
-phi = params + 1.96 * se
+plo = scipy_params - 1.96 * se
+phi = scipy_params + 1.96 * se
 pl.DataFrame(
     {
         "Parameter": index,
-        "Coef": params,
+        "Coef": scipy_params,
         "SE (Coef)": se,
         "5.5%": plo,
         "94.5%": phi,
@@ -233,16 +233,16 @@ Log-Likelihood = {-ll:0.4f}"""
 )
 
 index = index=["r", "α", "a", "b"]
-params = np.exp(result.x)
+lifetimes_params = np.exp(result.x)
 hessian_mat = hessian(negative_log_likelihood)(result.x, p1x, t_x, T)
-var_mat = (params ** 2) * np.linalg.inv(hessian_mat) # Variance-Covariance Matrix
+var_mat = (lifetimes_params ** 2) * np.linalg.inv(hessian_mat) # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
-plo = params - 1.96 * se
-phi = params + 1.96 * se
+plo = lifetimes_params - 1.96 * se
+phi = lifetimes_params + 1.96 * se
 pl.DataFrame(
     {
         "Parameter": index,
-        "Coef": params,
+        "Coef": lifetimes_params,
         "SE (Coef)": se,
         "5.5%": plo,
         "94.5%": phi,
@@ -252,9 +252,10 @@ pl.DataFrame(
 
 ## Stan Model
 
-### Parameters as per Peter Fader & Bruce Hardie
+### Standard Parameters
 
 ```{python}
+# | code-fold: false
 stan_code = '''
 data {
     int<lower=0> N;               // Number of customers
@@ -301,7 +302,9 @@ model {
     }
 }
 '''
+```
 
+```{python}
 data = {
     'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
@@ -334,14 +337,14 @@ x = [stan_model.opt_model.optimized_params_pd['r'][0],
      stan_model.opt_model.optimized_params_pd['a'][0],
      stan_model.opt_model.optimized_params_pd['b'][0]]
 
-print("Log-Likelihood:")
-print(bgnbd_ll(x, p1x, t_x, T))
+print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
 # print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
 ```
 
 ### Modified Parameters
 
 ```{python}
+# | code-fold: false
 stan_code = '''
 data {
     int<lower=0> N;               // Number of customers
@@ -397,7 +400,9 @@ model {
     }
 }
 '''
+```
 
+```{python}
 data = {
     'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
@@ -408,16 +413,16 @@ data = {
 stan_model = StanQuap(stan_file='stan_models/bg-nbd-1', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000, generated_var=['a', 'b'])
 
 index = index=["r", "α", 'phi', 'kappa', "a", "b"]
-params = np.array(list(stan_model.opt_model.stan_variables().values()))
+MAP_params = np.array(list(stan_model.opt_model.stan_variables().values()))
 var_mat = var_mar = stan_model.vcov_matrix() # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
 se =  np.concatenate((se, np.array([se[-2] * se[-1] , (1 - se[-2]) * se[-1]])))
-plo = params - 1.96 * se
-phi = params + 1.96 * se
+plo = MAP_params - 1.96 * se
+phi = MAP_params + 1.96 * se
 pl.DataFrame(
     {
         "Parameter": index,
-        "Coef": params,
+        "Coef": MAP_params,
         "SE (Coef)": se,
         "5.5%": plo,
         "94.5%": phi,
@@ -431,27 +436,68 @@ x = [stan_model.opt_model.optimized_params_pd['r'][0],
      stan_model.opt_model.optimized_params_pd['a'][0],
      stan_model.opt_model.optimized_params_pd['b'][0]]
 
-print("Log-Likelihood:")
-print(bgnbd_ll(x, p1x, t_x, T))
+print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
 # print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
 ```
 
 ### MCMC Model Fitting
 
 ```{python}
+# | code-fold: false
 mcmc = stan_model.stan_model.sample(data=data)
+inf_data = az.from_cmdstanpy(mcmc)
+print(mcmc.diagnose())
+```
+
+#### Model Summary
+
+```{python}
 mcmc.summary()
 ```
 
-```{python}
-mcmc.diagnose()
-```
+#### Model Trace Plot
 
 ```{python}
-inf_data = az.from_cmdstanpy(mcmc)
-az.plot_trace(inf_data);
+axes = az.plot_trace(
+    data=inf_data,
+    compact=True,
+    kind="rank_bars",
+    backend_kwargs={"figsize": (12, 9), "layout": "constrained"},
+)
+plt.gcf().suptitle("BG/NBD Model Trace", fontsize=18, fontweight="bold")
+plt.tight_layout();
 ```
 
+#### Model Posterior Plot
+
 ```{python}
-az.plot_posterior(inf_data, var_names=['r', 'alpha', 'a', 'b'], color="C0");
+fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharex=False, sharey=False)
+
+axes = axes.flatten()
+
+for i, var_name in enumerate(["r", "alpha", "a", "b"]):
+    ax = axes[i]
+    az.plot_posterior(
+        inf_data.posterior[var_name].values.flatten(),
+        color="C0",
+        point_estimate="mean",
+        ax=ax,
+        label="MCMC",
+    )
+    ax.axvline(x=stan_model.opt_model.stan_variable(var_name), color="C1", linestyle="--", label="Stan MAP")
+    ax.axvline(x=lifetimes_params[i], color="C2", linestyle="--", label="Lifetimes")
+    ax.axvline(x=scipy_params[i], color="C3", linestyle="--", label="SciPy")
+    ax.legend(loc="upper right")
+    ax.set_title(var_name)
+
+plt.gcf().suptitle("BG/NBD Model Parameters", fontsize=18, fontweight="bold")
+plt.tight_layout();
 ```
+
+The `r` and `alpha` purchase rate parameters are quite similar for all three models, but the `a` and `b` dropout parameters are better approximated with the `phi_dropout` and `kappa_dropout` parameters when fitted with MCMC.
+
+## Prior and Posterior Predictive Checks
+
+PPCs allow us to check the efficacy of our priors, and the performance of the fitted posteriors.
+
+Let’s see how the model performs in a prior predictive check, where we sample from the default priors before fitting the model:

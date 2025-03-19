@@ -571,10 +571,10 @@ actual_freq_sel = actual_freq[:10]
 actual_freq_sel[-1] = np.sum(actual_freq[9:])
 
 plt.clf()
-plt.bar(np.arange(10)+0.2, freq_counts / freq_counts.sum(), width=0.4, label='Estimated')
-plt.bar(np.arange(10)-0.2, actual_freq_sel / actual_freq_sel.sum(), 0.4, label='Observed')
-plt.xlabel("Number of Purchases (0-9+)")
-plt.ylabel("Percentage of Customers")
+plt.bar(np.arange(10)+0.2, freq_counts / freq_counts.sum(), width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5)
+plt.bar(np.arange(10)-0.2, actual_freq_sel / actual_freq_sel.sum(), 0.4, label='Observed', color='black')
+plt.xlabel("Number of Repeat Purchases (0-9+)")
+plt.ylabel("% of Customer Population")
 plt.title("Prior Predictive Check: Customer Purchase Frequency")
 plt.xticks(ticks=np.arange(10), labels=[f'{i}' if i < 9 else '9+' for i in range(10)])
 plt.legend();

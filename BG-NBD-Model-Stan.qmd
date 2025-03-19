@@ -256,6 +256,8 @@ pl.DataFrame(
 
 ```{python}
 # | code-fold: false
+import numpy as np
+
 stan_code = '''
 data {
     int<lower=0> N;               // Number of customers
@@ -500,4 +502,178 @@ The `r` and `alpha` purchase rate parameters are quite similar for all three mod
 
 PPCs allow us to check the efficacy of our priors, and the performance of the fitted posteriors.
 
+### Prior Predictive Check
+
 Let’s see how the model performs in a prior predictive check, where we sample from the default priors before fitting the model:
+
+```{python}
+stan_prior_code = '''
+data {
+    int<lower=0> N;               // Number of customers
+    vector<lower=0>[N] T;         // Total observation time per customer
+}
+
+parameters {
+    real<lower=0> r;                        
+    real<lower=0> alpha;                    
+    real<lower=0, upper=1> phi_dropout;     
+    real<lower=1> kappa_dropout;            
+}
+
+transformed parameters {
+    real a = phi_dropout * kappa_dropout;
+    real b = (1 - phi_dropout) * kappa_dropout; 
+}
+
+model {
+    // Priors 
+    r ~ weibull(2, 1);
+    alpha ~ weibull(2, 10);
+    phi_dropout ~ uniform(0,1);
+    kappa_dropout ~ pareto(1,1);   
+}
+
+generated quantities {
+    array[N] int X_pred;  // Simulated purchase counts
+    array[10] int frequency_counts = rep_array(0, 10); // Histogram of purchase counts
+
+    for (n in 1:N) {
+        real p_active = beta_rng(a, b);   // Sample from Beta(a, b)
+        real lambda = gamma_rng(r, alpha); // Sample purchase rate from Gamma(r, alpha)
+        int purchases = poisson_rng(lambda * T[n]) * bernoulli_rng(p_active);
+        X_pred[n] = purchases;
+
+        // Aggregate counts for plotting
+        if (purchases < 10) {
+            frequency_counts[purchases + 1] += 1;  // Convert to 1-based index
+        } else {
+            frequency_counts[10] += 1;  // Bucket for 9+
+        }
+    }
+}
+'''
+```
+
+```{python}
+data = {
+    'N': len(p1x),
+    'T': T.flatten().tolist(),
+}
+
+stan_model = Stan(stan_file='stan_models/bg-nbd-prior', stan_code=stan_prior_code)
+prior_preds = stan_model.sample(data=data)
+freq_counts = np.nanmean(prior_preds.stan_variables()['frequency_counts'], axis=0)
+```
+
+```{python}
+actual_freq = np.unique_counts(p1x).counts
+actual_freq_sel = actual_freq[:10] 
+actual_freq_sel[-1] = np.sum(actual_freq[9:])
+
+plt.clf()
+plt.bar(np.arange(10)+0.2, freq_counts / freq_counts.sum(), width=0.4, label='Estimated')
+plt.bar(np.arange(10)-0.2, actual_freq_sel / actual_freq_sel.sum(), 0.4, label='Observed')
+plt.xlabel("Number of Purchases (0-9+)")
+plt.ylabel("Percentage of Customers")
+plt.title("Prior Predictive Check: Customer Purchase Frequency")
+plt.xticks(ticks=np.arange(10), labels=[f'{i}' if i < 9 else '9+' for i in range(10)])
+plt.legend();
+```
+
+### Posterior Predictive Check
+
+```{python}
+stan_post_code = '''
+data {
+    int<lower=0> N;               
+    array[N] int<lower=0> X;      
+    vector<lower=0>[N] T;         
+    vector<lower=0>[N] Tx;        
+}
+
+parameters {
+    real<lower=0> r;                         
+    real<lower=0> alpha;                     
+    real<lower=0, upper=1> phi_dropout;      
+    real<lower=1> kappa_dropout;             
+}
+
+transformed parameters {
+    real a = phi_dropout * kappa_dropout;       
+    real b = (1 - phi_dropout) * kappa_dropout; 
+}
+
+model {
+    // Priors:
+    r ~ weibull(2, 1);                
+    alpha ~ weibull(2, 10);           
+    phi_dropout ~ uniform(0,1);       
+    kappa_dropout ~ pareto(1,1);      
+
+    for (n in 1:N) {
+        int x = X[n];                 
+        real tx = Tx[n];              
+        real t = T[n];                
+
+        if (x == 0) {
+            target += r * (log(alpha) - log(alpha + t));
+        } else {
+            real beta_term1 = lbeta(a, b + x) - lbeta(a, b);  
+            real gamma_term = lgamma(r + x) - lgamma(r);       
+            real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
+            
+            real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
+            real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
+            
+            target += log_sum_exp(term1, term2);
+        }
+    }
+}
+
+generated quantities {
+    vector[N] log_lik;
+    
+    for (n in 1:N) {
+        if (X[n] == 0) {
+            log_lik[n] = r * (log(alpha) - log(alpha + T[n]));
+        } else {
+            log_lik[n] = (lgamma(r + X[n]) - lgamma(r)) 
+                         + (lbeta(a, b + X[n]) - lbeta(a, b))
+                         + r * log(alpha) - (r + X[n]) * log(alpha + T[n]);
+        }
+    }
+}
+'''
+```
+
+```{python}
+data = {
+    'N': len(p1x),
+    'X': p1x.flatten().astype(int).tolist(),
+    'T': T.flatten().tolist(),
+    'Tx': t_x.flatten().tolist()
+}
+
+stan_model = Stan(stan_file='stan_models/bg-nbd-post', stan_code=stan_post_code)
+post_preds = stan_model.sample(data=data)
+```
+
+```{python}
+# posterior = az.from_cmdstanpy(post_preds, posterior_predictive=['X_rep'])
+# X_rep = posterior.posterior_predictive["X_rep"]
+
+# post_freq = np.unique_counts(X_rep.to_numpy().flatten()).counts
+# post_freq_sel = post_freq[:10] 
+# post_freq_sel[-1] = np.sum(post_freq[9:])
+```
+
+```{python}
+# plt.clf()
+# plt.bar(np.arange(10)+0.2, post_freq_sel / post_freq_sel.sum(), width=0.4, label='Estimated')
+# plt.bar(np.arange(10)-0.2, actual_freq_sel / actual_freq_sel.sum(), 0.4, label='Observed')
+# plt.xlabel("Number of Purchases (0-9+)")
+# plt.ylabel("Percentage of Customers")
+# plt.title("Prior Predictive Check: Customer Purchase Frequency")
+# plt.xticks(ticks=np.arange(10), labels=[f'{i}' if i < 9 else '9+' for i in range(10)])
+# plt.legend();
+```

@@ -28,11 +28,14 @@
         "barchart",
         "bgnbd",
         "bincount",
+        "bnds",
         "calib",
         "calwk",
         "CDNOW",
+        "Coef",
         "cumsum",
         "Cust",
+        "disp",
         "gammaln",
         "hstack",
         "marimo",
@@ -40,8 +43,10 @@
         "pactive",
         "paretonbd",
         "Purch",
+        "Quap",
         "silverman",
-        "unpivot"
+        "unpivot",
+        "vcov"
     ],
     "cSpell.ignoreWords": [
         "logitp",

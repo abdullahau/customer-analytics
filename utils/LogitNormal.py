@@ -4,22 +4,25 @@ import numpy as np
 from scipy.special import logit, expit
 from scipy.stats import norm, rv_continuous, kstest
 
+__all__ = ["LogitNormal"]
+
 # class LogitNorm(rv_continuous):
 
 #     def _argcheck(self, m, s):
 #         return (s > 0.) & (m > -np.inf)
-    
+
 #     def _pdf(self, x, m, s):
 #         return norm(loc=m, scale=s).pdf(logit(x))/(x*(1-x))
-    
+
 #     def _cdf(self, x, m, s):
 #         return norm(loc=m, scale=s).cdf(logit(x))
-    
+
 #     def _rvs(self, m, s, size=None, random_state=None):
 #         return expit(m + s*random_state.standard_normal(size))
-    
+
 #     def fit(self, data, **kwargs):
 #         return norm.fit(logit(data), **kwargs)
+
 
 class LogitNormal(rv_continuous):
     def __init__(self, scale=1, loc=0):
@@ -28,7 +31,7 @@ class LogitNormal(rv_continuous):
         self.loc = loc
 
     def _pdf(self, x):
-        return norm.pdf(logit(x), loc=self.loc, scale=self.scale)/(x*(1-x))
+        return norm.pdf(logit(x), loc=self.loc, scale=self.scale) / (x * (1 - x))
 
 
 if __name__ == "__main__":
@@ -43,5 +46,5 @@ if __name__ == "__main__":
     # expected = np.diff(law.cdf(bins))       # Expected bin counts
 
     # print(sample)
-    
+
     LogitNormal(scale=1.78, loc=0).pdf(10000)

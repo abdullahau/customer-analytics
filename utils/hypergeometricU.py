@@ -3,6 +3,8 @@
 import numpy as np
 from scipy.special import gamma, hyp1f1, gammaincc
 
+__all__ = ["U", "U_incomplete_gamma"]
+
 def U(a, b, z):
     '''
     U(a,b,z)=\frac{\Gamma(1-b)}{\Gamma(a+1-b)}1F1(a,b,z)+\frac{\Gamma(b-1)}{\Gamma(a)}z^{1-b}1F1(a+1-b,2-b,z)

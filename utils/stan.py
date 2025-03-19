@@ -16,6 +16,8 @@ warnings.filterwarnings("ignore", module="plotnine/..*")
 
 csp.utils.get_logger().setLevel(logging.ERROR)
 
+__all__ = ["Stan", "BridgeStan", "StanQuap", "link", "precis"]
+
 
 # -------------- Load & Compile Stan Model -------------------
 class Stan(CmdStanModel):
@@ -291,25 +293,3 @@ def precis(samples, prob=0.89, index_name="Parameter", np_axis=0):
         }
     )
     return res.set_index(f"{index_name}")
-
-
-def bw_nrd0(x):
-    """
-    Implementation of R's rule-of-thumb for choosing the bandwidth of a Gaussian
-    kernel density estimator. It defaults to 0.9 times the minimum of the standard
-    deviation and the interquartile range divided by 1.34 times the sample size to
-    the negative one-fifth power (= Silverman's ‘rule of thumb’, Silverman (1986,
-    page 48, eqn (3.31))) unless the quartiles coincide when a positive result
-    will be guaranteed.
-    """
-    if len(x) < 2:
-        raise (Exception("need at least 2 data points"))
-
-    hi = np.std(x, ddof=1)
-    q75, q25 = np.percentile(x, [75, 25])
-    iqr = q75 - q25
-    lo = min(hi, iqr / 1.34)
-
-    lo = lo or hi or abs(x[0]) or 1
-
-    return 0.9 * lo * len(x) ** -0.2

@@ -41,6 +41,250 @@ jupyter:
 
 In this notebook we show how to fit a BG/NBD model in Stan. We compare the results with the [`lifetimes`](https://github.com/CamDavidsonPilon/lifetimes) package. The model is presented in the paper: Fader, P. S., Hardie, B. G., & Lee, K. L. (2005). [“Counting your customers” the easy way: An alternative to the Pareto/NBD model. Marketing science, 24(2), 275-284.](http://www.brucehardie.com/papers/bgnbd_2004-04-20.pdf)
 
+## Introduction
+
+Faced with a database containing information on the *frequency* and *timing of transactions* for a list of customers, it is natural to try to make forecasts about future purchasing. These projections often range from **aggregate sales trajectories** (e.g., for the next 52 weeks), to **individual-level conditional expectations** (i.e., the best guess about a particular customer’s future purchasing, given information about his past behavior). The Pareto/NBD is robust model used for this purpose. It was introduced in “Counting Your Customers” framework originally proposed by Schmittlein, Morrison, and Colombo (1987), hereafter SMC. This model describes repeat-buying behavior in settings where customer “dropout” is unobserved: it assumes that customers buy at a steady rate (albeit in a stochastic manner) for a period of time, and then become inactive. More specifically, time to “dropout” is modeled using the **Pareto (exponential-gamma mixture) timing model**, and repeat-buying behavior while active is modeled using the **NBD (Poisson-gamma mixture) counting model**.
+
+In this notebook, we implement the **beta-geometric/negative binomial distribution** (BG/NBD), which represents a slight variation in the behavioral "story" that lies at the heart of SMC's original work, but it is vastly easier to implement. The model parameters can be obtained quite easily using Python and Stan, with no appreciable loss in the model's ability to fit or predict customer purchasing patterns. We will introduce the BG/NBD model from first principles, and present the expressions required for making individual-level statements about future buying behavior.
+
+Before developing the BG/NBD model, we briefly review the Pareto/NBD model. Then we outline the assumptions of the BG/NBD model, deriving the key expressions at the individual-level, and for a randomly-chosen individual.
+
+### Pareto/NBD
+
+The Pareto/NBD model is based on five assumptions:
+
+1.  While active, the number of transactions made by a customer in a time period of length $t$ is distributed Poisson with **transaction rate** $\lambda_t$.
+
+    $$
+    x \sim \text{Poisson}(\lambda) 
+    $$
+
+2.  Heterogeneity in transaction rates across customers follows a gamma distribution with shape parameter $r$ and scale parameter $\alpha$.
+
+    $$
+    \lambda \sim \text{Gamma}(r, \alpha)
+    $$
+
+3.  Each customer has an unobserved "lifetime" of length $\tau$. This point at which the customer becomes inactive is distributed exponential with **dropout rate** $\mu$.
+
+    $$
+    \tau \sim \text{Exponential}(\mu)
+    $$
+
+4.  Heterogeneity in dropout rates across customers follows a gamma distribution with shape parameter $s$ and scale parameter $\beta$.
+
+    $$
+    \mu \sim \text{Gamma}(s, \beta)
+    $$
+
+5.  The transaction rate $\lambda$ and the dropout rate $\mu$ vary independently across customers.
+
+The Pareto/NBD (and, as we will see shortly, the BG/NBD ) requires only two pieces of information about each customer's past purchasing history: his "recency" (when his last transaction occurred) and "frequency" (how many transactions he made in a specified time period). The notation used to represent this information is $\left(X=x, t_{x}, T\right)$, where $x$ is the number of transactions observed in the time period $(0, T]$ and $t_{x}\left(0<t_{x} \leq T\right)$ is the time of the last transaction. Using these two key summary statistics, SMC derive expressions for a number of managerially relevant quantities, such as:
+
+-   $E[X(t)]$, the **expected number of transactions in a time period** of length $t$, which is central to computing the expected transaction volume for the whole customer base over time.
+-   $P(X(t)=x)$, the probability of observing $x$ transactions in a time period of length $t$.
+-   $E\left(Y(t) \mid X=x, t_{x}, T\right)$, the expected number of transactions in the period $(T, T+t]$ for an individual with observed behavior ( $X=x, t_{x}, T$ ).
+
+The likelihood function associated with the Pareto/NBD model is quite complex, involving numerous evaluations of the Gaussian hypergeometric function. Multiple evaluations of the Gaussian hypergeometric are very demanding from a computational standpoint. Furthermore, the precision of some numerical procedures used to evaluate this function can vary substantially over the parameter space; this can cause major problems for numerical optimization routines as they search for the maximum of the likelihood function. In contrast, the BG/NBD model, can be implemented very quickly and efficiently via MLE and MCMC.
+
+### BG/NBD Assumptions
+
+Most aspects of the BG/NBD model directly mirror those of the Pareto/NBD. The only difference lies in the story being told about how/when customers become inactive. The Pareto timing model assumes that dropout can occur at any point in time, independent of the occurrence of actual purchases. If we assume instead that dropout occurs immediately after a purchase, we can model this process using the beta-geometric (BG) model.
+
+More formally, the BG/NBD model is based on the following five assumptions (the first two of which are identical to the corresponding Pareto/NBD assumptions):
+
+1.  While active, the number of transactions made by a customer follows a Poisson process with transaction rate $\lambda$. This is equivalent to assuming that the time between transactions is distributed exponential with transaction rate $\lambda$, i.e.,
+
+    $$
+    f\left(t_{j} \mid t_{j-1} ; \lambda\right)=\lambda e^{-\lambda\left(t_{j}-t_{j-1}\right)}, \quad t_{j}>t_{j-1} \geq 0
+    $$
+
+    $$
+    \text{"Wait"} \sim \text{Exponential}(\lambda)
+    $$
+
+2.  Heterogeneity in $\lambda$ follows a gamma distribution with pdf
+
+    $$
+    \begin{equation*}
+    f(\lambda \mid r, \alpha)=\frac{\alpha^{r} \lambda^{r-1} e^{-\lambda \alpha}}{\Gamma(r)}, \quad \lambda>0 
+    \end{equation*}
+    $$
+
+    $$
+    \lambda \sim \text{Gamma}(r,\alpha)
+    $$
+
+3.  After any transaction, a customer becomes inactive with probability $p$. Therefore the point at which the customer "drops out" is distributed across transactions according to a (shifted) geometric distribution with pmf
+
+    $$
+    P(\text { inactive immediately after } j \text { th transaction })=p(1-p)^{j-1}, \quad j=1,2,3, \ldots
+    $$
+
+    $$
+    \text{"Drop Out"} \sim \text{Bernoulli}(p)
+    $$
+
+4.  Heterogeneity in $p$ follows a beta distribution with pdf
+
+    $$
+    \begin{equation*}
+    f(p \mid a, b)=\frac{p^{a-1}(1-p)^{b-1}}{B(a, b)}, \quad 0 \leq p \leq 1 
+    \end{equation*}
+    $$
+
+    where $B(a, b)$ is the beta function, which can be expressed in terms of gamma functions: $B(a, b)=\Gamma(a) \Gamma(b) / \Gamma(a+b)$.
+
+    $$
+    p \sim \text{Beta}(a, b)
+    $$
+
+5.  The transaction rate $\lambda$ and the dropout probability $p$ vary independently across customers.
+
+### Model Development at the Individual Level
+
+#### Derivation of the Likelihood Function
+
+Consider a customer who had $x$ transactions in the period $(0, T]$ with the transactions occurring at $t_{1}, t_{2}, \ldots, t_{x}$ :
+
+![](references/recency_frequency_timeline.jpg){fig-align="center" width="342"}
+
+We derive the individual-level likelihood function in the following manner:
+
+-   the likelihood of the first transaction occurring at $t_{1}$ is a standard exponential likelihood component, which equals $\lambda e^{-\lambda t_{1}}$.
+-   the likelihood of the second transaction occurring at $t_{2}$ is the probability of remaining active at $t_{1}$ times the standard exponential likelihood component, which equals $(1-p) \lambda e^{-\lambda\left(t_{2}-t_{1}\right)}$.
+-   the likelihood of the $x$ th transaction occurring at $t_{x}$ is the probability of remaining active at $t_{x-1}$ times the standard exponential likelihood component, which equals ( $1-$ p) $\lambda e^{-\lambda\left(t_{x}-t_{x-1}\right)}$.
+-   Finally, the likelihood of observing zero purchases in $\left(t_{x}, T\right]$ is the probability the customer became inactive at $t_{x}$, plus the probability he remained active but made no purchases in this interval, which equals $p+(1-p) e^{-\lambda\left(T-t_{x}\right)}$.
+
+Therefore,
+
+$$
+\begin{aligned}
+L\left(\lambda, p \mid t_{1}, t_{2}, \ldots, t_{x}, T\right) & =\lambda e^{-\lambda t_{1}}(1-p) \lambda e^{-\lambda\left(t_{2}-t_{1}\right)} \cdots(1-p) \lambda e^{-\lambda\left(t_{x}-t_{x-1}\right)}\left\{p+(1-p) e^{-\lambda\left(T-t_{x}\right)}\right\} \\
+& =p(1-p)^{x-1} \lambda^{x} e^{-\lambda t_{x}}+(1-p)^{x} \lambda^{x} e^{-\lambda T}
+\end{aligned}
+$$
+
+As pointed out earlier for the Pareto/NBD, note that information on the timing of the $x$ transactions is not required; a sufficient summary of the customer's purchase history is $\left(X=x, t_{x}, T\right)$.
+
+Similar to SMC, we assume that all customers are active at the beginning of the observation period; therefore the likelihood function for a customer making 0 purchases in the interval $(0, T]$ is the standard exponential survival function:
+
+$$
+L(\lambda \mid X=0, T)=e^{-\lambda T}
+$$
+
+Thus we can write the individual-level likelihood function as
+
+$$
+\begin{equation*}
+L(\lambda, p \mid X=x, T)=(1-p)^{x} \lambda^{x} e^{-\lambda T}+\delta_{x>0} p(1-p)^{x-1} \lambda^{x} e^{-\lambda t_{x}}
+\end{equation*}
+$$
+
+where $\delta_{x>0}=1$ if $x>0,0$ otherwise.
+
+#### Derivation of $P(X(t)=x)$
+
+Let the random variable $X(t)$ denote the number of transactions occurring in a time period of length $t$ (with a time origin of 0 ). To derive an expression for the $P(X(t)=x)$, we recall the fundamental relationship between inter-event times and the number of events: $X(t) \geq x \Leftrightarrow$ $T_{x} \leq t$ where $T_{x}$ is the random variable denoting the time of the $x$ th transaction. Given our assumption regarding the nature of the dropout process,
+
+$$
+\begin{align*}
+P(X(t)=x)=& P \text{(active after } x \text{th purchase}) \\
+&\cdot P\left(T_{x} \leq t \text { and } T_{x+1}>t\right) +\delta_{x>0} \\ 
+&\cdot P(\text { becomes inactive after } x \text { th purchase }) \\
+&\cdot P\left(T_{x} \leq t\right)
+\end{align*}
+$$
+
+Given the assumption that the time between transactions is characterized by the exponential distribution, $P\left(T_{x} \leq t\right.$ and $\left.T_{x+1}>t\right)$ is simply the Poisson probability that $X(t)=x$, and $P\left(T_{x} \leq t\right)$ is the Erlang- $x$ cdf. Therefore
+
+$$
+\begin{equation*}
+P(X(t)=x \mid \lambda, p)=(1-p)^{x} \frac{(\lambda t)^{x} e^{-\lambda t}}{x!}+\delta_{x>0} p(1-p)^{x-1}\cdot\left[1-e^{-\lambda t} \sum_{j=0}^{x-1} \frac{(\lambda t)^{j}}{j!}\right]
+\end{equation*}
+$$
+
+#### Derivation of $E[X(t)]$
+
+Given that the number of transactions follows a Poisson process, $E[X(t)]$ is simply $\lambda t$ if the customer is active at $t$. For a customer who becomes inactive at $\tau \leq t$, the expected number of transactions in the period $(0, \tau]$ is $\lambda \tau$.
+
+But what is the likelihood that a customer becomes inactive at $\tau$ ? Conditional on $\lambda$ and $p$,
+
+$$
+\begin{aligned}
+P(\tau>t)=P(\text { active at } t \mid \lambda, p) & =\sum_{j=0}^{\infty}(1-p)^{j} \frac{(\lambda t)^{j} e^{-\lambda t}}{j!} \\
+& =e^{-\lambda p t}
+\end{aligned}
+$$
+
+This implies that the pdf of the dropout time is given by $g(\tau \mid \lambda, p)=\lambda p e^{-\lambda p \tau}$. (Note that this takes on an exponential form. But it features an explicit association with the transaction rate $\lambda$, in contrast with the Pareto/NBD, which has an exponential dropout process that is independent of the transaction rate.) It follows that the expected number of transactions in a time period of length $t$ is given by
+
+$$
+\begin{align*}
+E(X(t) \mid \lambda, p) & =\lambda t \cdot P(\tau>t)+\int_{0}^{t} \lambda \tau g(\tau \mid \lambda, p) d \tau \\
+& =\frac{1}{p}-\frac{1}{p} e^{-\lambda p t}
+\end{align*}
+$$
+
+### Model Development for a Randomly-Chosen Individual
+
+All the expressions developed above are conditional on the transaction rate $\lambda$ and the dropout probability $p$, both of which are unobserved. To derive the equivalent expressions for a randomly chosen customer, we take the expectation of the individual-level result over the mixing distributions for $\lambda$ and $p$, as given in (1) and (2). This yields the follow results.
+
+-   Taking the expectation of (3) over the distribution of $\lambda$ and $p$ results in the following expression for the likelihood function for a randomly-chosen customer with purchase history $\left(X=x, t_{x}, T\right):$
+
+$$
+\begin{align*}
+L\left(r, \alpha, a, b \mid X=x, t_{x}, T\right)&=\frac{B(a, b+x)}{B(a, b)} \frac{\Gamma(r+x) \alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
+&+\delta_{x>0} \frac{B(a+1, b+x-1)}{B(a, b)} \frac{\Gamma(r+x) \alpha^{r}}{\Gamma(r)\left(\alpha+t_{x}\right)^{r+x}}
+\end{align*}
+$$
+
+The four BG/NBD model parameters $(r, \alpha, a, b)$ can be estimated via the method of maximum likelihood in the following manner. Suppose we have a sample of $N$ customers, where customer $i$ had $X_{i}=x_{i}$ transactions in the period ( $0, T_{i}$ \], with the last transaction occurring at $t_{x_{i}}$. The sample log-likelihood function given by is
+
+$$
+\begin{equation*}
+L L(r, \alpha, a, b)=\sum_{i=1}^{N} \ln \left[L\left(r, \alpha, a, b \mid X_{i}=x_{i}, t_{x_{i}}, T_{i}\right)\right]
+\end{equation*}
+$$
+
+This can be maximized using standard numerical optimization routines.
+
+-   Taking the expectation of (4) over the distribution of $\lambda$ and $p$ results in the following expression for the probability of observing $x$ purchases in a time period of length $t$ :
+
+$$
+\begin{align*}
+P(X(t)= x \mid r, \alpha, a, b) &=\frac{B(a, b+x)}{B(a, b)} \frac{\Gamma(r+x)}{\Gamma(r) x!}\left(\frac{\alpha}{\alpha+t}\right)^{r}\left(\frac{t}{\alpha+t}\right)^{x} \\
+&+\delta_{x>0} \frac{B(a+1, b+x-1)}{B(a, b)} \\
+&\cdot\left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}\left\{\sum_{j=0}^{x-1} \frac{(\Gamma(r+j)}{\Gamma(r) j!}\left(\frac{t}{\alpha+t}\right)^{j}\right\}\right]
+\end{align*}
+$$
+
+-   Finally, taking the expectation of (5) over the distribution of $\lambda$ and $p$ results in the following expression for the expected number of purchases in a time period of length $t$ :
+
+$$
+\begin{equation*}
+E(X(t) \mid r, \alpha, a, b)=\frac{a+b-1}{a-1}\left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}{ }_{2} F_{1}\left(r, b ; a+b-1 ; \frac{t}{\alpha+t}\right)\right]
+\end{equation*}
+$$
+
+where ${ }_{2} F_{1}(\cdot)$ is the Gaussian hypergeometric function. (See the Appendix for details of the derivation.)
+
+Maximum likelihood estimates of the model parameters ($r$, $\alpha$, $a$, $b$) are obtained by maximizing the log-likelihood function given in (7) above. Standard numerical optimization methods are employed, using the SciPy minimize and Stan's optimize method, to obtain the parameter estimates. To implement the model in SciPy, we rewrite the log-likelihood function, (6), as
+
+$$
+L(r, \alpha, a, b | X = x, t_x, T) = A_1 \cdot A_2 \cdot (A_3 + \delta_{x > 0} A_4)
+$$
+
+where
+
+$$
+A_1 = \frac{\Gamma(r + x)\alpha^r}{\Gamma(r)} \quad A_2 = \frac{\Gamma(a + b)\Gamma(b + x)}{\Gamma(b)\Gamma(a + b + x)}
+$$
+
+$$
+A_3 = \left( \frac{1}{\alpha + T} \right)^{r + x} \quad A_4 = \left( \frac{a}{b + x - 1} \right) \left( \frac{1}{\alpha + t_x} \right)^{r + x}
+$$
+
 ### Imports
 
 #### Packages
@@ -414,7 +658,7 @@ data = {
 
 stan_model = StanQuap(stan_file='stan_models/bg-nbd-1', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000, generated_var=['a', 'b'])
 
-index = index=["r", "α", 'phi', 'kappa', "a", "b"]
+index = ["r", "α", 'phi', 'kappa', "a", "b"]
 MAP_params = np.array(list(stan_model.opt_model.stan_variables().values()))
 var_mat = var_mar = stan_model.vcov_matrix() # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
@@ -712,3 +956,148 @@ plt.title("Posterior Predictive Check: Customer Purchase Frequency")
 plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
 plt.legend();
 ```
+
+## Appendix
+
+In this appendix, we derive the expressions for $E[X(t)]$ and $E(Y(t) | X = x, t_x, T)$. Central to these derivations is Euler's integral for the Gaussian hypergeometric function:
+
+$$
+{}_{2}F_{1}(a, b; c; z) = \frac{1}{B(b, c - b)} \int_{0}^{1} t^{b-1} (1 - t)^{c - b - 1} (1 - zt)^{-a} dt, \quad c > b.
+$$
+
+### Derivation of $E[X(t)]$
+
+To arrive at an expression for $E[X(t)]$ for a randomly-chosen customer, we need to take the expectation of (5) over the distribution of $\lambda$ and $p$. First, we take the expectation with respect to $\lambda$, giving us:
+
+$$
+E(X(t) | r, \alpha, p) = \frac{1}{p} - \frac{\alpha^{r}}{p (\alpha + p t)^{r}}.
+$$
+
+The next step is to take the expectation of this over the distribution of $p$. We first evaluate:
+
+$$
+\int_{0}^{1} \frac{1}{p} \frac{p^{a - 1} (1 - p)^{b - 1}}{B(a, b)} dp = \frac{a + b - 1}{a - 1}.
+$$
+
+Next, we evaluate:
+
+$$
+\int_{0}^{1} \frac{\alpha^{r}}{p (\alpha + p t)^{r}} \frac{p^{a - 1} (1 - p)^{b - 1}}{B(a, b)} dp = \alpha^{r} \frac{1}{B(a, b)} \int_{0}^{1} p^{a - 2} (1 - p)^{b - 1} (\alpha + p t)^{-r} dp.
+$$
+
+Letting $q = 1 - p$ (which implies $dp = -dq$):
+
+$$
+= \left(\frac{\alpha}{\alpha + t}\right)^{r} \frac{1}{B(a, b)} \int_{0}^{1} q^{b - 1} (1 - q)^{a - 2} \left(1 - \frac{t}{\alpha + t} q\right)^{-r} dq.
+$$
+
+Recalling Euler's integral for the Gaussian hypergeometric function:
+
+$$
+= \left(\frac{\alpha}{\alpha + t}\right)^{r} \frac{B(a - 1, b)}{B(a, b)} {}_{2}F_{1}\left(r, b; a + b - 1; \frac{t}{\alpha + t}\right).
+$$
+
+It follows that:
+
+$$
+E(X(t) | r, \alpha, a, b) = \frac{a + b - 1}{a - 1} \left[1 - \left(\frac{\alpha}{\alpha + t}\right)^{r} {}_{2}F_{1}\left(r, b; a + b - 1; \frac{t}{\alpha + t}\right)\right].
+$$
+
+### Derivation of $E(Y(t) | X = x, t_x, T)$
+
+Let the random variable $Y(t)$ denote the number of purchases made in the period $(T, T + t]$. We are interested in computing the conditional expectation $E(Y(t) | X = x, t_x, T)$, the expected number of purchases in the period $(T, T + t]$ for a customer with purchase history $X = x, t_x, T$.
+
+If the customer is active at $T$, it follows from (5) that:
+
+$$
+E(Y(t) | \lambda, p) = \frac{1}{p} - \frac{1}{p} e^{-\lambda p t}.
+$$
+
+What is the probability that a customer is active at $T$? Given our assumption that all customers are active at the beginning of the initial observation period, a customer cannot drop out before he has made any transactions; therefore:
+
+$$
+P(\text{active at } T | X = 0, T, \lambda, p) = 1.
+$$
+
+For the case where purchases were made in the period $(0, T]$, the probability that a customer with purchase history $(X = x, t_x, T)$ is still active at $T$, conditional on $\lambda$ and $p$, is simply the probability that he did not drop out at $t_x$ and made no purchase in $(t_x, T]$, divided by the probability of making no purchases in this same period. Recalling that this second probability is simply the probability that the customer became inactive at $t_x$, plus the probability he remained active but made no purchases in this interval, we have:
+
+$$
+P(\text{active at } T | X = x, t_x, T, \lambda, p) = \frac{(1 - p) e^{-\lambda (T - t_x)}}{p + (1 - p) e^{-\lambda (T - t_x)}}.
+$$
+
+Multiplying this by $\frac{(1 - p)^{x - 1} \lambda^{x} e^{-\lambda t_x}}{(1 - p)^{x - 1} \lambda^{x} e^{-\lambda t_x}}$ gives us:
+
+$$
+P(\text{active at } T | X = x, t_x, T, \lambda, p) = \frac{(1 - p)^{x} \lambda^{x} e^{-\lambda T}}{L(\lambda, p | X = x, t_x, T)},
+$$
+
+where the expression for $L(\lambda, p | X = x, t_x, T)$ is given in (3). (Note that when $x = 0$, the expression given in (A2) equals 1.)
+
+Multiplying (A1) and (A2) yields:
+
+$$
+\begin{align*}
+E(Y(t) | X = x, t_x, T, \lambda, p) &= \frac{(1 - p)^{x} \lambda^{x} e^{-\lambda T} \left(\frac{1}{p} - \frac{1}{p} e^{-\lambda p t}\right)}{L(\lambda, p | X = x, t_x, T)} \\
+&= \frac{p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda T} - p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda (T + p t)}}{L(\lambda, p | X = x, t_x, T)}.
+\end{align*}
+$$
+
+(Note that this reduces to (A1) when $x = 0$, which follows from the result that a customer who made zero purchases in the time period $(0, T]$ must be assumed to be active at time $T$.)
+
+As the transaction rate $\lambda$ and dropout probability $p$ are unobserved, we compute $E(Y(t) | X = x, t_x, T)$ for a randomly chosen customer by taking the expectation of (A3) over the distribution of $\lambda$ and $p$, updated to take account of the information $X = x, t_x, T$:
+
+$$
+\begin{align*}
+E(Y(t) | X = x, t_x, T, r, \alpha, a, b) &= \int_{0}^{1} \int_{0}^{\infty} E(Y(t) | X = x, t_x, T, \lambda, p) \\
+&\cdot f(\lambda, p | r, \alpha, a, b, X = x, t_x, T) d\lambda dp.
+\end{align*}
+$$
+
+By Bayes theorem, the joint posterior distribution of $\lambda$ and $p$ is given by:
+
+$$
+f(\lambda, p | r, \alpha, a, b, X = x, t_x, T) = \frac{L(\lambda, p | X = x, t_x, T) f(\lambda | r, \alpha) f(p | a, b)}{L(r, \alpha, a, b | X = x, t_x, T)}.
+$$
+
+Substituting (A3) and (A5) in (A4), we get:
+
+$$
+E(Y(t) | X = x, t_x, T, r, \alpha, a, b) = \frac{A - B}{L(r, \alpha, a, b | X = x, t_x, T)'}
+$$
+
+where:
+
+$$
+\begin{align*}
+A &= \int_{0}^{1} \int_{0}^{\infty} p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda T} f(\lambda | r, \alpha) f(p | a, b) d\lambda dp \\
+&= \frac{B(a - 1, b + x)}{B(a, b)} \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) (\alpha + T)^{r + x}}
+\end{align*}
+$$
+
+and:
+
+$$
+\begin{align*}
+B &= \int_{0}^{1} \int_{0}^{\infty} p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda (T + p t)} f(\lambda | r, \alpha) f(p | a, b) d\lambda dp \\
+&= \int_{0}^{1} \frac{p^{a - 2} (1 - p)^{b + x - 1}}{B(a, b)} \left\{\int_{0}^{\infty} \frac{\alpha^{r} \lambda^{r + x - 1} e^{-\lambda (\alpha + T + p t)}}{\Gamma(r)} d\lambda\right\} dp \\
+&= \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) B(a, b)} \int_{0}^{1} p^{a - 2} (1 - p)^{b + x - 1} (\alpha + T + p t)^{-(r + x)} dp.
+\end{align*}
+$$
+
+Letting $q = 1 - p$ (which implies $dp = -dq$):
+
+$$
+= \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) B(a, b) (\alpha + T + t)^{r + x}} \cdot \int_{0}^{1} q^{b + x - 1} (1 - q)^{a - 2} \left(1 - \frac{t}{\alpha + T + t} q\right)^{-(r + x)} dq.
+$$
+
+Recalling Euler's integral for the Gaussian hypergeometric function:
+
+$$
+= \frac{B(a - 1, b + x)}{B(a, b)} \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) (\alpha + T + t)^{r + x}} \cdot {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right).
+$$
+
+Substituting (6), (A7), and (A8) in (A6) and simplifying, we get:
+
+$$
+E(Y(t) | X = x, t_x, T, r, \alpha, a, b) = \frac{\frac{a + b + x - 1}{a - 1} \left[1 - \left(\frac{\alpha + T}{\alpha + T + t}\right)^{r + x} {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right)\right]}{1 + \delta_{x > 0} \frac{a}{b + x - 1} \left(\frac{\alpha + T}{\alpha + t_x}\right)^{r + x}}.
+$$

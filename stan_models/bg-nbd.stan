@@ -3,7 +3,7 @@ data {
     int<lower=0> N;               // Number of customers
     array[N] int<lower=0> X;      // Number of transactions per customer
     vector<lower=0>[N] T;         // Total observation time per customer
-    vector<lower=0>[N] Tx;        // Time of last transaction (0 if X=0)
+    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)
 }
 
 parameters {
@@ -22,7 +22,7 @@ model {
 
     for (n in 1:N) {
         int x = X[n];
-        real tx = Tx[n];
+        real tx = t_x[n];
         real t = T[n];
     
         if (x == 0) {

@@ -269,6 +269,19 @@ $$
 
 where ${ }_{2} F_{1}(\cdot)$ is the Gaussian hypergeometric function. (See the Appendix for details of the derivation.)
 
+Note that this final expression requires a single evaluation of the Gaussian hypergeometric function. But it is important to emphasize that this expectation is only used after the likelihood function has been maximized. A single evaluation of the Gaussian hypergeometric function for a given set of parameters is relatively straightforward, and can be closely approximated with a polynomial series, even in a modeling environment such as Microsoft Excel.
+
+In order for the BG/NBD model to be of use in a forward-looking customer-base analysis, we need to obtain an expression for the expected number of transactions in a future period of length $t$ for an individual with past observed behavior $\left(X=x, t_{x}, T\right)$. We provide a careful derivation in the Appendix, but here is the key expression:
+
+$$
+\begin{align*}
+& E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
+& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}} \tag{10}
+\end{align*}
+$$
+
+Once again, this expectation requires a single evaluation of the Gaussian hypergeometric function for any customer of interest, but this is not a burdensome task. The remainder of the expression is simple arithmetic.
+
 Maximum likelihood estimates of the model parameters ($r$, $\alpha$, $a$, $b$) are obtained by maximizing the log-likelihood function given in (7) above. Standard numerical optimization methods are employed, using the SciPy minimize and Stan's optimize method, to obtain the parameter estimates. To implement the model in SciPy, we rewrite the log-likelihood function, (6), as
 
 $$
@@ -507,7 +520,7 @@ data {
     int<lower=0> N;               // Number of customers
     array[N] int<lower=0> X;      // Number of transactions per customer
     vector<lower=0>[N] T;         // Total observation time per customer
-    vector<lower=0>[N] Tx;        // Time of last transaction (0 if X=0)
+    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)
 }
 
 parameters {
@@ -526,7 +539,7 @@ model {
 
     for (n in 1:N) {
         int x = X[n];
-        real tx = Tx[n];
+        real tx = t_x[n];
         real t = T[n];
     
         if (x == 0) {
@@ -555,10 +568,15 @@ data = {
     'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
     'T': T.flatten().tolist(),
-    'Tx': t_x.flatten().tolist()
+    't_x': t_x.flatten().tolist()
 }
 
-stan_model = StanQuap(stan_file='stan_models/bg-nbd', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000)
+stan_model = StanQuap(
+    stan_file='stan_models/bg-nbd', 
+    stan_code=stan_code, data=data, 
+    algorithm='LBFGS', jacobian=False, 
+    tol_rel_grad=1e-7, iter=5000
+)
 
 index = index=["r", "α", "a", "b"]
 params = np.array(list(stan_model.opt_model.stan_variables().values()))
@@ -596,7 +614,7 @@ data {
     int<lower=0> N;               // Number of customers
     array[N] int<lower=0> X;      // Number of transactions per customer
     vector<lower=0>[N] T;         // Total observation time per customer
-    vector<lower=0>[N] Tx;        // Time of last transaction (0 if X=0)
+    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)
 }
 
 parameters {
@@ -620,7 +638,7 @@ model {
 
     for (n in 1:N) {
         int x = X[n];                 // Number of transactions for customer n
-        real tx = Tx[n];              // Time of last transaction
+        real tx = t_x[n];              // Time of last transaction
         real t = T[n];                // Total observation time
 
         if (x == 0) {
@@ -635,7 +653,7 @@ model {
             real gamma_term = lgamma(r + x) - lgamma(r);       // Gamma function term
             real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
             
-            // Term 2: Probability of surviving until Tx, then dropping out
+            // Term 2: Probability of surviving until t_x, then dropping out
             // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
             real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
             real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
@@ -653,10 +671,16 @@ data = {
     'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
     'T': T.flatten().tolist(),
-    'Tx': t_x.flatten().tolist()
+    't_x': t_x.flatten().tolist()
 }
 
-stan_model = StanQuap(stan_file='stan_models/bg-nbd-1', stan_code=stan_code, data=data, algorithm='LBFGS', jacobian=False, tol_rel_grad=1e-7, iter=5000, generated_var=['a', 'b'])
+stan_model = StanQuap(
+    stan_file='stan_models/bg-nbd-1', 
+    stan_code=stan_code, data=data, 
+    algorithm='LBFGS', jacobian=False, 
+    tol_rel_grad=1e-7, iter=5000, 
+    generated_var=['a', 'b']
+)
 
 index = ["r", "α", 'phi', 'kappa', "a", "b"]
 MAP_params = np.array(list(stan_model.opt_model.stan_variables().values()))
@@ -768,7 +792,7 @@ generated quantities {
     real b = (1 - phi_dropout) * kappa_dropout;
 
     array[N] int X_rep;
-    vector[N] Tx_rep;
+    vector[N] t_x_rep;
 
     for (n in 1:N) {
         real lambda_n = gamma_rng(r, alpha);
@@ -792,7 +816,7 @@ generated quantities {
             }
         }
         X_rep[n] = x;
-        Tx_rep[n] = tx;
+        t_x_rep[n] = tx;
     }
 }
 '''
@@ -843,7 +867,7 @@ data {
     int<lower=0> N;               
     array[N] int<lower=0> X;      
     vector<lower=0>[N] T;         
-    vector<lower=0>[N] Tx;        
+    vector<lower=0>[N] t_x;        
 }
 
 parameters {
@@ -867,7 +891,7 @@ model {
 
     for (n in 1:N) {
         int x = X[n];                 
-        real tx = Tx[n];              
+        real tx = t_x[n];              
         real t = T[n];                
 
         if (x == 0) {
@@ -887,7 +911,7 @@ model {
 
 generated quantities {
     array[N] int X_rep;
-    vector[N] Tx_rep;
+    vector[N] t_x_rep;
 
     for (n in 1:N) {
         real lambda_n = gamma_rng(r, alpha);
@@ -911,7 +935,7 @@ generated quantities {
             }
         }
         X_rep[n] = x;
-        Tx_rep[n] = tx;
+        t_x_rep[n] = tx;
     }
 }
 '''
@@ -922,7 +946,7 @@ data = {
     'N': len(p1x),
     'X': p1x.flatten().astype(int).tolist(),
     'T': T.flatten().tolist(),
-    'Tx': t_x.flatten().tolist()
+    't_x': t_x.flatten().tolist()
 }
 
 stan_model = Stan(stan_file='stan_models/bg-nbd-post', stan_code=stan_post_code)
@@ -930,7 +954,7 @@ post_preds = stan_model.sample(data=data)
 ```
 
 ```{python}
-posterior = az.from_cmdstanpy(post_preds, posterior_predictive=['X_rep', 'Tx_rep'])
+posterior = az.from_cmdstanpy(post_preds, posterior_predictive=['X_rep', 't_x_rep'])
 posterior_samples = post_preds.stan_variable('X_rep').astype(int) 
 
 # Compute frequency distribution
@@ -955,6 +979,77 @@ plt.ylabel("% of Customer Population")
 plt.title("Posterior Predictive Check: Customer Purchase Frequency")
 plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
 plt.legend();
+```
+
+## Applications
+
+Now that you have fitted the model, we can use it to make predictions. For example, we can predict the expected probability of a customer being alive as a function of time (steps). 
+
+### Expected Number of Purchases
+
+Let us take a sample of users:
+
+```{python}
+example_customer_ids = [1, 6, 10, 18, 45, 1412]
+
+p1x_sample = p1x[example_customer_ids]
+t_x_sample = t_x[example_customer_ids]
+T_sample = T[example_customer_ids]
+
+pl.DataFrame({
+    'p1x': p1x_sample.astype(int),
+    't_x': t_x_sample.round(2),
+    'T': T_sample.round(2)
+})
+```
+
+Observe that the last two customers are *frequent buyers* as compared to the others.
+
+We will use the following forward-looking expression to obtain the expected number of transactions in a future period of length $t$ for an individual with past observed behavior $\left(X=x, t_{x}, T\right)$.
+
+$$
+\begin{align*}
+& E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
+& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}} \tag{10}
+\end{align*}
+$$
+
+```{python}
+def expected_purchases(x, t_x, T, t, r, alpha, a, b):
+    '''
+    Compute the expected number of future purchases across future *t* 
+    time periods given recency *t_x*, frequency *x*, and age of the customer *T* for each customer.
+    '''
+    h2f1_cust = hyp2f1(r+x, b+x, a+b+x-1, t/(alpha + T + t))
+    return (
+        (a + b + x - 1) / (a - 1) * (1 - ((alpha + T) / (alpha + T + t))**(r + x) * h2f1_cust) /
+        (1 + (x > 0) * a / (b + x - 1) * ((alpha + T) / (alpha + t_x))**(r + x))
+    )
+```
+
+
+```{python}
+future_t = np.arange(91) # Future Periods to analyze
+params = [post_preds.stan_variable('r').reshape(-1,1) for param in ['r', 'alpha', 'a', 'b']]
+exp_purch = expected_purchases(p1x_sample, t_x_sample, T_sample, future_t.reshape(-1,1,1), *params)
+
+fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+fig.subplots_adjust(hspace=0.4)  
+
+for i, cust_id in enumerate(example_customer_ids):
+    ax = axes[i]
+    customer_data = exp_purch[:, :, i]  # Shape (91, 4000)
+    mean_purchases = customer_data.mean(axis=1) # Shape (91,)
+    pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
+    
+    ax.plot(future_t, mean_purchases, color='blue', label='Mean')
+    ax.fill_between(future_t, pi[0,:], pi[1,:], color='blue', alpha=0.3, label='89% PI')
+    ax.set_title(f'Customer ID: {cust_id}')
+    ax.set_ylabel('Expected Purchases')
+    if i == 0: ax.legend()
+
+axes[-1].set_xlabel('Future Time Period')
+plt.show()
 ```
 
 ## Appendix

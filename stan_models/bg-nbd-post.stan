@@ -3,7 +3,7 @@ data {
     int<lower=0> N;               
     array[N] int<lower=0> X;      
     vector<lower=0>[N] T;         
-    vector<lower=0>[N] Tx;        
+    vector<lower=0>[N] t_x;        
 }
 
 parameters {
@@ -27,7 +27,7 @@ model {
 
     for (n in 1:N) {
         int x = X[n];                 
-        real tx = Tx[n];              
+        real tx = t_x[n];              
         real t = T[n];                
 
         if (x == 0) {
@@ -47,7 +47,7 @@ model {
 
 generated quantities {
     array[N] int X_rep;
-    vector[N] Tx_rep;
+    vector[N] t_x_rep;
 
     for (n in 1:N) {
         real lambda_n = gamma_rng(r, alpha);
@@ -71,6 +71,6 @@ generated quantities {
             }
         }
         X_rep[n] = x;
-        Tx_rep[n] = tx;
+        t_x_rep[n] = tx;
     }
 }

@@ -239,7 +239,7 @@ L\left(r, \alpha, a, b \mid X=x, t_{x}, T\right)&=\frac{B(a, b+x)}{B(a, b)} \fra
 \end{align*}
 $$
 
-The four BG/NBD model parameters $(r, \alpha, a, b)$ can be estimated via the method of maximum likelihood in the following manner. Suppose we have a sample of $N$ customers, where customer $i$ had $X_{i}=x_{i}$ transactions in the period ( $0, T_{i}$ \], with the last transaction occurring at $t_{x_{i}}$. The sample log-likelihood function given by is
+The four BG/NBD model parameters $(r, \alpha, a, b)$ can be estimated via the method of maximum likelihood in the following manner. Suppose we have a sample of $N$ customers, where customer $i$ had $X_{i}=x_{i}$ transactions in the period $(0, T_{i}]$, with the last transaction occurring at $t_{x_{i}}$. The sample log-likelihood function given by is
 
 $$
 \begin{equation*}
@@ -276,7 +276,7 @@ In order for the BG/NBD model to be of use in a forward-looking customer-base an
 $$
 \begin{align*}
 & E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
-& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}} \tag{10}
+& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}}
 \end{align*}
 $$
 
@@ -297,6 +297,74 @@ $$
 $$
 A_3 = \left( \frac{1}{\alpha + T} \right)^{r + x} \quad A_4 = \left( \frac{a}{b + x - 1} \right) \left( \frac{1}{\alpha + t_x} \right)^{r + x}
 $$
+
+### Computing $P(\text{alive})$ Using the BG/NBD Model
+
+One of the key results we associate with the Pareto/NBD model (Schmittlein et al. 1987) is an expression for $P(\text{alive}\mid x, t_x, T)$, the probability that a customer with purchase history $(x, t_x, T)$ is "alive" at time $T$.
+
+Deriving the expression for $P(\text{alive})$ under the BG/NBD model is a trivial exercise. Given the assumptions of the BG/NBD model, the probability that a customer with purchase history $(x, t_x, T)$ is alive at time $T$ is simply the probability that he did not "die" at $t_x$.
+
+Recall the BG/NBD likelihood function:
+
+$$
+\begin{align*}
+L(r,\alpha,a,b \mid x,t_x,T) &= \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r + x)\alpha^{r}}{\Gamma(r)(\alpha + T)^{r+x}} \\
+&+ \delta_{x>0} \frac{B(a+1,b+x-1)}{B(a,b)} \frac{\Gamma(r + x)\alpha^{r}}{\Gamma(r)(\alpha + t_x)^{r+x}}.
+\end{align*}
+$$
+
+Noting that the first half of the expression represents the likelihood under the assumption that the customer did not die at $t_x$ (and is therefore alive at $T$), while the second half represents the likelihood under the assumption that the customer died at $t_x$, the application of Bayes' theorem gives us
+
+$$
+\begin{align*}
+P(\text{alive} &\mid x,t_x,T,r,\alpha,a,b) \\
+&= \frac{\frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}}}{L(r,\alpha,a,b \mid x,t_x,T)} \\
+&= \frac{1}{1 + \delta_{x>0} \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}.
+\end{align*}
+$$
+
+We note that $P(\text{alive}) = 1$ for a customer who made no purchases in the interval $(0,T]$; this follows from the model's assumptions that death occurs after a purchase and that customers are alive at the beginning of the observation period. Those interested in the $P(\text{alive})$ metric may view this as a shortcoming of the model.
+
+There are two ways to overcome this potential problem.
+
+1.  **Zero-Inflated Variant**:\
+    Assume $\pi \times 100$ of the customer base is "dead" at $T = 0$. The likelihood function becomes:
+
+    $$
+    \begin{aligned}
+    L(r,\alpha,a,b,\pi \mid x,t_x,T) &= \pi \delta_{x=0} + (1-\pi) \bigg\{ \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
+    & \quad + \delta_{x>0} \frac{B(a+1,b+x-1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}} \bigg\}.
+    \end{aligned}
+    $$
+
+    Then:
+
+    $$
+    \begin{align*}
+    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b,\pi) \\
+    = 
+    \begin{cases}
+    \frac{(1-\pi)}{\pi \left( \frac{\alpha+T}{\alpha} \right)^r + (1-\pi)} & x = 0 \\
+    \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}} & x > 0
+    \end{cases}
+    \end{align*}
+    $$
+
+2.  **Flip-at-Time-0 Variant**:\
+    Modify the death process assumption:
+
+    $$
+    \begin{align*}
+    L(r,\alpha,a,b \mid x,t_x,T) &= \frac{B(a,b+x+1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
+    &+ \frac{B(a+1,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}}.
+    \end{align*}
+    $$
+
+    Then:
+
+    $$
+    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b) = \frac{1}{1 + \frac{a}{b+x} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}},
+    $$ which is less than $1$ for $x = 0$ in the interval $(0,T]$.
 
 ### Imports
 
@@ -446,18 +514,18 @@ import autograd.numpy as np
 from autograd.scipy.special import gammaln, beta, gamma
 from autograd import value_and_grad, hessian
 
-def negative_log_likelihood(log_params, freq, rec, T):
+def negative_log_likelihood(log_params, x, t_x, T):
     params = np.exp(log_params)
     r, alpha, a, b = params
 
-    A_1 = gammaln(r + freq) - gammaln(r) + r * np.log(alpha)
-    A_2 = gammaln(a + b) + gammaln(b + freq) - gammaln(b) - gammaln(a + b + freq)
-    A_3 = -(r + freq) * np.log(alpha + T)
-    A_4 = np.log(a) - np.log(b + np.maximum(freq, 1) - 1) - (r + freq) * np.log(rec + alpha)
+    A_1 = gammaln(r + x) - gammaln(r) + r * np.log(alpha)
+    A_2 = gammaln(a + b) + gammaln(b + x) - gammaln(b) - gammaln(a + b + x)
+    A_3 = -(r + x) * np.log(alpha + T)
+    A_4 = np.log(a) - np.log(b + np.maximum(x, 1) - 1) - (r + x) * np.log(t_x + alpha)
 
     max_A_3_A_4 = np.maximum(A_3, A_4)
 
-    ll = (A_1 + A_2 + np.log(np.exp(A_3 - max_A_3_A_4) + np.exp(A_4 - max_A_3_A_4) * (freq > 0)) + max_A_3_A_4)
+    ll = (A_1 + A_2 + np.log(np.exp(A_3 - max_A_3_A_4) + np.exp(A_4 - max_A_3_A_4) * (x > 0)) + max_A_3_A_4)
 
     return -ll.sum()
 
@@ -983,7 +1051,7 @@ plt.legend();
 
 ## Applications
 
-Now that you have fitted the model, we can use it to make predictions. For example, we can predict the expected probability of a customer being alive as a function of time (steps). 
+Now that you have fitted the model, we can use it to make predictions. For example, we can predict the expected probability of a customer being alive as a function of time (steps).
 
 ### Expected Number of Purchases
 
@@ -997,6 +1065,7 @@ t_x_sample = t_x[example_customer_ids]
 T_sample = T[example_customer_ids]
 
 pl.DataFrame({
+    'cust_id': example_customer_ids,
     'p1x': p1x_sample.astype(int),
     't_x': t_x_sample.round(2),
     'T': T_sample.round(2)
@@ -1010,7 +1079,7 @@ We will use the following forward-looking expression to obtain the expected numb
 $$
 \begin{align*}
 & E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
-& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}} \tag{10}
+& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}}
 \end{align*}
 $$
 
@@ -1027,14 +1096,12 @@ def expected_purchases(x, t_x, T, t, r, alpha, a, b):
     )
 ```
 
-
 ```{python}
 future_t = np.arange(91) # Future Periods to analyze
-params = [post_preds.stan_variable('r').reshape(-1,1) for param in ['r', 'alpha', 'a', 'b']]
-exp_purch = expected_purchases(p1x_sample, t_x_sample, T_sample, future_t.reshape(-1,1,1), *params)
+params = [post_preds.stan_variable(param).reshape(-1,1) for param in ['r', 'alpha', 'a', 'b']]
+exp_purch = expected_purchases(p1x_sample, t_x_sample, T_sample, future_t.reshape(-1,1,1), *params) # shape (91, 4000, 6)
 
 fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
-fig.subplots_adjust(hspace=0.4)  
 
 for i, cust_id in enumerate(example_customer_ids):
     ax = axes[i]
@@ -1042,14 +1109,218 @@ for i, cust_id in enumerate(example_customer_ids):
     mean_purchases = customer_data.mean(axis=1) # Shape (91,)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
     
-    ax.plot(future_t, mean_purchases, color='blue', label='Mean')
-    ax.fill_between(future_t, pi[0,:], pi[1,:], color='blue', alpha=0.3, label='89% PI')
+    ax.plot(future_t, mean_purchases, color='k', label='Mean')
+    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
     ax.set_title(f'Customer ID: {cust_id}')
     ax.set_ylabel('Expected Purchases')
     if i == 0: ax.legend()
 
 axes[-1].set_xlabel('Future Time Period')
 plt.show()
+```
+
+Note that the frequent buyers are expected to make more purchases in the future.
+
+### Probability of a Customer Being Alive
+
+We will implement the following expression as a Python function:
+
+$$
+P(\text{alive} \mid x, t_x, T, r, \alpha, a, b) = 
+\begin{cases} 
+1 & x = 0 \\
+\frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}} & x > 0 
+\end{cases}
+$$
+
+```{python}
+from scipy.special import expit
+
+def expected_probability_alive(x, t_x, T, r, alpha, a, b):
+    '''
+    Compute the probability a customer with history recency *t_x*, 
+    frequency *x*, and age of the customer *T* is currently active.
+    '''
+    log_div = (r + x) * np.log((alpha + T) / (alpha + t_x)) + np.log(
+        a / (b + np.maximum(x, 1) - 1)
+    )    
+
+    return np.where(x == 0, 1.0, expit(-log_div))
+```
+
+For $x = 0$:\
+The code returns `1.0` directly (`np.where(x == 0, 1.0, ...)`), so $P(\text{alive}) = 1$ when no purchases are observed.
+
+For $x > 0$:\
+`log_div` computes:\
+$$
+\log\left(\frac{a}{b + x - 1}\right) + (r + x) \log\left(\frac{\alpha + T}{\alpha + t_x}\right)
+$$
+
+`expit(-log_div)` computes:\
+$$
+\frac{1}{1 + e^{\log\_div}} = \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}
+$$
+
+We now look into the probability of a customer being alive for the next 90 periods:
+
+```{python}
+future_t = np.arange(91)
+future_alive = expected_probability_alive(p1x_sample, t_x_sample, (T_sample + future_t.reshape(-1,1,1)), *params)
+
+fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+
+for i, cust_id in enumerate(example_customer_ids):
+    ax = axes[i]
+    customer_data = future_alive[:, :, i]  # Shape (91, 4000)
+    mean_palive = customer_data.mean(axis=1) # Shape (91,)
+    pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
+    
+    ax.plot(future_t, mean_palive, color='k', label='Mean')
+    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
+    ax.set_title(f'Customer ID: {cust_id}')
+    ax.set_ylabel('Probability Alive')
+    if i == 0: ax.legend()
+
+axes[-1].set_xlabel('Future Time Period')
+plt.show()
+```
+
+Here are some general remarks:
+
+-   **These plots assume no future purchases**.
+
+-   The decay probability is not the same as it depends in the purchase history of the customer.
+
+-   The probability of being alive is always decreasing as we are assuming there is no change in the other parameters.
+
+-   These probabilities are always non-negative, as expected.
+
+For the frequent buyers, the probability of being alive drops very fast as we are assuming no future purchases. It is very important to keep this in mind when interpreting the results.
+
+### Probability of a Customer Making Zero Purchases in a time range
+
+```{python}
+from scipy.special import gammaln, betaln, factorial, logsumexp
+
+def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
+    """
+    Compute P(Y(t)=y | X=x,t_x,T,r,alpha,a,b).
+    """
+    alpha_T = alpha + T
+    alpha_t_x = alpha + t_x
+    alpha_T_t = alpha + T + t
+    
+    # Compute log_A (Equation 35)
+    log_A = (
+        betaln(a + 1, b + x - 1)
+        - betaln(a, b)
+        + gammaln(r + x)
+        - gammaln(r)
+        + r * np.log(alpha)
+        - (r + x) * np.log(alpha_t_x)
+    )
+    
+    # Compute log_B (Equation 36)
+    log_B = (
+        betaln(a, b + x + y)
+        - betaln(a, b)
+        + gammaln(r + x + y)
+        - gammaln(r)
+        - gammaln(y + 1)  # = log(factorial(y))
+        + r * np.log(alpha)
+        + y * np.log(t)
+        - (r + x + y) * np.log(alpha_T_t)
+    )
+    
+    # Compute log_C (Equation 37) if y > 0
+    if y > 0:
+        j = np.arange(y)
+        log_terms = (
+            gammaln(r + x + j)
+            - gammaln(r)
+            - gammaln(j + 1)
+            + r * np.log(alpha)
+            + j * np.log(t)
+            - (r + x + j) * np.log(alpha_T_t)
+        )
+        log_sum = logsumexp(log_terms, axis=-1)  # Sum over j
+        
+        log_C_part1 = (
+            betaln(a + 1, b + x + y - 1)
+            - betaln(a, b)
+            + gammaln(r + x)
+            - gammaln(r)
+            + r * np.log(alpha)
+            - (r + x) * np.log(alpha_T)
+        )
+        
+        log_C_part2 = (
+            betaln(a + 1, b + x + y - 1)
+            - betaln(a, b)
+            + log_sum
+        )
+        
+        # Compute log(exp(log_C_part1) - exp(log_C_part2)) safely
+        log_diff = log_C_part2 - log_C_part1
+        log_C = np.where(
+            log_diff < 0,
+            log_C_part1 + np.log1p(-np.exp(log_diff)),
+            -np.inf
+        )
+    else:
+        log_C = -np.inf
+    
+    # Compute numerator terms
+    mask_A = (x > 0) & (y == 0)
+    mask_C = (y > 0)
+    
+    log_term_A = np.where(mask_A, log_A, -np.inf)
+    log_term_B = log_B
+    log_term_C = np.where(mask_C, log_C, -np.inf)
+    
+    # Combine numerator terms using logsumexp
+    log_numerator = logsumexp(
+        [log_term_A, log_term_B, log_term_C],
+        axis=0
+    )
+    
+    # Compute denominator (BG/NBD likelihood L from Equation 11)
+    log_L_term1 = (
+        betaln(a, b + x)
+        - betaln(a, b)
+        + gammaln(r + x)
+        - gammaln(r)
+        + r * np.log(alpha)
+        - (r + x) * np.log(alpha_T)
+    )
+    
+    log_L_term2 = (
+        betaln(a + 1, b + x - 1)
+        - betaln(a, b)
+        + gammaln(r + x)
+        - gammaln(r)
+        + r * np.log(alpha)
+        - (r + x) * np.log(alpha_t_x)
+    )
+    
+    log_L = np.where(
+        x > 0,
+        logsumexp([log_L_term1, log_L_term2], axis=0),
+        log_L_term1
+    )
+    
+    return np.exp(log_numerator - log_L)
+```
+
+We now look into the probability of a customer making $0$ purchases between now, and the next periods between 0 and 30.
+
+```{python}
+# future_t = np.arange(31) # Future Periods to analyze
+# expected_probability_zero_purchases = expected_probability_y_purchase(
+#     p1x_sample, t_x_sample, T_sample, np.array([0]).reshape(1,-1,1), future_t.reshape(-1,1,1), *params
+# )
+# expected_probability_zero_purchases
 ```
 
 ## Appendix

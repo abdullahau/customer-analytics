@@ -1319,145 +1319,102 @@ plt.show()
 
 ## Appendix
 
-In this appendix, we derive the expressions for $E[X(t)]$ and $E(Y(t) | X = x, t_x, T)$. Central to these derivations is Euler's integral for the Gaussian hypergeometric function:
+In this appendix, we list all the managerially relevant quantities and their expressions.
+
+### Likelihood Function
+
+The likelihood function for a randomly chosen customer with purchase history $(X=x,t_{x},T)$ is given by
 
 $$
-{}_{2}F_{1}(a, b; c; z) = \frac{1}{B(b, c - b)} \int_{0}^{1} t^{b-1} (1 - t)^{c - b - 1} (1 - zt)^{-a} dt, \quad c > b.
+\begin{align*}
+L(r,\alpha,a,b\,|\,X =x,t_{x},T) &= \frac{B(a,b+x)}{B(a,b)}\frac{\Gamma(r+x)\alpha^{r}}{ \Gamma(r)(\alpha+T)^{r+x}} \\
+&+ \delta_{x>0}\,\frac{B(a+1,b+x-1)}{B(a,b)}\frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_{x})^{r+x}}
+\end{align*}
 $$
 
-### Derivation of $E[X(t)]$
+### $P(X(t)=x)$
 
-To arrive at an expression for $E[X(t)]$ for a randomly-chosen customer, we need to take the expectation of (5) over the distribution of $\lambda$ and $p$. First, we take the expectation with respect to $\lambda$, giving us:
-
-$$
-E(X(t) | r, \alpha, p) = \frac{1}{p} - \frac{\alpha^{r}}{p (\alpha + p t)^{r}}.
-$$
-
-The next step is to take the expectation of this over the distribution of $p$. We first evaluate:
+For a randomly chosen customer:
 
 $$
-\int_{0}^{1} \frac{1}{p} \frac{p^{a - 1} (1 - p)^{b - 1}}{B(a, b)} dp = \frac{a + b - 1}{a - 1}.
+\begin{split}
+P(X(t)=x \mid r,\alpha,a,b) &= \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)}{\Gamma(r)x!}\left(\frac{\alpha}{\alpha+t}\right)^{r}\left(\frac{t}{\alpha+t}\right)^{x} \\
+&+ \delta_{x>0}\,\frac{B(a+1,b+x-1)}{B(a,b)} \\
+& \times \left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}\left\{\sum_{j=0}^{x-1}\frac{\Gamma(r+j)}{\Gamma(r)j!}\left(\frac{t}{ \alpha+t}\right)^{j}\right\} \right]
+\end{split}
 $$
 
-Next, we evaluate:
+### $P($alive at $t)$
+
+For a randomly chosen customer:
 
 $$
-\int_{0}^{1} \frac{\alpha^{r}}{p (\alpha + p t)^{r}} \frac{p^{a - 1} (1 - p)^{b - 1}}{B(a, b)} dp = \alpha^{r} \frac{1}{B(a, b)} \int_{0}^{1} p^{a - 2} (1 - p)^{b - 1} (\alpha + p t)^{-r} dp.
+P({\rm alive\ at\ }t\,|\,r,\alpha,a,b) = \left(\frac{\alpha}{\alpha+t}\right)^{r}{}_{2}F_{1}\left(r,b;a+b;\tfrac{t}{\alpha+t}\right)
 $$
 
-Letting $q = 1 - p$ (which implies $dp = -dq$):
+### $E[X(t)]$
 
-$$
-= \left(\frac{\alpha}{\alpha + t}\right)^{r} \frac{1}{B(a, b)} \int_{0}^{1} q^{b - 1} (1 - q)^{a - 2} \left(1 - \frac{t}{\alpha + t} q\right)^{-r} dq.
-$$
-
-Recalling Euler's integral for the Gaussian hypergeometric function:
-
-$$
-= \left(\frac{\alpha}{\alpha + t}\right)^{r} \frac{B(a - 1, b)}{B(a, b)} {}_{2}F_{1}\left(r, b; a + b - 1; \frac{t}{\alpha + t}\right).
-$$
-
-It follows that:
+An expression for $E[X(t)]$ for a randomly-chosen customer:
 
 $$
 E(X(t) | r, \alpha, a, b) = \frac{a + b - 1}{a - 1} \left[1 - \left(\frac{\alpha}{\alpha + t}\right)^{r} {}_{2}F_{1}\left(r, b; a + b - 1; \frac{t}{\alpha + t}\right)\right].
 $$
 
-### Derivation of $E(Y(t) | X = x, t_x, T)$
+### $E(Y(t) \mid X = x, t_x, T)$
 
 Let the random variable $Y(t)$ denote the number of purchases made in the period $(T, T + t]$. We are interested in computing the conditional expectation $E(Y(t) | X = x, t_x, T)$, the expected number of purchases in the period $(T, T + t]$ for a customer with purchase history $X = x, t_x, T$.
 
-If the customer is active at $T$, it follows from (5) that:
-
-$$
-E(Y(t) | \lambda, p) = \frac{1}{p} - \frac{1}{p} e^{-\lambda p t}.
-$$
-
-What is the probability that a customer is active at $T$? Given our assumption that all customers are active at the beginning of the initial observation period, a customer cannot drop out before he has made any transactions; therefore:
-
-$$
-P(\text{active at } T | X = 0, T, \lambda, p) = 1.
-$$
-
-For the case where purchases were made in the period $(0, T]$, the probability that a customer with purchase history $(X = x, t_x, T)$ is still active at $T$, conditional on $\lambda$ and $p$, is simply the probability that he did not drop out at $t_x$ and made no purchase in $(t_x, T]$, divided by the probability of making no purchases in this same period. Recalling that this second probability is simply the probability that the customer became inactive at $t_x$, plus the probability he remained active but made no purchases in this interval, we have:
-
-$$
-P(\text{active at } T | X = x, t_x, T, \lambda, p) = \frac{(1 - p) e^{-\lambda (T - t_x)}}{p + (1 - p) e^{-\lambda (T - t_x)}}.
-$$
-
-Multiplying this by $\frac{(1 - p)^{x - 1} \lambda^{x} e^{-\lambda t_x}}{(1 - p)^{x - 1} \lambda^{x} e^{-\lambda t_x}}$ gives us:
-
-$$
-P(\text{active at } T | X = x, t_x, T, \lambda, p) = \frac{(1 - p)^{x} \lambda^{x} e^{-\lambda T}}{L(\lambda, p | X = x, t_x, T)},
-$$
-
-where the expression for $L(\lambda, p | X = x, t_x, T)$ is given in (3). (Note that when $x = 0$, the expression given in (A2) equals 1.)
-
-Multiplying (A1) and (A2) yields:
-
-$$
-\begin{align*}
-E(Y(t) | X = x, t_x, T, \lambda, p) &= \frac{(1 - p)^{x} \lambda^{x} e^{-\lambda T} \left(\frac{1}{p} - \frac{1}{p} e^{-\lambda p t}\right)}{L(\lambda, p | X = x, t_x, T)} \\
-&= \frac{p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda T} - p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda (T + p t)}}{L(\lambda, p | X = x, t_x, T)}.
-\end{align*}
-$$
-
-(Note that this reduces to (A1) when $x = 0$, which follows from the result that a customer who made zero purchases in the time period $(0, T]$ must be assumed to be active at time $T$.)
-
-As the transaction rate $\lambda$ and dropout probability $p$ are unobserved, we compute $E(Y(t) | X = x, t_x, T)$ for a randomly chosen customer by taking the expectation of (A3) over the distribution of $\lambda$ and $p$, updated to take account of the information $X = x, t_x, T$:
-
-$$
-\begin{align*}
-E(Y(t) | X = x, t_x, T, r, \alpha, a, b) &= \int_{0}^{1} \int_{0}^{\infty} E(Y(t) | X = x, t_x, T, \lambda, p) \\
-&\cdot f(\lambda, p | r, \alpha, a, b, X = x, t_x, T) d\lambda dp.
-\end{align*}
-$$
-
-By Bayes theorem, the joint posterior distribution of $\lambda$ and $p$ is given by:
-
-$$
-f(\lambda, p | r, \alpha, a, b, X = x, t_x, T) = \frac{L(\lambda, p | X = x, t_x, T) f(\lambda | r, \alpha) f(p | a, b)}{L(r, \alpha, a, b | X = x, t_x, T)}.
-$$
-
-Substituting (A3) and (A5) in (A4), we get:
-
-$$
-E(Y(t) | X = x, t_x, T, r, \alpha, a, b) = \frac{A - B}{L(r, \alpha, a, b | X = x, t_x, T)'}
-$$
-
-where:
-
-$$
-\begin{align*}
-A &= \int_{0}^{1} \int_{0}^{\infty} p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda T} f(\lambda | r, \alpha) f(p | a, b) d\lambda dp \\
-&= \frac{B(a - 1, b + x)}{B(a, b)} \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) (\alpha + T)^{r + x}}
-\end{align*}
-$$
-
-and:
-
-$$
-\begin{align*}
-B &= \int_{0}^{1} \int_{0}^{\infty} p^{-1} (1 - p)^{x} \lambda^{x} e^{-\lambda (T + p t)} f(\lambda | r, \alpha) f(p | a, b) d\lambda dp \\
-&= \int_{0}^{1} \frac{p^{a - 2} (1 - p)^{b + x - 1}}{B(a, b)} \left\{\int_{0}^{\infty} \frac{\alpha^{r} \lambda^{r + x - 1} e^{-\lambda (\alpha + T + p t)}}{\Gamma(r)} d\lambda\right\} dp \\
-&= \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) B(a, b)} \int_{0}^{1} p^{a - 2} (1 - p)^{b + x - 1} (\alpha + T + p t)^{-(r + x)} dp.
-\end{align*}
-$$
-
-Letting $q = 1 - p$ (which implies $dp = -dq$):
-
-$$
-= \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) B(a, b) (\alpha + T + t)^{r + x}} \cdot \int_{0}^{1} q^{b + x - 1} (1 - q)^{a - 2} \left(1 - \frac{t}{\alpha + T + t} q\right)^{-(r + x)} dq.
-$$
-
-Recalling Euler's integral for the Gaussian hypergeometric function:
-
-$$
-= \frac{B(a - 1, b + x)}{B(a, b)} \frac{\Gamma(r + x) \alpha^{r}}{\Gamma(r) (\alpha + T + t)^{r + x}} \cdot {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right).
-$$
-
-Substituting (6), (A7), and (A8) in (A6) and simplifying, we get:
-
 $$
 E(Y(t) | X = x, t_x, T, r, \alpha, a, b) = \frac{\frac{a + b + x - 1}{a - 1} \left[1 - \left(\frac{\alpha + T}{\alpha + T + t}\right)^{r + x} {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right)\right]}{1 + \delta_{x > 0} \frac{a}{b + x - 1} \left(\frac{\alpha + T}{\alpha + t_x}\right)^{r + x}}.
+$$
+
+### Conditional Predictions
+
+Below are some expressions that produce the following forward-looking quantities:
+
+- the probability that an individual with observed behavior $(X = x, t_x, T)$ is still active at time $T$,
+- the expected number of transactions in a future period of length $t$ for an individual with observed behavior $(X = x, t_x, T)$
+- and, an expression for the probability of making $y$ purchases in a future time period given the observed past behavior.
+
+
+### $P(\text{alive at }T \mid X=x,t_{x},T)$
+
+$$
+P(\text{alive at }T\,|\,X=x,t_{x},T,r,\alpha,a,b) = 1 \bigg/ \left[1 + \delta_{x>0}\frac{a}{b+x-1}\left(\frac{\alpha + T}{\alpha + t_{x}}\right)^{r+x}\right].
+$$
+
+### $E(Y(t) \mid X=x,t_{x},T)$
+
+Let the random variable $Y(t)$ denote the number of purchases made in $(T, T + t]$. We are interested in computing the conditional expectation $E(Y (t) \mid X = x, t_x, T)$, the expected number of purchases in $(T, T + t]$ for a customer with purchase history $(X = x, t_x, T)$.
+
+For $Y(t)$, the expected number of purchases in $(T,T+t]$,
+
+$$
+\begin{align*}
+& E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
+& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}}
+\end{align*}
+$$
+
+### $P(Y(t)=y \mid X=x,t_{x},T)$
+
+Below is an expression for the probability of observing $y$ purchases in the interval $(T,T+t]$ by a customer with purchase history $(X=x,t_{x},T)$.
+
+$$
+P(Y(t)=y \mid X=x,t_{x},T,r,\alpha,a,b)=\frac{\delta_{x>0,y=0}\,\mathsf{A}+ \mathsf{B}+\delta_{y>0}\,\mathsf{C}}{L(r,\alpha,a,b \mid X=x,t_{x},T)}
+$$
+
+$$
+\mathsf{A}=\frac{B(a+1,b+x-1)}{B(a,b)}\frac{\Gamma(r+x)}{\Gamma(r)}\frac{ \alpha^{r}}{(\alpha+t_{x})^{r+x}},
+$$
+
+$$
+\mathsf{B} =\frac{B(a,b+x+y)}{B(a,b)}\frac{\Gamma(r+x+y)}{\Gamma(r)y!}\frac{ \alpha^{r}t^{y}}{(\alpha+T+t)^{r+x+y}},
+$$
+
+$$
+\begin{align*}
+\mathsf{C} &= \frac{B(a+1,b+x+y-1)}{B(a,b)} \\
+&\times\left\{\frac{\Gamma(r+x)}{\Gamma(r)}\frac{\alpha^{r} }{(\alpha+T)^{r+x}}-\sum_{j=0}^{y-1}\frac{\Gamma(r+x+j)}{\Gamma(r)j!}\frac{ \alpha^{r}t^{j}}{(\alpha+T+t)^{r+x+j}}\right\}
+\end{align*}
 $$

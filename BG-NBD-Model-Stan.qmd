@@ -1074,14 +1074,7 @@ pl.DataFrame({
 
 Observe that the last two customers are *frequent buyers* as compared to the others.
 
-We will use the following forward-looking expression to obtain the expected number of transactions in a future period of length $t$ for an individual with past observed behavior $\left(X=x, t_{x}, T\right)$.
-
-$$
-\begin{align*}
-& E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
-& \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}}
-\end{align*}
-$$
+We will use the forward-looking @eq-E-Y-t to obtain the expected number of transactions in a future period of length $t$ for an individual with past observed behavior $\left(X=x, t_{x}, T\right)$.
 
 ```{python}
 def expected_purchases(x, t_x, T, t, r, alpha, a, b):
@@ -1125,15 +1118,7 @@ Note that the frequent buyers are expected to make more purchases in the future.
 
 ### Probability of a Customer Being Alive
 
-We will implement the following expression as a Python function:
-
-$$
-P(\text{alive} \mid x, t_x, T, r, \alpha, a, b) = 
-\begin{cases} 
-1 & x = 0 \\
-\frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}} & x > 0 
-\end{cases}
-$$
+We will implement the @eq-P-alive-T as a Python function:
 
 ```{python}
 from scipy.special import expit
@@ -1150,20 +1135,6 @@ def expected_probability_alive(x, t_x, T, r, alpha, a, b):
 
     return np.where(x == 0, 1.0, expit(-log_div))
 ```
-
-For $x = 0$:\
-The code returns `1.0` directly (`np.where(x == 0, 1.0, ...)`), so $P(\text{alive}) = 1$ when no purchases are observed.
-
-For $x > 0$:\
-`log_div` computes:\
-$$
-\log\left(\frac{a}{b + x - 1}\right) + (r + x) \log\left(\frac{\alpha + T}{\alpha + t_x}\right)
-$$
-
-`expit(-log_div)` computes:\
-$$
-\frac{1}{1 + e^{\log\_div}} = \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}
-$$
 
 We now look into the probability of a customer being alive for the next 90 periods:
 
@@ -1204,7 +1175,7 @@ For the frequent buyers, the probability of being alive drops very fast as we ar
 
 ### Probability of a Customer Making Zero Purchases in a Time Range
 
-We will leverage the (@eq-P-Y-t)
+We will leverage @eq-P-Y-t
 
 ```{python}
 def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
@@ -1344,7 +1315,7 @@ P(X(t)=x \mid r,\alpha,a,b) &= \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)}{\Gamma
 &+ \delta_{x>0}\,\frac{B(a+1,b+x-1)}{B(a,b)} \\
 & \times \left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}\left\{\sum_{j=0}^{x-1}\frac{\Gamma(r+j)}{\Gamma(r)j!}\left(\frac{t}{ \alpha+t}\right)^{j}\right\} \right]
 \end{split}
-$$
+$$ {#eq-P-X-t}
 
 ### $P($alive at $t)$
 
@@ -1383,6 +1354,16 @@ Below are some expressions that produce the following forward-looking quantities
 
 $$
 P(\text{alive at }T\,|\,X=x,t_{x},T,r,\alpha,a,b) = 1 \bigg/ \left[1 + \delta_{x>0}\frac{a}{b+x-1}\left(\frac{\alpha + T}{\alpha + t_{x}}\right)^{r+x}\right].
+$$ {#eq-P-alive-T}
+
+Note that for $x > 0$ we can compute the denominator quantity in a log form as:\
+$$
+\text{Denominator} = \log\left(\frac{a}{b + x - 1}\right) + (r + x) \log\left(\frac{\alpha + T}{\alpha + t_x}\right)
+$$
+
+Running an expit function on the denominator get us :\
+$$
+\frac{1}{1 + e^{\text{Denominator}}} = \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}
 $$
 
 ### $E(Y(t) \mid X=x,t_{x},T)$
@@ -1396,7 +1377,7 @@ $$
 & E\left(Y(t) \mid X=x, t_{x}, T, r, \alpha, a, b\right)= \\
 & \qquad \frac{\frac{a+b+x-1}{a-1}\left[1-\left(\frac{\alpha+T}{\alpha+T+t}\right)^{r+x}{ }_{2} F_{1}\left(r+x, b+x ; a+b+x-1 ; \frac{t}{\alpha+T+t}\right)\right]}{1+\delta_{x>0} \frac{a}{b+x-1}\left(\frac{\alpha+T}{\alpha+t_{x}}\right)^{r+x}}
 \end{align*}
-$$
+$$ {#eq-E-Y-t}
 
 ### $P(Y(t)=y \mid X=x,t_{x},T)$
 

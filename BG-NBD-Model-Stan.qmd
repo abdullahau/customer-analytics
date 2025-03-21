@@ -1140,6 +1140,7 @@ from scipy.special import expit
 
 def expected_probability_alive(x, t_x, T, r, alpha, a, b):
     '''
+    P(alive at T | X = x, t_x, T, r,  alpha, a, b)
     Compute the probability a customer with history recency *t_x*, 
     frequency *x*, and age of the customer *T* is currently active.
     '''
@@ -1201,13 +1202,13 @@ Here are some general remarks:
 
 For the frequent buyers, the probability of being alive drops very fast as we are assuming no future purchases. It is very important to keep this in mind when interpreting the results.
 
-### Probability of a Customer Making Zero Purchases in a time range
+### Probability of a Customer Making Zero Purchases in a Time Range
 
 ```{python}
 def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
     """
     Compute P(Y(t)=y | X=x,t_x,T,r,alpha,a,b)
-    If broadcasting, either t or y must be scalar.
+    If broadcasting, y must be scalar.
     """
 
     # Compute denominator Log-Likelihood
@@ -1266,7 +1267,7 @@ We now look into the probability of a customer making $0$ purchases between now,
 future_t = np.arange(31) # Future Periods to analyze
 expected_probability_zero_purchases = expected_probability_y_purchase(
     p1x_sample, t_x_sample, T_sample, 0, future_t.reshape(-1,1,1), *params
-)
+) # Shape (time interval, params, customer)
 
 fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
 
@@ -1287,12 +1288,33 @@ plt.gcf().suptitle("Expected Probability of Zero Purchases between $(T, T+t]$.",
 plt.show()
 ```
 
+### Probability of a Customer Making $y$ Purchases Within 30 days from Now
+
+Let us look into the probability of a customer making $0, 1, 2, 3, 4, \text{ or } 5$ number of purchases between now, and 30 days from now.
+
 ```{python}
-# num_purchases = np.arange(5) # Num of purchases
-# expected_probability_purchases = expected_probability_y_purchase(
-#     p1x_sample, t_x_sample, T_sample, num_purchases.reshape(-1,1,1), 30, *params
-# )
-# expected_probability_purchases
+num_purchases = np.arange(6) # Num of purchases
+expected_probability_purchases = np.zeros((len(num_purchases), len(params[0]), len(p1x_sample))) 
+for y in num_purchases: # Shape (number of purchases, params, customer)
+    expected_probability_purchases[y, :, :] = expected_probability_y_purchase(
+        p1x_sample, t_x_sample, T_sample, y, 30, *params
+    ) 
+
+fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+
+for i, cust_id in enumerate(example_customer_ids):
+    ax = axes[i]
+    customer_data = expected_probability_purchases[:, :, i]  
+    mean = customer_data.mean(axis=1) 
+    pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)
+    
+    ax.bar(num_purchases, mean, color='white', edgecolor='black', yerr=[mean - pi[0,:], pi[1,:] - mean])
+    ax.set_title(f'Customer ID: {cust_id}')
+    ax.set_ylabel('Probability')
+
+axes[-1].set_xlabel('Number of Purchases')
+plt.gcf().suptitle("Expected Probability of $y$ Purchases within 30 days from T.", fontweight="bold")
+plt.show()
 ```
 
 ## Appendix

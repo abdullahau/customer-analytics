@@ -1204,6 +1204,8 @@ For the frequent buyers, the probability of being alive drops very fast as we ar
 
 ### Probability of a Customer Making Zero Purchases in a Time Range
 
+We will leverage the (@eq-P-Y-t)
+
 ```{python}
 def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
     """
@@ -1330,7 +1332,7 @@ $$
 L(r,\alpha,a,b\,|\,X =x,t_{x},T) &= \frac{B(a,b+x)}{B(a,b)}\frac{\Gamma(r+x)\alpha^{r}}{ \Gamma(r)(\alpha+T)^{r+x}} \\
 &+ \delta_{x>0}\,\frac{B(a+1,b+x-1)}{B(a,b)}\frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_{x})^{r+x}}
 \end{align*}
-$$
+$$ {#eq-loglikelihood}
 
 ### $P(X(t)=x)$
 
@@ -1402,7 +1404,7 @@ Below is an expression for the probability of observing $y$ purchases in the int
 
 $$
 P(Y(t)=y \mid X=x,t_{x},T,r,\alpha,a,b)=\frac{\delta_{x>0,y=0}\,\mathsf{A}+ \mathsf{B}+\delta_{y>0}\,\mathsf{C}}{L(r,\alpha,a,b \mid X=x,t_{x},T)}
-$$
+$$ {#eq-P-Y-t}
 
 $$
 \mathsf{A}=\frac{B(a+1,b+x-1)}{B(a,b)}\frac{\Gamma(r+x)}{\Gamma(r)}\frac{ \alpha^{r}}{(\alpha+t_{x})^{r+x}},

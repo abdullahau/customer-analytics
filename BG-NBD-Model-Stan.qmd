@@ -1086,6 +1086,7 @@ $$
 ```{python}
 def expected_purchases(x, t_x, T, t, r, alpha, a, b):
     '''
+    E(Y(t) | X = x, t_x, T, r,  alpha, a, b)
     Compute the expected number of future purchases across future *t* 
     time periods given recency *t_x*, frequency *x*, and age of the customer *T* for each customer.
     '''
@@ -1116,6 +1117,7 @@ for i, cust_id in enumerate(example_customer_ids):
     if i == 0: ax.legend()
 
 axes[-1].set_xlabel('Future Time Period')
+plt.gcf().suptitle("Expected Number of Purchases", fontweight="bold")
 plt.show()
 ```
 
@@ -1183,6 +1185,7 @@ for i, cust_id in enumerate(example_customer_ids):
     if i == 0: ax.legend()
 
 axes[-1].set_xlabel('Future Time Period')
+plt.gcf().suptitle("Expected Probability Alive over Time", fontweight="bold")
 plt.show()
 ```
 
@@ -1201,126 +1204,95 @@ For the frequent buyers, the probability of being alive drops very fast as we ar
 ### Probability of a Customer Making Zero Purchases in a time range
 
 ```{python}
-from scipy.special import gammaln, betaln, factorial, logsumexp
-
 def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
     """
-    Compute P(Y(t)=y | X=x,t_x,T,r,alpha,a,b).
+    Compute P(Y(t)=y | X=x,t_x,T,r,alpha,a,b)
+    If broadcasting, either t or y must be scalar.
     """
-    alpha_T = alpha + T
-    alpha_t_x = alpha + t_x
-    alpha_T_t = alpha + T + t
-    
-    # Compute log_A (Equation 35)
-    log_A = (
-        betaln(a + 1, b + x - 1)
-        - betaln(a, b)
-        + gammaln(r + x)
-        - gammaln(r)
-        + r * np.log(alpha)
-        - (r + x) * np.log(alpha_t_x)
+
+    # Compute denominator Log-Likelihood
+    L_term1 = (
+        (beta(a, b + x) / beta(a, b)) * 
+        (gamma(r + x) / gamma(r)) * 
+        (alpha**r / (alpha + T)**(r + x))
     )
     
-    # Compute log_B (Equation 36)
-    log_B = (
-        betaln(a, b + x + y)
-        - betaln(a, b)
-        + gammaln(r + x + y)
-        - gammaln(r)
-        - gammaln(y + 1)  # = log(factorial(y))
-        + r * np.log(alpha)
-        + y * np.log(t)
-        - (r + x + y) * np.log(alpha_T_t)
-    )
+    L_term2 = (
+        (beta(a + 1, b + x - 1) / beta(a, b)) * 
+        (gamma(r + x) / gamma(r)) * 
+        (alpha**r / (alpha + t_x)**(r + x))
+    ) * (x > 0)
     
-    # Compute log_C (Equation 37) if y > 0
+    L = L_term1 + L_term2
+
+    # Compute numerator components
+    # Term A (Equation 35)
+    A = (
+        (beta(a + 1, b + x - 1) / beta(a, b)) * 
+        (gamma(r + x) / gamma(r)) * 
+        (alpha**r / (alpha + t_x)**(r + x))
+    ) * (x > 0) * (y == 0)
+
+    # Term B (Equation 36)
+    B = (
+        (beta(a, b + x + y) / beta(a, b)) * 
+        (gamma(r + x + y) / gamma(r)) / gamma(y + 1) * 
+        (alpha**r * t**y / (alpha + T + t)**(r + x + y))
+    )
+
+    # Term C (Equation 37)
+    C = 0
     if y > 0:
-        j = np.arange(y)
-        log_terms = (
-            gammaln(r + x + j)
-            - gammaln(r)
-            - gammaln(j + 1)
-            + r * np.log(alpha)
-            + j * np.log(t)
-            - (r + x + j) * np.log(alpha_T_t)
+        sum_terms = 0 
+        for j in range(y):  
+            term = gamma(r + x + j) / (gamma(r) * gamma(j + 1))
+            term *= (alpha**r * t**j) / (alpha + T + t)**(r + x + j)
+            sum_terms += term  
+            
+        C_part = (
+            (beta(a + 1, b + x + y - 1) / beta(a, b)) * 
+            ((gamma(r + x) / gamma(r)) * (alpha**r / (alpha + T)**(r + x)) - sum_terms)
         )
-        log_sum = logsumexp(log_terms, axis=-1)  # Sum over j
-        
-        log_C_part1 = (
-            betaln(a + 1, b + x + y - 1)
-            - betaln(a, b)
-            + gammaln(r + x)
-            - gammaln(r)
-            + r * np.log(alpha)
-            - (r + x) * np.log(alpha_T)
-        )
-        
-        log_C_part2 = (
-            betaln(a + 1, b + x + y - 1)
-            - betaln(a, b)
-            + log_sum
-        )
-        
-        # Compute log(exp(log_C_part1) - exp(log_C_part2)) safely
-        log_diff = log_C_part2 - log_C_part1
-        log_C = np.where(
-            log_diff < 0,
-            log_C_part1 + np.log1p(-np.exp(log_diff)),
-            -np.inf
-        )
-    else:
-        log_C = -np.inf
+        C = C_part * (y > 0)
+
+    numerator = A + B + C
     
-    # Compute numerator terms
-    mask_A = (x > 0) & (y == 0)
-    mask_C = (y > 0)
-    
-    log_term_A = np.where(mask_A, log_A, -np.inf)
-    log_term_B = log_B
-    log_term_C = np.where(mask_C, log_C, -np.inf)
-    
-    # Combine numerator terms using logsumexp
-    log_numerator = logsumexp(
-        [log_term_A, log_term_B, log_term_C],
-        axis=0
-    )
-    
-    # Compute denominator (BG/NBD likelihood L from Equation 11)
-    log_L_term1 = (
-        betaln(a, b + x)
-        - betaln(a, b)
-        + gammaln(r + x)
-        - gammaln(r)
-        + r * np.log(alpha)
-        - (r + x) * np.log(alpha_T)
-    )
-    
-    log_L_term2 = (
-        betaln(a + 1, b + x - 1)
-        - betaln(a, b)
-        + gammaln(r + x)
-        - gammaln(r)
-        + r * np.log(alpha)
-        - (r + x) * np.log(alpha_t_x)
-    )
-    
-    log_L = np.where(
-        x > 0,
-        logsumexp([log_L_term1, log_L_term2], axis=0),
-        log_L_term1
-    )
-    
-    return np.exp(log_numerator - log_L)
+    return numerator / L
 ```
 
 We now look into the probability of a customer making $0$ purchases between now, and the next periods between 0 and 30.
 
 ```{python}
-# future_t = np.arange(31) # Future Periods to analyze
-# expected_probability_zero_purchases = expected_probability_y_purchase(
-#     p1x_sample, t_x_sample, T_sample, np.array([0]).reshape(1,-1,1), future_t.reshape(-1,1,1), *params
+future_t = np.arange(31) # Future Periods to analyze
+expected_probability_zero_purchases = expected_probability_y_purchase(
+    p1x_sample, t_x_sample, T_sample, 0, future_t.reshape(-1,1,1), *params
+)
+
+fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+
+for i, cust_id in enumerate(example_customer_ids):
+    ax = axes[i]
+    customer_data = expected_probability_zero_purchases[:, :, i]  # Shape (91, 4000)
+    mean = customer_data.mean(axis=1) # Shape (91,)
+    pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
+    
+    ax.plot(future_t, mean, color='k', label='Mean')
+    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
+    ax.set_title(f'Customer ID: {cust_id}')
+    ax.set_ylabel('Probability')
+    if i == 0: ax.legend()
+
+axes[-1].set_xlabel('Future Time Period')
+plt.gcf().suptitle("Expected Probability of Zero Purchases between $(T, T+t]$.", fontweight="bold")
+plt.show()
+```
+
+```{python}
+# num_purchases = np.arange(5) # Num of purchases
+# expected_probability_purchases = expected_probability_y_purchase(
+#     p1x_sample, t_x_sample, T_sample, num_purchases.reshape(-1,1,1), 30, *params
 # )
-# expected_probability_zero_purchases
+# expected_probability_purchases
 ```
 
 ## Appendix

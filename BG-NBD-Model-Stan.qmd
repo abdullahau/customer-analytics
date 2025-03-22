@@ -194,7 +194,7 @@ P(X(t)=x)=& P \text{(active after } x \text{th purchase}) \\
 &\cdot P(\text { becomes inactive after } x \text { th purchase }) \\
 &\cdot P\left(T_{x} \leq t\right)
 \end{align*}
-$$
+$$ {#eq-numtrans}
 
 Given the assumption that the time between transactions is characterized by the exponential distribution, $P\left(T_{x} \leq t\right.$ and $\left.T_{x+1}>t\right)$ is simply the Poisson probability that $X(t)=x$, and $P\left(T_{x} \leq t\right)$ is the Erlang- $x$ cdf. Therefore
 
@@ -202,7 +202,7 @@ $$
 \begin{equation*}
 P(X(t)=x \mid \lambda, p)=(1-p)^{x} \frac{(\lambda t)^{x} e^{-\lambda t}}{x!}+\delta_{x>0} p(1-p)^{x-1}\cdot\left[1-e^{-\lambda t} \sum_{j=0}^{x-1} \frac{(\lambda t)^{j}}{j!}\right]
 \end{equation*}
-$$
+$$ {#eq-numtrans2}
 
 #### Derivation of $E[X(t)]$
 
@@ -257,7 +257,7 @@ P(X(t)= x \mid r, \alpha, a, b) &=\frac{B(a, b+x)}{B(a, b)} \frac{\Gamma(r+x)}{\
 &+\delta_{x>0} \frac{B(a+1, b+x-1)}{B(a, b)} \\
 &\cdot\left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}\left\{\sum_{j=0}^{x-1} \frac{(\Gamma(r+j)}{\Gamma(r) j!}\left(\frac{t}{\alpha+t}\right)^{j}\right\}\right]
 \end{align*}
-$$
+$$ {#eq-numtrans3}
 
 -   Finally, taking the expectation of (5) over the distribution of $\lambda$ and $p$ results in the following expression for the expected number of purchases in a time period of length $t$ :
 
@@ -308,7 +308,6 @@ from scipy.optimize import minimize
 import arviz as az
 import polars as pl
 import numpy as np
-
 
 import matplotlib.pyplot as plt
 %config InlineBackend.figure_formats = ['svg']
@@ -506,7 +505,7 @@ pl.DataFrame(
 
 ## Stan Model
 
-We will now set-up a Stan model and run both, the optimiztion algorithm and the MCMC sampler. 
+We will now set-up a Stan model and run both, the optimization algorithm and the MCMC sampler.
 
 ### Standard Parameters
 
@@ -575,7 +574,7 @@ data = {
 stan_model = StanQuap(
     stan_file='stan_models/bg-nbd', 
     stan_code=stan_code, data=data, 
-    algorithm='LBFGS', jacobian=False, 
+    algorithm='LBFGS', jacobian=False,
     tol_rel_grad=1e-7, iter=5000
 )
 
@@ -612,10 +611,10 @@ print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
 # | code-fold: false
 stan_code = '''
 data {
-    int<lower=0> N;               // Number of customers
-    array[N] int<lower=0> X;      // Number of transactions per customer
-    vector<lower=0>[N] T;         // Total observation time per customer
-    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)
+    int<lower=0> N;                  // Number of customers
+    array[N] int<lower=0> X;         // Number of transactions per customer
+    vector<lower=0>[N] T;            // Total observation time per customer
+    vector<lower=0>[N] t_x;           // Time of last transaction (0 if X=0)
 }
 
 parameters {
@@ -769,7 +768,54 @@ The `r` and `alpha` purchase rate parameters are quite similar for all three mod
 
 ## Prior and Posterior Predictive Checks
 
-PPCs allow us to check the efficacy of our priors, and the performance of the fitted posteriors.
+PPCs allow us to check the efficacy of our priors, and the performance of the fitted posteriors. For prior predictive check, we generate random numbers of the parameters based on the prior distribution. In contrast, for posterior predictive check, we generate replicated data according to the posterior predictive distribution.
+
+Note that in addition to generating random numbers of the priors or sampling parameters from the posterior, we are computing the predicted number of transactions for each customer during their observation period $T$. This will be computed in two ways:
+
+-   In Stan, we will us the expression @eq-numtrans and @eq-numtrans2 given the nature of the dropout process and the time between transactions:
+
+    -   Transaction Process: $$
+         \text{Time between transactions} \sim \text{Exponential}(\lambda)
+         $$
+
+    -   Dropout Process:
+
+    $$
+     \text{Dropout after transaction} \sim \text{Bernoulli}(p)
+     $$
+
+    -   Population Distributions:
+
+    $$
+     \lambda \sim \text{Gamma}(r, \alpha), \quad p \sim \text{Beta}(a, b)
+     $$
+
+-   We will also compute the number of transactions for each customer using the expression @eq-numtrans3.
+
+```{python}
+# probability of observing x purchases in a time period of length t
+def pmf(x, t, r, alpha, a, b):
+    A = np.cumsum(
+        gamma(r+x[:-1])/(gamma(r)*factorial(x[:-1])) *
+        (t/(alpha+t))**x[:-1], axis=0
+    )
+    pmf = (
+        beta(a,b+x)/beta(a,b) *
+        gamma(r+x)/(gamma(r)*factorial(x)) *
+        (alpha/(alpha+t))**r *
+        (t/(alpha+t))**x
+    )
+    pmf[1:] += (
+        beta(a+1,b+x[1:]-1)/beta(a,b) *
+        (1 - (alpha/(alpha+t))**r * A)
+    )
+    return pmf
+
+def bgnbd_predict_trans_dist(x, n, T, r, alpha, a, b):
+    pmf = bgnbd_pmf(x, T, r, alpha, a, b)
+    pmf[-1] = 1 - np.sum(pmf[:-1], axis=0)
+    return np.dot(pmf, n)
+```
 
 ### Prior Predictive Check
 
@@ -859,23 +905,27 @@ plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'
 plt.legend();
 ```
 
+```{python}
+prior_fit.stan_variables()
+```
+
 ### Posterior Predictive Check
 
 ```{python}
 # | code-fold: false
 stan_post_code = '''
 data {
-    int<lower=0> N;               
-    array[N] int<lower=0> X;      
-    vector<lower=0>[N] T;         
-    vector<lower=0>[N] t_x;        
+    int<lower=0> N;
+    array[N] int<lower=0> X;
+    vector<lower=0>[N] T;
+    vector<lower=0>[N] t_x;
 }
 
 parameters {
-    real<lower=0> r;                         
-    real<lower=0> alpha;                     
-    real<lower=0, upper=1> phi_dropout;      
-    real<lower=1> kappa_dropout;             
+    real<lower=0> r;
+    real<lower=0> alpha;
+    real<lower=0, upper=1> phi_dropout;
+    real<lower=1> kappa_dropout;
 }
 
 transformed parameters {
@@ -1278,10 +1328,9 @@ $$
 
 Below are some expressions that produce the following forward-looking quantities:
 
-- the probability that an individual with observed behavior $(X = x, t_x, T)$ is still active at time $T$,
-- the expected number of transactions in a future period of length $t$ for an individual with observed behavior $(X = x, t_x, T)$
-- and, an expression for the probability of making $y$ purchases in a future time period given the observed past behavior.
-
+-   the probability that an individual with observed behavior $(X = x, t_x, T)$ is still active at time $T$,
+-   the expected number of transactions in a future period of length $t$ for an individual with observed behavior $(X = x, t_x, T)$
+-   and, an expression for the probability of making $y$ purchases in a future time period given the observed past behavior.
 
 ### $P(\text{alive at }T \mid X=x,t_{x},T)$
 
@@ -1298,7 +1347,6 @@ P(\text{alive} &\mid x,t_x,T,r,\alpha,a,b) \\
 &= \frac{1}{1 + \delta_{x>0} \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}.
 \end{align*}
 $$
-
 
 $$
 P(\text{alive at }T\,|\,X=x,t_{x},T,r,\alpha,a,b) = 1 \bigg/ \left[1 + \delta_{x>0}\frac{a}{b+x-1}\left(\frac{\alpha + T}{\alpha + t_{x}}\right)^{r+x}\right].
@@ -1355,7 +1403,7 @@ There are two ways to overcome this potential problem.
 
     $$
     P(\text{alive} \mid x,t_x,T,r,\alpha,a,b) = \frac{1}{1 + \frac{a}{b+x} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}},
-    $$ 
+    $$
 
     which is less than $1$ for $x = 0$ in the interval $(0,T]$.
 
@@ -1394,4 +1442,3 @@ $$
 &\times\left\{\frac{\Gamma(r+x)}{\Gamma(r)}\frac{\alpha^{r} }{(\alpha+T)^{r+x}}-\sum_{j=0}^{y-1}\frac{\Gamma(r+x+j)}{\Gamma(r)j!}\frac{ \alpha^{r}t^{j}}{(\alpha+T+t)^{r+x+j}}\right\}
 \end{align*}
 $$
-

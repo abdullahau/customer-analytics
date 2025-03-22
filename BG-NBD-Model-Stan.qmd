@@ -282,7 +282,7 @@ $$
 
 Once again, this expectation requires a single evaluation of the Gaussian hypergeometric function for any customer of interest, but this is not a burdensome task. The remainder of the expression is simple arithmetic.
 
-Maximum likelihood estimates of the model parameters ($r$, $\alpha$, $a$, $b$) are obtained by maximizing the log-likelihood function given in (7) above. Standard numerical optimization methods are employed, using the SciPy minimize and Stan's optimize method, to obtain the parameter estimates. To implement the model in SciPy, we rewrite the log-likelihood function, (6), as
+Maximum likelihood estimates (MLE) of the model parameters ($r$, $\alpha$, $a$, $b$) are obtained by maximizing the log-likelihood function given in @eq-loglikelihood above. Standard numerical optimization methods are employed, using the SciPy minimize and Stan's optimize method, to obtain the parameter estimates. To implement the model in SciPy, we rewrite the log-likelihood function, @eq-loglikelihood, as
 
 $$
 L(r, \alpha, a, b | X = x, t_x, T) = A_1 \cdot A_2 \cdot (A_3 + \delta_{x > 0} A_4)
@@ -297,74 +297,6 @@ $$
 $$
 A_3 = \left( \frac{1}{\alpha + T} \right)^{r + x} \quad A_4 = \left( \frac{a}{b + x - 1} \right) \left( \frac{1}{\alpha + t_x} \right)^{r + x}
 $$
-
-### Computing $P(\text{alive})$ Using the BG/NBD Model
-
-One of the key results we associate with the Pareto/NBD model (Schmittlein et al. 1987) is an expression for $P(\text{alive}\mid x, t_x, T)$, the probability that a customer with purchase history $(x, t_x, T)$ is "alive" at time $T$.
-
-Deriving the expression for $P(\text{alive})$ under the BG/NBD model is a trivial exercise. Given the assumptions of the BG/NBD model, the probability that a customer with purchase history $(x, t_x, T)$ is alive at time $T$ is simply the probability that he did not "die" at $t_x$.
-
-Recall the BG/NBD likelihood function:
-
-$$
-\begin{align*}
-L(r,\alpha,a,b \mid x,t_x,T) &= \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r + x)\alpha^{r}}{\Gamma(r)(\alpha + T)^{r+x}} \\
-&+ \delta_{x>0} \frac{B(a+1,b+x-1)}{B(a,b)} \frac{\Gamma(r + x)\alpha^{r}}{\Gamma(r)(\alpha + t_x)^{r+x}}.
-\end{align*}
-$$
-
-Noting that the first half of the expression represents the likelihood under the assumption that the customer did not die at $t_x$ (and is therefore alive at $T$), while the second half represents the likelihood under the assumption that the customer died at $t_x$, the application of Bayes' theorem gives us
-
-$$
-\begin{align*}
-P(\text{alive} &\mid x,t_x,T,r,\alpha,a,b) \\
-&= \frac{\frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}}}{L(r,\alpha,a,b \mid x,t_x,T)} \\
-&= \frac{1}{1 + \delta_{x>0} \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}.
-\end{align*}
-$$
-
-We note that $P(\text{alive}) = 1$ for a customer who made no purchases in the interval $(0,T]$; this follows from the model's assumptions that death occurs after a purchase and that customers are alive at the beginning of the observation period. Those interested in the $P(\text{alive})$ metric may view this as a shortcoming of the model.
-
-There are two ways to overcome this potential problem.
-
-1.  **Zero-Inflated Variant**:\
-    Assume $\pi \times 100$ of the customer base is "dead" at $T = 0$. The likelihood function becomes:
-
-    $$
-    \begin{aligned}
-    L(r,\alpha,a,b,\pi \mid x,t_x,T) &= \pi \delta_{x=0} + (1-\pi) \bigg\{ \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
-    & \quad + \delta_{x>0} \frac{B(a+1,b+x-1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}} \bigg\}.
-    \end{aligned}
-    $$
-
-    Then:
-
-    $$
-    \begin{align*}
-    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b,\pi) \\
-    = 
-    \begin{cases}
-    \frac{(1-\pi)}{\pi \left( \frac{\alpha+T}{\alpha} \right)^r + (1-\pi)} & x = 0 \\
-    \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}} & x > 0
-    \end{cases}
-    \end{align*}
-    $$
-
-2.  **Flip-at-Time-0 Variant**:\
-    Modify the death process assumption:
-
-    $$
-    \begin{align*}
-    L(r,\alpha,a,b \mid x,t_x,T) &= \frac{B(a,b+x+1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
-    &+ \frac{B(a+1,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}}.
-    \end{align*}
-    $$
-
-    Then:
-
-    $$
-    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b) = \frac{1}{1 + \frac{a}{b+x} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}},
-    $$ which is less than $1$ for $x = 0$ in the interval $(0,T]$.
 
 ### Imports
 
@@ -430,6 +362,8 @@ $$
 Instead of estimating $\lambda$ and $p$ for each specific customer, we do it for a randomly chosen customer, i.e. we work with the expected values of the parameters. Hence, we are interesting in finding the posterior distribution of the parameters $r$, $\alpha$, $a$, and $b$.
 
 ## Analytical MLE
+
+Let us implement the standard approach highlighted in the paper and find the parameters $r, \alpha, a, \text{ and } b$ that maximize the posterior log-likelihood function.
 
 ### Standard SciPy Implementation
 
@@ -530,11 +464,6 @@ def negative_log_likelihood(log_params, x, t_x, T):
     return -ll.sum()
 
 def BetaGeoFitter(guess={'r': 0.1, 'alpha': 0.1, 'a': 0.0, 'b': 0.1}):
-    
-    # Bounds for the optimization
-    # bnds = [(1e-6, np.inf) for _ in range(4)]
-
-    # Optimization using minimize
     return minimize(
         value_and_grad(negative_log_likelihood),
         jac=True,
@@ -577,6 +506,8 @@ pl.DataFrame(
 
 ## Stan Model
 
+We will now set-up a Stan model and run both, the optimiztion algorithm and the MCMC sampler. 
+
 ### Standard Parameters
 
 ```{python}
@@ -588,18 +519,18 @@ data {
     int<lower=0> N;               // Number of customers
     array[N] int<lower=0> X;      // Number of transactions per customer
     vector<lower=0>[N] T;         // Total observation time per customer
-    vector<lower=0>[N] t_x;        // Time of last transaction (0 if X=0)
+    vector<lower=0>[N] t_x;       // Time of last transaction (0 if X=0)
 }
 
 parameters {
-    real<lower=0> r;                   // gamma shape (r)
-    real<lower=0> alpha;               // gamma scale (alpha)
-    real<lower=0, upper=5> a;          // beta shape 1 (a)
-    real<lower=0, upper=5> b;          // beta shape 2 (b)
+    real<lower=0> r;                   // Gamma shape (r)
+    real<lower=0> alpha;               // Gamma scale (alpha)
+    real<lower=0, upper=5> a;          // Beta shape 1 (a)
+    real<lower=0, upper=5> b;          // Beta shape 2 (b)
 }
 
 model {
-    // Weakly informative priors on log parameters
+    // Weakly informative priors
     r ~ weibull(2, 1);
     alpha ~ weibull(2, 10);
     a ~ uniform(0, 5);
@@ -609,23 +540,25 @@ model {
         int x = X[n];
         real tx = t_x[n];
         real t = T[n];
-    
-        if (x == 0) {
-              // Likelihood for X=0: (alpha/(alpha + t))^r
-              target += r * (log(alpha) - log(alpha + t));
-        } else {
-              // Term 1: B(a, b + x)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + t))^(r + x)
-              real beta_term1 = lbeta(a, b + x) - lbeta(a, b);
-              real gamma_term = lgamma(r + x) - lgamma(r);
-              real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
-            
-              // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
-              real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
-              real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
-            
-              // Log-sum-exp for numerical stability
-              target += log_sum_exp(term1, term2);
+        
+        // Term 1: B(a, b + x)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + t))^(r + x)
+        real log_term1 = (
+            lbeta(a, b + x) - lbeta(a, b) + 
+            lgamma(r + x) - lgamma(r) + 
+            r * log(alpha) - (r + x) * log(alpha + t)
+        );
+
+        // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
+        real log_term2 = negative_infinity();
+        if (x > 0) {
+            log_term2 = (
+                lbeta(a + 1, b + x - 1) - lbeta(a, b) + 
+                lgamma(r + x) - lgamma(r) + 
+                r * log(alpha) - (r + x) * log(alpha + tx)
+            );
         }
+
+        target += log_sum_exp(log_term1, log_term2);
     }
 }
 '''
@@ -646,9 +579,9 @@ stan_model = StanQuap(
     tol_rel_grad=1e-7, iter=5000
 )
 
-index = index=["r", "α", "a", "b"]
+index = ["r", "α", "a", "b"]
 params = np.array(list(stan_model.opt_model.stan_variables().values()))
-var_mat = var_mar = stan_model.vcov_matrix() # Variance-Covariance Matrix
+var_mat = stan_model.vcov_matrix() # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
 plo = params - 1.96 * se
 phi = params + 1.96 * se
@@ -752,7 +685,7 @@ stan_model = StanQuap(
 
 index = ["r", "α", 'phi', 'kappa', "a", "b"]
 MAP_params = np.array(list(stan_model.opt_model.stan_variables().values()))
-var_mat = var_mar = stan_model.vcov_matrix() # Variance-Covariance Matrix
+var_mat = stan_model.vcov_matrix() # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
 se =  np.concatenate((se, np.array([se[-2] * se[-1] , (1 - se[-2]) * se[-1]])))
 plo = MAP_params - 1.96 * se
@@ -1310,19 +1243,19 @@ $$ {#eq-loglikelihood}
 For a randomly chosen customer:
 
 $$
-\begin{split}
+\begin{align*}
 P(X(t)=x \mid r,\alpha,a,b) &= \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)}{\Gamma(r)x!}\left(\frac{\alpha}{\alpha+t}\right)^{r}\left(\frac{t}{\alpha+t}\right)^{x} \\
 &+ \delta_{x>0}\,\frac{B(a+1,b+x-1)}{B(a,b)} \\
 & \times \left[1-\left(\frac{\alpha}{\alpha+t}\right)^{r}\left\{\sum_{j=0}^{x-1}\frac{\Gamma(r+j)}{\Gamma(r)j!}\left(\frac{t}{ \alpha+t}\right)^{j}\right\} \right]
-\end{split}
+\end{align*}
 $$ {#eq-P-X-t}
 
-### $P($alive at $t)$
+### $P(\text{alive at }t)$
 
 For a randomly chosen customer:
 
 $$
-P({\rm alive\ at\ }t\,|\,r,\alpha,a,b) = \left(\frac{\alpha}{\alpha+t}\right)^{r}{}_{2}F_{1}\left(r,b;a+b;\tfrac{t}{\alpha+t}\right)
+P(\text{alive at }t \mid r,\alpha,a,b) = \left(\frac{\alpha}{\alpha+t}\right)^{r}{}_{2}F_{1}\left(r,b;a+b;\tfrac{t}{\alpha+t}\right)
 $$
 
 ### $E[X(t)]$
@@ -1338,7 +1271,7 @@ $$
 Let the random variable $Y(t)$ denote the number of purchases made in the period $(T, T + t]$. We are interested in computing the conditional expectation $E(Y(t) | X = x, t_x, T)$, the expected number of purchases in the period $(T, T + t]$ for a customer with purchase history $X = x, t_x, T$.
 
 $$
-E(Y(t) | X = x, t_x, T, r, \alpha, a, b) = \frac{\frac{a + b + x - 1}{a - 1} \left[1 - \left(\frac{\alpha + T}{\alpha + T + t}\right)^{r + x} {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right)\right]}{1 + \delta_{x > 0} \frac{a}{b + x - 1} \left(\frac{\alpha + T}{\alpha + t_x}\right)^{r + x}}.
+E(Y(t) \mid X = x, t_x, T, r, \alpha, a, b) = \frac{\frac{a + b + x - 1}{a - 1} \left[1 - \left(\frac{\alpha + T}{\alpha + T + t}\right)^{r + x} {}_{2}F_{1}\left(r + x, b + x; a + b + x - 1; \frac{t}{\alpha + T + t}\right)\right]}{1 + \delta_{x > 0} \frac{a}{b + x - 1} \left(\frac{\alpha + T}{\alpha + t_x}\right)^{r + x}}.
 $$
 
 ### Conditional Predictions
@@ -1351,6 +1284,21 @@ Below are some expressions that produce the following forward-looking quantities
 
 
 ### $P(\text{alive at }T \mid X=x,t_{x},T)$
+
+$P(\text{alive}\mid x, t_x, T)$: An expression for the probability that a customer with purchase history $(x, t_x, T)$ is "alive" at time $T$.
+
+Given the assumptions of the BG/NBD model, the probability that a customer with purchase history $(x, t_x, T)$ is alive at time $T$ is simply the probability that he did not "die" at $t_x$.
+
+Recall the BG/NBD likelihood function @eq-loglikelihood. Noting that the first half of the expression represents the likelihood under the assumption that the customer did not die at $t_x$ (and is therefore alive at $T$), while the second half represents the likelihood under the assumption that the customer died at $t_x$, the application of Bayes' theorem gives us
+
+$$
+\begin{align*}
+P(\text{alive} &\mid x,t_x,T,r,\alpha,a,b) \\
+&= \frac{\frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}}}{L(r,\alpha,a,b \mid x,t_x,T)} \\
+&= \frac{1}{1 + \delta_{x>0} \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}.
+\end{align*}
+$$
+
 
 $$
 P(\text{alive at }T\,|\,X=x,t_{x},T,r,\alpha,a,b) = 1 \bigg/ \left[1 + \delta_{x>0}\frac{a}{b+x-1}\left(\frac{\alpha + T}{\alpha + t_{x}}\right)^{r+x}\right].
@@ -1365,6 +1313,51 @@ Running an expit function on the denominator get us :\
 $$
 \frac{1}{1 + e^{\text{Denominator}}} = \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha + T}{\alpha + t_x} \right)^{r+x}}
 $$
+
+We note that $P(\text{alive}) = 1$ for a customer who made no purchases in the interval $(0,T]$; this follows from the model's assumptions that death occurs after a purchase and that customers are alive at the beginning of the observation period. Those interested in the $P(\text{alive})$ metric may view this as a shortcoming of the model.
+
+There are two ways to overcome this potential problem.
+
+1.  **Zero-Inflated Variant**:\
+    Assume $\pi \times 100$ of the customer base is "dead" at $T = 0$. The likelihood function becomes:
+
+    $$
+    \begin{aligned}
+    L(r,\alpha,a,b,\pi \mid x,t_x,T) &= \pi \delta_{x=0} + (1-\pi) \bigg\{ \frac{B(a,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
+    & \quad + \delta_{x>0} \frac{B(a+1,b+x-1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}} \bigg\}.
+    \end{aligned}
+    $$
+
+    Then:
+
+    $$
+    \begin{align*}
+    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b,\pi) \\
+    = 
+    \begin{cases}
+    \frac{(1-\pi)}{\pi \left( \frac{\alpha+T}{\alpha} \right)^r + (1-\pi)} & x = 0 \\
+    \frac{1}{1 + \frac{a}{b+x-1} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}} & x > 0
+    \end{cases}
+    \end{align*}
+    $$
+
+2.  **Flip-at-Time-0 Variant**:\
+    Modify the death process assumption:
+
+    $$
+    \begin{align*}
+    L(r,\alpha,a,b \mid x,t_x,T) &= \frac{B(a,b+x+1)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+T)^{r+x}} \\
+    &+ \frac{B(a+1,b+x)}{B(a,b)} \frac{\Gamma(r+x)\alpha^{r}}{\Gamma(r)(\alpha+t_x)^{r+x}}.
+    \end{align*}
+    $$
+
+    Then:
+
+    $$
+    P(\text{alive} \mid x,t_x,T,r,\alpha,a,b) = \frac{1}{1 + \frac{a}{b+x} \left( \frac{\alpha+T}{\alpha+t_x} \right)^{r+x}},
+    $$ 
+
+    which is less than $1$ for $x = 0$ in the interval $(0,T]$.
 
 ### $E(Y(t) \mid X=x,t_{x},T)$
 
@@ -1401,3 +1394,4 @@ $$
 &\times\left\{\frac{\Gamma(r+x)}{\Gamma(r)}\frac{\alpha^{r} }{(\alpha+T)^{r+x}}-\sum_{j=0}^{y-1}\frac{\Gamma(r+x+j)}{\Gamma(r)j!}\frac{ \alpha^{r}t^{j}}{(\alpha+T+t)^{r+x+j}}\right\}
 \end{align*}
 $$
+

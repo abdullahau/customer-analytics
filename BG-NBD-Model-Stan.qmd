@@ -652,12 +652,12 @@ model {
             real beta_term1 = lbeta(a, b + x) - lbeta(a, b);  // Beta function term
             real gamma_term = lgamma(r + x) - lgamma(r);       // Gamma function term
             real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
-            
+
             // Term 2: Probability of surviving until t_x, then dropping out
             // Term 2: B(a + 1, b + x - 1)/B(a, b) * Γ(r + x)/Γ(r) * (alpha/(alpha + tx))^(r + x)
             real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
             real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
-            
+
             // Log-sum-exp for numerical stability
             target += log_sum_exp(term1, term2);
         }
@@ -772,29 +772,28 @@ PPCs allow us to check the efficacy of our priors, and the performance of the fi
 
 Note that in addition to generating random numbers of the priors or sampling parameters from the posterior, we are computing the predicted number of transactions for each customer during their observation period $T$. This will be computed in two ways:
 
--   In Stan, we will us the expression @eq-numtrans and @eq-numtrans2 given the nature of the dropout process and the time between transactions:
+-   In Stan, we will us @eq-numtrans and @eq-numtrans2 given the nature of the dropout process and the time between transactions:
 
-    -   Transaction Process: $$
-         \text{Time between transactions} \sim \text{Exponential}(\lambda)
-         $$
+    -   Transaction Process: 
+  $$
+  \text{Time between transactions} \sim \text{Exponential}(\lambda)
+  $$
 
     -   Dropout Process:
-
-    $$
-     \text{Dropout after transaction} \sim \text{Bernoulli}(p)
-     $$
+  $$
+  \text{Dropout after transaction} \sim \text{Bernoulli}(p)
+  $$
 
     -   Population Distributions:
+  $$
+  \lambda \sim \text{Gamma}(r, \alpha), \quad p \sim \text{Beta}(a, b)
+  $$
 
-    $$
-     \lambda \sim \text{Gamma}(r, \alpha), \quad p \sim \text{Beta}(a, b)
-     $$
-
--   We will also compute the number of transactions for each customer using the expression @eq-numtrans3.
+-   We will also compute the number of transactions for each customer using @eq-numtrans3.
 
 ```{python}
 # probability of observing x purchases in a time period of length t
-def pmf(x, t, r, alpha, a, b):
+def P_X_t(x, t, r, alpha, a, b):
     A = np.cumsum(
         gamma(r+x[:-1])/(gamma(r)*factorial(x[:-1])) *
         (t/(alpha+t))**x[:-1], axis=0
@@ -811,10 +810,18 @@ def pmf(x, t, r, alpha, a, b):
     )
     return pmf
 
-def bgnbd_predict_trans_dist(x, n, T, r, alpha, a, b):
-    pmf = bgnbd_pmf(x, T, r, alpha, a, b)
+def bgnbd_predict_trans_dist(x, n_t, T, r, alpha, a, b):
+    '''
+    x - range of purchase quantites, shape (x, 1, 1)
+    n_t - number of customers who have the time of birth t, shape (n_t,)
+    t - age of the customer with time origin of 0, shape (1, t, 1)
+    *params - parameters, shape (1,1,params)
+
+    return: shape (x, param)
+    '''
+    pmf = P_X_t(x, T, r, alpha, a, b)
     pmf[-1] = 1 - np.sum(pmf[:-1], axis=0)
-    return np.dot(pmf, n)
+    return np.tensordot(pmf, n_t,  axes=([1], [0]))
 ```
 
 ### Prior Predictive Check
@@ -905,8 +912,32 @@ plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'
 plt.legend();
 ```
 
+Now, let's compute the probability of observing $x$ purchases in a time period of length $t$ using a closed-form function (@eq-numtrans3):
+
 ```{python}
-prior_fit.stan_variables()
+max_purch = 7
+params = [prior_fit.stan_variable(param).reshape(1,1, -1) for param in ['r', 'alpha', 'a', 'b']]
+
+T_unique, n_t = np.unique(T, return_counts=True)
+
+frequency_counts = bgnbd_predict_trans_dist(np.arange(max_purch+1).reshape(-1,1,1), n_t, T_unique.reshape(1,-1,1), *params) / data['N']
+
+mean_frequency = np.nanmean(frequency_counts, axis=1)
+hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
+
+observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
+observed_counts_cen = observed_counts[:max_purch + 1]
+observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1:])
+observed_frequency = observed_counts_cen / data['N']
+
+plt.clf()
+plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
+plt.bar(np.arange(max_purch+1)-0.2, observed_frequency, width=0.4, label='Observed', color='black')
+plt.xlabel("Number of Repeat Purchases (0-10+)")
+plt.ylabel("% of Customer Population")
+plt.title("Posterior Predictive Check: Customer Purchase Frequency")
+plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.legend();
 ```
 
 ### Posterior Predictive Check
@@ -929,32 +960,32 @@ parameters {
 }
 
 transformed parameters {
-    real a = phi_dropout * kappa_dropout;       
-    real b = (1 - phi_dropout) * kappa_dropout; 
+    real a = phi_dropout * kappa_dropout;
+    real b = (1 - phi_dropout) * kappa_dropout;
 }
 
 model {
     // Priors:
-    r ~ weibull(2, 1);                
-    alpha ~ weibull(2, 10);           
-    phi_dropout ~ uniform(0,1);       
-    kappa_dropout ~ pareto(1,1);      
+    r ~ weibull(2, 1);
+    alpha ~ weibull(2, 10);
+    phi_dropout ~ uniform(0,1);
+    kappa_dropout ~ pareto(1,1);
 
     for (n in 1:N) {
-        int x = X[n];                 
-        real tx = t_x[n];              
-        real t = T[n];                
+        int x = X[n];
+        real tx = t_x[n];
+        real t = T[n];
 
         if (x == 0) {
             target += r * (log(alpha) - log(alpha + t));
         } else {
             real beta_term1 = lbeta(a, b + x) - lbeta(a, b);  
-            real gamma_term = lgamma(r + x) - lgamma(r);       
+            real gamma_term = lgamma(r + x) - lgamma(r);
             real term1 = gamma_term + beta_term1 + r * log(alpha) - (r + x) * log(alpha + t);
-            
+
             real beta_term2 = lbeta(a + 1, b + x - 1) - lbeta(a, b);
             real term2 = gamma_term + beta_term2 + r * log(alpha) - (r + x) * log(alpha + tx);
-            
+
             target += log_sum_exp(term1, term2);
         }
     }
@@ -1032,9 +1063,37 @@ plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'
 plt.legend();
 ```
 
+Now, let's compute the probability of observing $x$ purchases in a time period of length $t$ using a closed-form function (@eq-numtrans3):
+
+```{python}
+max_purch = 7
+params = [post_preds.stan_variable(param).reshape(1, 1, -1) for param in ['r', 'alpha', 'a', 'b']]
+
+T_unique, n_t = np.unique(T, return_counts=True)
+
+frequency_counts = bgnbd_predict_trans_dist(np.arange(max_purch+1).reshape(-1,1,1), n_t, T_unique.reshape(1,-1,1), *params) / data['N']
+
+mean_frequency = np.mean(frequency_counts, axis=1)
+hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
+
+observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
+observed_counts_cen = observed_counts[:max_purch + 1]
+observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1:])
+observed_frequency = observed_counts_cen / data['N']
+
+plt.clf()
+plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
+plt.bar(np.arange(max_purch+1)-0.2, observed_frequency, width=0.4, label='Observed', color='black')
+plt.xlabel("Number of Repeat Purchases (0-10+)")
+plt.ylabel("% of Customer Population")
+plt.title("Posterior Predictive Check: Customer Purchase Frequency")
+plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.legend();
+```
+
 ## Applications
 
-Now that you have fitted the model, we can use it to make predictions. For example, we can predict the expected probability of a customer being alive as a function of time (steps).
+Now that we have fitted the model, we can use it to make predictions. For example, we can predict the expected probability of a customer being alive as a function of time.
 
 ### Expected Number of Purchases
 
@@ -1101,7 +1160,7 @@ Note that the frequent buyers are expected to make more purchases in the future.
 
 ### Probability of a Customer Being Alive
 
-We will implement the @eq-P-alive-T as a Python function:
+We will implement @eq-P-alive-T as a Python function:
 
 ```{python}
 from scipy.special import expit
@@ -1114,7 +1173,7 @@ def expected_probability_alive(x, t_x, T, r, alpha, a, b):
     '''
     log_div = (r + x) * np.log((alpha + T) / (alpha + t_x)) + np.log(
         a / (b + np.maximum(x, 1) - 1)
-    )    
+    )
 
     return np.where(x == 0, 1.0, expit(-log_div))
 ```
@@ -1166,38 +1225,32 @@ def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
     Compute P(Y(t)=y | X=x,t_x,T,r,alpha,a,b)
     If broadcasting, y must be scalar.
     """
-
-    # Compute denominator Log-Likelihood
     L_term1 = (
         (beta(a, b + x) / beta(a, b)) * 
         (gamma(r + x) / gamma(r)) * 
         (alpha**r / (alpha + T)**(r + x))
     )
-    
+
     L_term2 = (
         (beta(a + 1, b + x - 1) / beta(a, b)) * 
         (gamma(r + x) / gamma(r)) * 
         (alpha**r / (alpha + t_x)**(r + x))
     ) * (x > 0)
-    
+
     L = L_term1 + L_term2
 
-    # Compute numerator components
-    # Term A (Equation 35)
     A = (
         (beta(a + 1, b + x - 1) / beta(a, b)) * 
         (gamma(r + x) / gamma(r)) * 
         (alpha**r / (alpha + t_x)**(r + x))
     ) * (x > 0) * (y == 0)
 
-    # Term B (Equation 36)
     B = (
         (beta(a, b + x + y) / beta(a, b)) * 
         (gamma(r + x + y) / gamma(r)) / gamma(y + 1) * 
         (alpha**r * t**y / (alpha + T + t)**(r + x + y))
     )
 
-    # Term C (Equation 37)
     C = 0
     if y > 0:
         sum_terms = 0 
@@ -1205,7 +1258,7 @@ def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
             term = gamma(r + x + j) / (gamma(r) * gamma(j + 1))
             term *= (alpha**r * t**j) / (alpha + T + t)**(r + x + j)
             sum_terms += term  
-            
+
         C_part = (
             (beta(a + 1, b + x + y - 1) / beta(a, b)) * 
             ((gamma(r + x) / gamma(r)) * (alpha**r / (alpha + T)**(r + x)) - sum_terms)
@@ -1213,11 +1266,11 @@ def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
         C = C_part * (y > 0)
 
     numerator = A + B + C
-    
+
     return numerator / L
 ```
 
-We now look into the probability of a customer making $0$ purchases between now, and the next periods between 0 and 30.
+We now look into the probability of a customer making 0 purchases between now, and the next $t$ periods between 0 and 30.
 
 ```{python}
 future_t = np.arange(31) # Future Periods to analyze
@@ -1232,7 +1285,7 @@ for i, cust_id in enumerate(example_customer_ids):
     customer_data = expected_probability_zero_purchases[:, :, i]  # Shape (91, 4000)
     mean = customer_data.mean(axis=1) # Shape (91,)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
-    
+
     ax.plot(future_t, mean, color='k', label='Mean')
     ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
     ax.set_title(f'Customer ID: {cust_id}')
@@ -1246,7 +1299,7 @@ plt.show()
 
 ### Probability of a Customer Making $y$ Purchases Within 30 days from Now
 
-Let us look into the probability of a customer making $0, 1, 2, 3, 4, \text{ or } 5$ number of purchases between now, and 30 days from now.
+Let us look into the probability of a customer making $0, 1, 2, 3, 4, \text{ or } 5$ purchases between now and 30 period from now.
 
 ```{python}
 num_purchases = np.arange(6) # Num of purchases
@@ -1254,7 +1307,7 @@ expected_probability_purchases = np.zeros((len(num_purchases), len(params[0]), l
 for y in num_purchases: # Shape (number of purchases, params, customer)
     expected_probability_purchases[y, :, :] = expected_probability_y_purchase(
         p1x_sample, t_x_sample, T_sample, y, 30, *params
-    ) 
+    )
 
 fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
 
@@ -1263,7 +1316,7 @@ for i, cust_id in enumerate(example_customer_ids):
     customer_data = expected_probability_purchases[:, :, i]  
     mean = customer_data.mean(axis=1) 
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)
-    
+
     ax.bar(num_purchases, mean, color='white', edgecolor='black', yerr=[mean - pi[0,:], pi[1,:] - mean])
     ax.set_title(f'Customer ID: {cust_id}')
     ax.set_ylabel('Probability')

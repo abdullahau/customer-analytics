@@ -16,10 +16,7 @@ numpy
 pandas
 plotly
 polars
-pymc
-pymc-marketing
 pymdown-extensions
-pytensor
 scikit-learn
 scikit-optimize
 scipy

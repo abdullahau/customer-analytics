@@ -1,0 +1,4472 @@
+---
+title: Analysing Buyer Behaviour Using Consumer Panel Data
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+jupyter:
+    jupytext:
+        formats: ipynb,qmd
+        text_representation:
+            extension: .qmd
+            format_name: quarto
+            format_version: '1.0'
+            jupytext_version: 1.16.7
+    kernelspec:
+            display_name: main
+            language: python
+            name: main
+---
+
+## Introduction
+
+This is a python implementation of Bruce G.S. Hardie's [An Excel-based Introduction to Analysing Buyer Behaviour Using Consumer Panel Data](https://www.brucehardie.com/notes/042/) using [Polars](https://pola.rs).
+
+Several leading market research firms (e.g., Kantar, IRI, Nielsen) collect so called consumer panel data and sell reports and analyses based on these data to interested parties. A large number of households are recruited to join the panel and they record all their grocery/HBA purchases. The idea of a panel is that we have repeated observations of the same people. The ability to track what individual households are purchasing over time can give important insights into what behavioural changes lie beneath observed changes in aggregate sales data. (terms panellist and household are used interchangeably) Nowadays, it is common for panellists to record their purchasing by scanning product barcodes via an app on their smartphones.
+
+The objective of this notebook is to provide an introduction to basic analyses we can undertake using panel data. After briefing **describing the data** we will be working with, we present some preliminary **aggregate-level analyses**. Next we introduce some basic **brand performance measures** and consider the simple analyses that describe the **variation we observe in buyer behaviour** in a given time period. This analysis focuses on one brand at a time; next we consider some basic analyses that describe consumers’ **buying of multiple brands in a category**. We finish with some basic analyses that describe **how buyer behaviour evolves over time**, both for established products and new products.
+
+Note: Whereas consumer panel data gives us information on the purchasing of a sample of customers for the whole category, the data in a firm’s transaction database gives us complete information on the purchasing of our products (but not those of our competitors). At a fundamental level, the types of reports developed by market research firms over the past 60+ years are a good starting point for the types of reports a firm should create as it seeks to understand the buying behaviour of its customers.
+
+A traditional consumer panel works in the following manner:
+
+1.  When an individual first joins the panel, they complete a detailed questionnaire. A section of this questionnaire focuses on the demographics of their household. (This is typically updated once a year.)
+
+2.  After each shopping trip, each panellist records their purchases, scanning the barcode associated with each product and recording other information such as where the purchase was made (store or channel), the price paid, and the use of promotional deals. Twenty years ago, this would have been done using a custom handheld barcode scanner provided by the market research firm. These days, it is more common to use a smartphone app.
+
+3.  These data are uploaded to the research firm’s servers and merged with the purchases records of the other panellists. Each barcode is matched with detailed product information (e.g., category, brand, size, flavour) and this information is also stored in the database. The analyst can then create (typically product-category-specific) datasets for further analysis that tell us what each panellist purchased, when and where, and associated transaction- and/or product-specific data that may be of interest.
+
+4.  Panellists drop out of the panel all the time, and the research firm will be recruiting replacement households on a regular basis. When creating a dataset for further analysis, it is generally desirable to work with a so-called static sample of panellists, which comprises all those panellists active using the time period of interest; new panellists, as well as those that dropped out during the given time period, are excluded.
+
+## Imports
+
+### Import Packages
+
+```{python}
+import polars as pl
+import altair as alt
+import numpy as np
+from great_tables import GT, style, loc, md
+import gc
+
+# https://altair-viz.github.io/user_guide/display_frontends.html
+# alt.renderers.enable('mimetype')
+# alt.JupyterChart.enable_offline()
+# alt.renderers.enable("jupyter", offline=True)
+```
+
+### Import Panel Data
+
+We will make use of two datasets as we explore the basic types of summaries of buyer behaviour that can be created using consumer panel data. The first contains data on the purchasing of established brands in a mature product category, while the second contains data on the purchasing of a new product. Both datasets were created using static samples. While these are small datasets and contain a subset of the information available in the research firm’s databases, they are more than sufficient to convey the logic of creating the key summaries of buyer behaviour. Neither dataset includes data on the demographics of each panellist. As such, we will not consider how to create reports that explore how behaviours differ across demographic groups (e.g., by age or geography). However, anyone comfortable with the analyses undertaken in this note should be able to work out how to create such reports for themselves.
+
+#### Dataset 1
+
+The file `edible_grocery.csv` contains two years of data from a panel of 5021 households on their purchasing in an unnamed edible grocery product category. (We intentionally do not identity the category and the associated brand names.) There are 119 SKUs in this category. 91 SKUs are associated with the four largest brands in the category, which we have named Alpha, Bravo, Charlie, and Delta. The remaining SKUs belong to very low-share brands and we grouped them under the brand Other.
+
+*Note*: SKU - A stock-keeping unit (SKU) is a unique combination of the attributes (e.g., brand, package type, package size, flavour) that define the products in the category.
+
+Each record in this file consists of seven fields:
+
+-   `panel_id` A unique identifier for each household.
+
+-   `trans_id` A unique identifier for the purchase occasion.
+
+-   `week` The week number in which the purchase occurred. Week 1 corresponds to the calendar week starting on January 1, 20xy. Week 53 corresponds to the calendar week starting on December 31, 20xy.
+
+-   `sku_id` The SKU code.
+
+-   `units` The number of units purchased on the particular purchase occasion.
+
+-   `price` The price per unit paid at the point of purchase.
+
+-   `brand` The brand associated with the SKU purchased.
+
+The associated file `sku_weight.csv` gives us the weight (in grams) of each SKU. There are two fields: `sku_id` and `weight`.
+
+```{python}
+grocery_lf = pl.scan_csv(
+    source="data/panel-datasets/edible_grocery.csv",
+    has_header=True,
+    separator=",",
+    schema={
+        'panel_id': pl.UInt32,
+        'trans_id': pl.Int32,
+        'week': pl.UInt16,
+        'sku_id': pl.UInt8,
+        'units': pl.Int16,
+        'price': pl.Float32,
+        'brand': pl.Categorical})
+grocery_lf.head().collect()
+```
+
+```{python}
+sku_lf = pl.scan_csv(
+    source="data/panel-datasets/sku_weight.csv",
+    has_header=True,
+    separator=",",
+    schema={
+        'sku_id': pl.UInt8,
+        'weight': pl.Int16})
+sku_lf.head().collect()
+```
+
+```{python}
+#| code-fold: false
+panel_size = 5021
+```
+
+#### Dataset 2
+
+“Kiwi Bubbles” is a masked name for a shelf-stable juice drink, aimed primarily at children, which is sold as a multipack with several single-serve containers bundled together. Prior to national launch, it underwent a year-long test conducted in two of IRI’s BehaviorScan markets. The file `kiwibubbles_trans.csv` contains purchasing data for the new product, drawn from 1300 panellists in Market 1 and 1499 panellists in Market 2. (The purchasing of other brands in the category has been excluded from the dataset.)
+
+Each record in this file consists of five fields:
+
+-   `ID` A unique identifier for each household.
+
+-   `Market` 1 or 2.
+
+-   `Week` The week in which the purchase occurred.
+
+-   `Day` The day of the week in which the purchase occurred. (The product was launched on day 1 of week 1.)
+
+-   `Units` The number of units of the new product purchased on the particular purchase occasion.
+
+```{python}
+kiwi_lf = pl.scan_csv(
+    source="data/panel-datasets/kiwibubbles_trans.csv",
+    has_header=True,
+    separator=",",
+    schema={
+        'ID': pl.UInt16,
+        'Market': pl.UInt8,
+        'Week': pl.Int16,
+        'Day': pl.Int16,
+        'Units': pl.Int16})
+kiwi_lf.head().collect()
+```
+
+### Reusable Functions
+
+```{python}
+# Weekly Grocery Sales LazyFrame (Query Plan): Weekly 'spend' by 'Category', 'Brand' or 'All'
+def weekly_spend_summary(brand, lf):
+    summary = (
+        lf
+        .select(['week', 'units', 'price', 'brand'])
+        .with_columns(((pl.col('units') * pl.col('price'))).alias('spend'))
+    )
+    
+    if brand == 'Category': # Return LazyFrame of total category
+        summary = summary.group_by('week')
+    elif brand == 'All': # Return LazyFrame of all brands
+        summary = summary.group_by('week', 'brand')
+    else:  # Return LazyFrame of specified brand
+        summary = summary.filter(
+            pl.col('brand') == brand
+        ).group_by('week', 'brand')
+        
+    summary = summary.agg(
+        pl.col("spend").sum().alias('Weekly Spend') 
+    ).sort('week')
+    
+    return summary
+```
+
+```{python}
+# Weekly Grocery Volume Sales LazyFrame (Query Plan): Weekly 'volume' by 'Brand' or 'All'
+def weekly_vol_summary(brand, lf):
+    with pl.StringCache():
+        lf = (
+            lf
+            .join(
+                other=sku_lf,
+                left_on="sku_id",
+                right_on="sku_id"            
+            )
+            .select(['week', 'units', 'brand', 'weight'])
+        )
+        
+        if brand != 'All': 
+            brand = [brand] if type(brand) == str else brand
+            lf = lf.filter(
+                pl.col('brand').is_in(*[brand])
+            )
+            
+        summary = lf.with_columns(
+            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume')
+        ).group_by('week', 'brand').agg(
+            pl.col("volume").sum().alias('Weekly Volume')
+        ).sort('week')
+        
+    return summary
+```
+
+```{python}
+# Altair Weekly Line Plot
+def weekly_plot(dataframe, y, year=2, color=None, title="", y_axis_label="", pct=False, legend=False):
+    
+    # Configure the color encoding only if color is provided
+    if color is not None:
+        color_encoding = alt.Color(
+            f'{color}:N',  # N = a discrete unordered category
+            legend=alt.Legend(title=color) if legend else None  # Add legend conditionally
+        )
+    else:
+        color_encoding = alt.Color()  # No color encoding    
+    
+    chart = alt.Chart(dataframe).mark_line(strokeWidth=1).encode(
+        x = alt.X(
+            'week',
+            axis=alt.Axis(
+                values=np.arange(0, (year*52) + 1, 13), # Explicitly specify quarter-end weeks
+                labelExpr="datum.value", # Show only these labels
+                title='Week'
+            )
+        ),
+        y = alt.Y(
+            f'{y}:Q', # Q = a continuous real-valued quantity
+            title=y_axis_label,
+            axis=alt.Axis(format="$,.0f") if not pct else alt.Axis(format=",.0%")
+        ),
+        color = color_encoding
+    ).properties(
+        width=650,
+        height=250,
+        title=title
+    ).configure_view(
+        stroke=None
+    ).configure_axisY(
+        # grid=False # turn off y-axis grid if required
+    )
+
+    return chart # alt.JupyterChart(chart)
+```
+
+```{python}
+# Annual Sales Summary LazyFrame for All Brands
+def annual_sales_summary():
+    summary = (
+        weekly_spend_summary('All', grocery_lf)
+        .with_columns((pl.col("week") / 52).ceil().alias('year'))
+        .group_by(['year', 'brand'])
+        .agg(pl.col("Weekly Spend").sum().alias('Yearly Sales'))
+    ).sort('year')
+    
+    return summary
+```
+
+```{python}
+def freq_dist_plot(
+    data, 
+    column, 
+    bin_edges, 
+    labels, 
+    x_title, 
+    y_title, 
+    chart_title, 
+    subtitle, 
+    width=650, 
+    height=250, 
+    label_angle=0, 
+    left_closed=True, 
+    compute_rel_freq=True
+):
+    """
+    Creates a standardized Altair bar chart for relative frequency distribution plots.
+
+    Parameters:
+    - data (Polars LazyFrame or DataFrame): Input dataset.
+    - column (str): Column to analyze for distribution.
+    - bin_edges (array-like): Edges for binning.
+    - labels (list of str): Labels for the bins.
+    - x_title (str): Title for the x-axis.
+    - y_title (str): Title for the y-axis.
+    - chart_title (str): Main title for the chart.
+    - subtitle (str): Subtitle for the chart.
+    - width (int, optional): Width of the chart. Default is 650.
+    - height (int, optional): Height of the chart. Default is 250.
+    - label_angle (int, optional): Angle for x-axis labels. Default is 0.
+    - left_closed (bool, optional): Whether bins are left-closed. Default is True.
+    - compute_rel_freq (bool, optional): Whether to compute relative frequencies. Default is True.
+
+    Returns:
+    - alt.Chart: The generated Altair chart.
+    """
+    # Apply binning to the data
+    binned_data = data.with_columns(
+        pl.col(column).cut(bin_edges, labels=labels, left_closed=left_closed).alias("cut")
+    )
+
+    # Optionally compute relative frequencies
+    if compute_rel_freq:
+        binned_data = (
+            binned_data
+            .group_by("cut")
+            .agg(pl.col("cut").count().alias("Frequency"))
+            .with_columns(
+                (pl.col("Frequency") / pl.col("Frequency").sum()).alias("% of Total")
+            )
+            .collect()
+        )
+
+    # Create the Altair chart
+    chart = alt.Chart(binned_data).mark_bar().encode(
+        x=alt.X("cut:O", axis=alt.Axis(labelAngle=label_angle, title=x_title), sort=labels),
+        y=alt.Y("% of Total:Q", axis=alt.Axis(format=".0%", title=y_title)),
+    ).properties(
+        width=width,
+        height=height,
+        title={"text": chart_title, "subtitle": subtitle},
+    )
+
+    return chart
+```
+
+## Preliminaries
+
+Before we start analysing household-level behaviour, let us first get a sense of the general sales patterns observed in this category.
+
+Our initial objective is to plot weekly revenue for all the brands and the overall category, respectively, and then plot weekly (volume) market shares for target brands.
+
+### Weekly Sales Pattern
+
+```{python}
+# Weekly Sales Pivot Table - Polars DataFrame
+# For visualizing and inspecting only
+weekly_spend_summary('All', grocery_lf).collect().pivot(
+    on="brand",
+    index="week",
+    values="Weekly Spend",
+    sort_columns=True,
+).with_columns(
+    pl.sum_horizontal(pl.exclude('week')).alias("Total") # Row total
+).sort("week")
+```
+
+```{python}
+weekly_plot(dataframe=weekly_spend_summary('Category', grocery_lf).collect(), 
+            y='Weekly Spend', 
+            title='Category - Weekly Revenue', 
+            y_axis_label='Spend ($)',
+            pct=False,
+            legend=False)
+```
+
+```{python}
+weekly_plot(dataframe=weekly_spend_summary('Alpha', grocery_lf).collect(), 
+            y='Weekly Spend', 
+            title='Alpha - Weekly Revenue', 
+            y_axis_label='Spend ($)',
+            pct=False,
+            legend=False)
+```
+
+```{python}
+weekly_plot(dataframe=weekly_spend_summary('Bravo', grocery_lf).collect(), 
+            y='Weekly Spend', 
+            title='Bravo - Weekly Revenue', 
+            y_axis_label='Spend ($)',
+            pct=False,
+            legend=False)
+```
+
+### Weekly (Volume) Market Share
+
+```{python}
+# Weekly (volume) market share
+pct_volume =(
+    weekly_vol_summary('All', grocery_lf)
+    .collect()
+    .pivot(
+        on='brand',
+        index='week',
+        values='Weekly Volume',
+        sort_columns=True
+    )
+    .with_columns(
+        (pl.col("*").exclude("week")) / pl.sum_horizontal(pl.exclude('week'))
+    )
+)
+pct_volume
+```
+
+```{python}
+with pl.StringCache():
+    pct_volume_plot = (
+        weekly_vol_summary('All', grocery_lf)
+        .group_by('week')
+        .agg(
+            pl.col('Weekly Volume').sum().alias('Total Weekly Volume')
+        )
+        .join(
+            other=weekly_vol_summary(['Alpha', 'Bravo'], grocery_lf),
+            on='week',
+        )
+        .filter(
+            (pl.col('brand').is_in(['Alpha', 'Bravo']))
+        )
+        .with_columns(
+            # compute brand wise % of total volume sale
+            (pl.col('Weekly Volume') / pl.col('Total Weekly Volume')).alias('pct_volume')
+        )
+    ).collect()
+
+weekly_plot(dataframe=pct_volume_plot, 
+            y='pct_volume', 
+            color='brand', 
+            title="Volume Market Share - Alpha vs. Bravo", 
+            y_axis_label="% of Weekly Total", 
+            pct=True, 
+            legend=True)
+```
+
+There appears to be a **high level of competition** between these two brands. What is the correlation in their market shares?
+
+We observe that there is a strong negative correlation between the shares of Alpha and Bravo: an increase in one brand’s share is associated with a corresponding decrease in the share of the other brand.
+
+```{python}
+corr_matrix = (
+    pct_volume.select(
+        pl.col('*').exclude('week')  # Exclude 'week' column
+    )
+    .corr()  # Compute the correlation matrix
+    .with_columns(
+        pl.Series(pct_volume.columns[1:]).alias("index")
+    )
+)
+
+columns = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other']
+
+(
+    GT(corr_matrix, rowname_col='index')
+    .tab_header(title="Correlation Matrix of Weekly (Volume) Market Share")
+    .fmt_number(columns=columns)
+    .data_color(
+        columns=columns,
+        domain=[-1, 1],
+        palette=["rebeccapurple", "white", 'orange']
+    )
+    .tab_style(
+        style=[
+            style.text(color="black"),
+            style.fill('white'),
+            
+        ],
+        locations=[
+            loc.body(0,0), 
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )    
+)
+```
+
+### Annual Sales
+
+Let us finish this preliminary analysis of the data by computing the annual sales of each brand.
+
+```{python}
+annual_sales_pivot = annual_sales_summary().collect().pivot(
+    on='brand',
+    index='year',
+    sort_columns=True
+).with_columns(
+    pl.sum_horizontal(pl.all().exclude('year')).alias("Total") # add totals column
+)
+
+(
+    GT(annual_sales_pivot, rowname_col="year")
+    .tab_header(title="Annual Sales ($)")
+    .tab_stubhead(label="Year")
+    .fmt_currency()
+    .fmt_integer(columns='year')
+    .data_color(
+        columns=columns,
+        domain=[100, 36_000],
+        palette=["white", "rebeccapurple"]
+    )    
+)
+```
+
+```{python}
+annual_change_sales = annual_sales_pivot.with_columns(
+    pl.col('*').exclude('year').pct_change()
+).filter(
+    pl.col('year') == 2
+).unpivot(
+    index="year",  # Keep 'year' as a fixed identifier
+    value_name='% Change',  
+    variable_name='brand'
+)
+
+(
+    GT(annual_change_sales, rowname_col='brand')
+    .tab_header(title='% Change in Annual Sales')
+    .tab_stubhead(label="Brands")
+    .fmt_percent()
+    .data_color(
+        columns=['% Change'],
+        domain=[-0.3, 0.3],
+        palette=['orange', 'white', 'rebeccapurple']
+    ) 
+    .cols_hide('year')   
+    .cols_label(brand='Y-o-Y % Change')
+)
+```
+
+```{python}
+chart = alt.Chart(annual_sales_summary().collect()).mark_bar().encode(
+    x=alt.X("brand:N", 
+            axis=alt.Axis(title='Brands', labelAngle=0)),
+    xOffset="year:N",
+    y=alt.Y("Yearly Sales:Q",
+            axis=alt.Axis(format="$,.0f"),
+            title='Yearly Revenue ($)'),
+    color=alt.Color("year:N", title='Year'),
+).properties(
+    width=650,
+    height=250,
+    title='Year 1 & Year 2 Revenues'
+).show()
+```
+
+```{python}
+base = alt.Chart(annual_change_sales).encode(
+    x=alt.X("brand:N", 
+            title='Brand',
+            axis=alt.Axis(labelAngle=0)
+    ),
+    y=alt.Y("% Change:Q",
+            axis=alt.Axis(format=".0%")
+    ),
+    color=alt.condition(
+        alt.datum["% Change"] > 0, # fixed this 
+        alt.value("green"),  # The positive color
+        alt.value("red")  # The negative color
+    ),
+    text=alt.Text(
+        '% Change',
+        format=(".1%")
+    )
+        
+).properties(
+    width=650,
+    height=250,
+    title='Y-o-Y % Change in Revenue'
+)
+
+chart = base.mark_bar() + base.mark_text(
+    align='center', 
+    baseline=alt.expr(alt.expr.if_(alt.datum['% Change'] >= 0, 'bottom', 'top')),
+    dy=alt.expr(alt.expr.if_(alt.datum['% Change'] >= 0, -2, 2)),
+    dx=0)
+chart.show()
+```
+
+### Annual Market Share
+
+```{python}
+market_share = annual_sales_pivot.with_columns(
+    pl.col('*').exclude('year') / pl.col('Total')
+)
+
+(
+    GT(market_share, rowname_col="year")
+    .tab_header(title="Annual Market Share (%)")
+    .tab_stubhead(label="Year")
+    .fmt_percent()
+    .cols_hide('Total')
+    .data_color(
+        columns=columns,
+        domain=[0, 0.5],
+        palette=["white", "rebeccapurple"]
+    )    
+)
+```
+
+```{python}
+annual_change_share = market_share.drop('Total').with_columns(
+    pl.col('*').exclude('year').pct_change()
+).filter(
+    pl.col('year') == 2
+).unpivot(
+    index="year",  # Keep 'year' as a fixed identifier
+    value_name='% Change',  
+    variable_name='brand'
+)
+
+(
+    GT(annual_change_share, rowname_col='brand')
+    .tab_header(title='% Change in Market Share')
+    .tab_stubhead(label="Brands")
+    .fmt_percent()
+    .data_color(
+        columns=['% Change'],        
+        domain=[-0.3, 0.3],
+        palette=['orange', 'white', 'rebeccapurple']
+    ) 
+    .cols_hide('year')   
+    .cols_label(brand='Y-o-Y % Change')
+)
+```
+
+```{python}
+base = alt.Chart(annual_change_share).encode(
+    x=alt.X("brand:N",
+            title='Brands', 
+            axis=alt.Axis(labelAngle=0)
+    ),
+    y=alt.Y("% Change:Q",
+            axis=alt.Axis(format=".0%")
+    ),
+    color=alt.condition(
+        alt.datum["% Change"] > 0, # fixed this 
+        alt.value("green"),  # The positive color
+        alt.value("red")  # The negative color
+    ),
+    text=alt.Text(
+        '% Change',
+        format=(".1%")
+    )
+        
+).properties(
+    width=650,
+    height=250,
+    title='% Change in Annual Market Share'
+)
+
+chart = base.mark_bar() + base.mark_text(
+    align='center', 
+    baseline=alt.expr(alt.expr.if_(alt.datum['% Change'] >= 0, 'bottom', 'top')),
+    dy=alt.expr(alt.expr.if_(alt.datum['% Change'] >= 0, -3, 3)),
+    dx=0)
+
+chart.show()
+```
+
+### Average SKU Price
+
+```{python}
+avg_sku_price = grocery_lf.select(
+    ['week', 'sku_id', 'price', 'brand']
+).filter(
+    (pl.col('week') <= 52) & # pricing in the first year
+    (pl.col('brand') == 'Alpha') # Filter by Alpha brand 
+).group_by('brand', 'sku_id').agg(
+    pl.col('price').mean()
+).drop('brand').sort(
+    pl.col('sku_id').cast(pl.Int8)
+)
+
+(
+    GT(avg_sku_price.collect(), rowname_col='sku_id') 
+    .tab_header(title='Alpha - Average SKU Retail Prices')
+    .tab_stubhead(label="SKU IDs")
+    .fmt_currency()
+    .data_color(
+        columns=['price'],
+        domain=[1, 15],
+        palette=['white', 'rebeccapurple']
+    )  
+    .cols_label(price='Average Price ($)')
+)
+```
+
+```{python}
+avg_sku_price.drop(pl.col('sku_id')).describe()
+```
+
+::: example-text
+*Garbage Collect*
+
+```{python}
+exceptions = ['grocery_lf', 'sku_lf', 'kiwi_lf', 'In', 'exceptions', 'active_variables']
+
+active_variables = [
+    var for var, value in globals().items()
+    if not var.startswith('_')   # Exclude variables that start with "_"
+    and var not in exceptions    # Exclude variables in the exceptions list
+    and isinstance(value, (pl.LazyFrame, pl.DataFrame, pl.Series, alt.Chart, alt.LayerChart, list, int, float, str, np.ndarray, np.int64, np.float32))  # Remove these types only
+]
+
+for var in active_variables:
+    del globals()[var]
+del active_variables, exceptions, var
+
+gc.collect()
+```
+:::
+
+## Exploring Variation in Buyer Behaviour
+
+### Introduction
+
+The objective here is to explore how to perform the basic analyses that describe the variation we observe in buyer behaviour in a given time period. We will continue to work with the edible grocery dataset, exploring both purchase frequency and spend.
+
+Before we can doing any analysis, we need to create some summary datasets. The first will summarise **how many times each panellist purchased each brand as well as in the category**. The second will summarise **how much each panellist spent on each brand and in the category**.
+
+```{python}
+grocery_lf.filter(
+    (pl.col('panel_id') == 3102016) &
+    (pl.col('trans_id') == 844)
+).collect()
+```
+
+On this one shopping trip (`trans_id` = 844), panellist `3102021` purchased a total of six items: three packs of SKU 5, two packs of SKU 15, and one pack of SKU 89. They purchased two different brand, Alpha and Delta.
+
+Why are three lines for SKU 5 and not one line with units = 3. This is simply a function of how the items were scanned at the checkout. Some checkout operators will scan the three items separately; this would result in three lines in the transaction file, each with units = 1. Others will scan the item and press “3” on their till, resulting in one line in the transaction file with units = 3.
+
+By convention, this purchase occasion is recorded as one **category transaction**, one Alpha transaction, and one Delta transaction. The number of units of Alpha purchased is five. When we say that the panellist made one category transaction, we mean they purchased at least one item in the category on that shopping trip. When we say that the panellist made one Alpha transaction, we mean they purchased at least one item associated with the brand on that shopping trip.
+
+In order to analyse buyer behaviour in terms of transactions, we need to know the **number of brand and category transactions for each person**. We cannot work directly with the dataset we have been using; we effectively need to collapse the five rows associated with Alpha into one. This will require some intermediate analysis, which we undertake in the following manner.
+
+Result of the intermediate prep should produce a dataset that summarizes transaction 844 by panellist 3102016 as 1 occasion of Alpha brand purchase and 1 occasion of Delta brand purchase:
+
+![](references/intermediate-data-prep.png){fig-align="center" width="734"}
+
+### Panellist-Level Data Preparation
+
+![](references/Consumer-Panel-Data-Relationship.png){fig-align="center" width="605"}
+
+**One row per transaction**, with a binary indicator of whether or not each brand was purchased.
+
+-   Filter for year == 1, group by transaction ID, panel ID and brand, then count unique panel_ids per transaction and brand
+
+-   Each panelist has done some number of transactions. Group unique transactions and obtain the count of transactions occasions in which any listed brand was purchased
+
+-   Note: this is not a sum of total units (by brand) purchased per panellist.
+
+-   Note: Because there are multiple entires for the same transaction ID, we are not doing a count of brand instance per panelist (without trans_id grouping) as this would duplicate the occasions in some cases.
+
+-   Produce a dataset where there is just one row per transaction, with a binary indicator of whether or not each brand was purchased.
+
+-   Create a new column to track category purchase. Each row is an instance of at least one brand purchase so category column is set to 1.
+
+**Panellist-level *transaction* summary**
+
+The function below executes a query plan which summarizes each panellist's purchase occasions (transactions) for each brand
+
+```{python}
+def trans_summary(brand, lf, year):
+    
+    # Primary Step: Filter by Year 1 and Remove Unused Columns
+    filtered_lf = lf.filter(
+        (pl.col('week') <= (year * 52)) &
+        (pl.col('week') > ((year - 1) * 52))
+    ).drop(
+        pl.col('week','sku_id')
+    )
+
+    # Intermediate Step: Group by trans_id, panel_id, and brand
+    group_trans = filtered_lf.drop(
+        pl.col('price', 'units')
+    ).group_by(
+        'trans_id', 'panel_id', 'brand'
+    ).n_unique()
+    
+    if brand == "Category":
+        # Panellist-level category transaction summary
+        summary = group_trans.group_by(
+            'panel_id'
+        ).n_unique()
+    else:
+        # Panellist-level brand transaction summary
+        summary = group_trans.filter(
+            pl.col('brand') == brand
+        ).group_by(
+            'panel_id'
+        ).n_unique()
+    
+    return summary.select(
+        pl.col('panel_id'),
+        pl.col('trans_id').alias('# of Purchases'),
+        pl.col('brand').alias('Brands Purchased')
+    )
+```
+
+```{python}
+def trans_pivot(lf, year):
+    
+    # Primary Step: Filter by Year 1 and Remove Unused Columns
+    filtered_lf = lf.filter(
+        (pl.col('week') <= (year * 52)) &
+        (pl.col('week') > ((year - 1) * 52))
+    ).drop(
+        pl.col('week','sku_id')
+    )
+
+    # Intermediate Step: Group by trans_id, panel_id, and brand
+    group_trans = filtered_lf.drop(
+        pl.col('price', 'units')
+    ).group_by(
+        'trans_id', 'panel_id', 'brand'
+    ).n_unique() # count of unique entires
+    
+    summary = group_trans.collect().pivot(
+        on='brand',
+        index='panel_id',
+        values='panel_id',
+        aggregate_function="len"
+        
+    ).join(
+        other=group_trans.group_by('panel_id').n_unique().drop('brand').collect(),
+        on='panel_id'
+    ).rename(
+        {'trans_id': 'Category'}
+    ).drop(
+        pl.col('panel_id')
+    )
+    
+    return summary
+```
+
+**Panellist-level *spend* summary**
+
+The function below executes a query plan which summarizes the amount each panellist spent on each brand (and in the category) during year 1.
+
+```{python}
+def spend_summary(brand, lf, year):
+    
+    group_spend = lf.filter(
+        (pl.col('week') <= (year * 52)) &
+        (pl.col('week') > ((year - 1) * 52))
+    ).drop(
+        pl.col('week','sku_id')
+    ).with_columns(
+        ((pl.col('units') * pl.col('price'))).alias('spend')
+    )
+    
+    if brand == "Category":
+        # Panellist-level category spend summary
+        summary = group_spend.drop(
+            pl.col('units', 'price', 'brand')
+        ).group_by(
+            'panel_id'
+        ).agg(
+            pl.col('spend').sum()
+        )
+    else:
+        # Panellist-level brand spend summary
+        summary = group_spend.drop(
+            pl.col('units', 'price')
+        ).group_by(
+            'panel_id', 'brand'
+        ).agg(
+            pl.col('spend').sum()
+        ).filter(
+            pl.col('brand') == brand
+        ).drop('brand')
+        
+    return summary
+```
+
+```{python}
+def spend_pivot(lf, year):
+    
+    group_spend = lf.filter(
+        (pl.col('week') <= (year * 52)) &
+        (pl.col('week') > ((year - 1) * 52))
+    ).drop(
+        pl.col('week','sku_id')
+    ).with_columns(
+        ((pl.col('units') * pl.col('price'))).alias('spend')
+    ).collect().pivot(
+        on='brand',
+        index='panel_id',
+        values='spend',
+        aggregate_function='sum'
+    ).select(
+        'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'
+    )
+
+    return group_spend
+```
+
+**Panellist-level *volume purchasing* summary**
+
+The function below executes a query plan which summarises each panellist’s volume purchasing in year 1.
+
+```{python}
+def vol_summary(brand, lf, year):
+    with pl.StringCache():
+        group_vol = lf.filter(
+            (pl.col('week') <= (year * 52)) &
+            (pl.col('week') > ((year - 1) * 52))
+        ).join(
+            other=sku_lf,
+            left_on='sku_id',
+            right_on='sku_id'
+        ).drop(
+            pl.col('week','sku_id')
+        ).with_columns(
+            # volume column that is the product of weight of each SKU and the units of SKU sold
+            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume') # # weight from grams to kilograms
+        ).drop(
+            pl.col('units', 'price', 'weight')
+        )
+        
+        if brand == "Category":
+            # Panellist-level category volume sales summary
+            summary = group_vol.drop(
+                pl.col('brand')
+            ).group_by(
+                'panel_id'
+            ).agg(
+                pl.col('volume').sum()
+            )
+        else:
+            # Panellist-level brand volume sales summary
+            summary = group_vol.group_by(
+                'panel_id', 'brand'
+            ).agg(
+                pl.col('volume').sum()
+            ).filter(
+                pl.col('brand') == brand
+            ).drop('brand')
+        
+    return summary
+```
+
+```{python}
+def vol_pivot(lf, year):
+    with pl.StringCache():
+        group_vol = lf.filter(
+            (pl.col('week') <= (year * 52)) &
+            (pl.col('week') > ((year - 1) * 52))
+        ).join(
+            other=sku_lf,
+            left_on='sku_id',
+            right_on='sku_id'
+        ).drop(
+            pl.col('week','sku_id')
+        ).with_columns(
+            # volume column that is the product of weight of each SKU and the units of SKU sold
+            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume') # # weight from grams to kilograms
+        ).drop(
+            pl.col('units', 'price', 'weight')
+        ).collect().pivot(
+            on='brand',
+            index='panel_id',
+            values='volume',
+            aggregate_function='sum'
+        ).select(
+            'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'
+        )
+        
+    return group_vol
+```
+
+Looking at panellist-level spend and panellist-level volume purchasing, we note that for each row, `Category` equals the sum of the brand numbers, as we would expect. But this is not always the case in panellist-level transactions. Why is the sum of the brand-specific numbers sometimes greater than the associated category number?
+
+Answer: Because a single transactions (once grouped) can have occasions of multiple brand purchases but the transaction only counts as one occasion of a category purchase. Consider the panellist `3102016` and her transaction ID `844`, The 4 entires on the one transaction ID count as a single category transaction, a single Alpha brand transaction and a single Delta transaction. The category transaction count is not a sum of brand purchase transaction count because regardless of the brand(s) and quantities purchased, the panelist purchased the category once in that transaction only.
+
+### Examining Purchase Frequency
+
+Two standard brand performance metrics that summarize purchasing behaviour are **penetration** and **purchases per buyer (PPB)**.
+
+-   *Penetration* is the percentage of households buying the product/category at least once in the given time period.
+    -   In order to compute this, we need to know the number of panellists buying the product at least once in the time period of interest and the size of the panel during this period.
+-   *Purchases per buyer (PPB)* is the average number of times (separate shopping trips) the product/category was purchased (in the given time period) by those households that made at least one product/category purchase (in the given time period).
+    -   i.e. purchases per buyer (PPB) is the average number of times the product was purchased (in the given time period) per buyer.
+    -   This is computed as the total number of purchase occasions on which the product was purchased by the panellists (in the time period of interest) divided by the number of panellists that purchased the product at least once (in the time period of interest).
+
+Looking at *panellist-level transaction summary*, we see that there are 4574 rows in this table, meaning that we have summary data on the purchasing of 4574 households in year 1. But there are 5021 households in the panel. What has happened to the remaining 447 households? They did not make any category purchase during the year. (But they will have purchased in other categories.)
+
+```{python}
+# the number of panellists who purchased each brand at least once in year 1
+buyers = trans_pivot(grocery_lf, 1).count().select(
+    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other', 'Category'
+).unpivot(
+    variable_name='brand',
+    value_name='buyers'
+)
+
+(
+    GT(buyers, rowname_col='brand')
+    .tab_header(title='Number of Buyers in Year 1')
+    .tab_stubhead(label="Brands/Category")
+    .fmt_integer()
+    .data_color(
+        columns=['buyers'],
+        rows=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[100, 3_000],
+        palette=['white', 'rebeccapurple']
+    )  
+    .cols_label(buyers='# Of Buyers')
+)
+```
+
+```{python}
+# On how many purchase occasions did the brand/category buyers of each brand/category buy that brand/category?
+# i.e, On how many purchase occasions did the 2624 buyers of Alpha buy Alpha?
+transactions = trans_pivot(grocery_lf, 1).sum().select(
+    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other', 'Category'
+).unpivot(
+    variable_name='brand',
+    value_name='transactions'
+)
+
+(
+    GT(transactions, rowname_col='brand')
+    .tab_header(title='Purchase Occasions by Buyers')
+    .tab_stubhead(label="Brands/Category")
+    .fmt_integer()
+    .data_color(
+        columns=['transactions'],
+        rows=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[400, 10_000],
+        palette=[ 'white', 'rebeccapurple']
+    )  
+    .cols_label(transactions='# Of Transactions')
+)
+```
+
+```{python}
+panel_size = 5021
+
+# Penetration is simply the number of brand buyers divided by the number of panellists, expressed as a percentage
+penetration = buyers.with_columns(
+    (pl.col('buyers') / panel_size).alias('penetration')
+)
+
+# Purchases per buyer (PPB) is simply to total number of purchases occasions divided by the number of buyers.
+ppb = transactions.with_columns(
+    (pl.col('transactions') / penetration.get_column('buyers')).alias('ppb')
+)
+```
+
+```{python}
+(
+    GT(penetration, rowname_col='brand')
+    .tab_header(title='Penetration by Category & Brand')
+    .tab_stubhead(label="Brands/Category")
+    .fmt_percent()
+    .data_color(
+        columns=['penetration'],
+        rows=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 1],
+        palette=['white', 'rebeccapurple']
+    )  
+    .cols_label(penetration='Penetration (%)')
+    .cols_hide('buyers')
+)
+```
+
+```{python}
+(
+    GT(ppb, rowname_col='brand')
+    .tab_header(title='Purchases per Buyer (PPB)')
+    .tab_stubhead(label="Brands/Category")
+    .fmt_number()
+    .data_color(
+        columns=['ppb'],
+        rows=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 5],
+        palette=['white', 'rebeccapurple']
+    )  
+    .cols_label(ppb='PPB')
+    .cols_hide('transactions')
+)
+```
+
+We see that 91% of the households in the panel purchased in the category at least once in year 1. (This is a widely purchased product category.) On average, they purchased in the category 4.4 times that year. Looking at Alpha, we see that 52% of the households in the panel purchased the brand at least once, purchasing it on average 3.5 times.
+
+Penetration and PPB are in fact summary measures of an important but frequently overlooked summary of buyer behaviour: the **distribution of purchase frequency**. We first explore how to create this summary of category purchasing and then consider how to create such a summary of brand purchasing.
+
+### Distribution of Purchase
+
+#### Distribution of Category Purchase Frequency
+
+Looking at the *panellist-level transaction summary*, the distribution of category purchasing is determined by counting how many households made one category purchase (panellists 3102011, 3102046, etc.), two category purchases (panellists 3102012, 3102021, etc.), and so on.
+
+```{python}
+# Category Transaction Distribution
+category_trans_dist = (
+    trans_summary('Category', grocery_lf, 1)
+    .group_by(pl.col('# of Purchases'))
+    .agg(pl.len().alias("Frequency"))
+    .collect() 
+    # Add zero purchase row to the top of the data series with a new column name 'Frequency'
+    .pipe(
+        lambda df: df.vstack(
+            pl.DataFrame(
+                {
+                    "# of Purchases": [0],
+                    "Frequency": [panel_size - df["Frequency"].sum()],
+                }
+            ).with_columns(
+                pl.col("# of Purchases").cast(pl.UInt32),
+                pl.col('Frequency').cast(pl.UInt32)
+            )
+        )
+    )
+    .sort(by='# of Purchases')
+    # Add percentage of total column
+    .with_columns(
+        (pl.col('Frequency') / pl.col('Frequency').sum()).alias("% of Total")
+    )    
+)
+
+(
+    GT(category_trans_dist, rowname_col='# of Purchases')
+    .tab_header(title='Category Purchase Distribution')
+    .tab_stubhead(label="# of Purchases")
+    .fmt_integer(columns='Frequency')
+    .fmt_percent(columns='% of Total')
+    .data_color(
+        columns=['% of Total'],
+        domain=[0, 0.2],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+If we wish to create a visual representation of this distribution, it is tempting to simply plot the data in % of total column. However, the resulting plot would be misleading as *some purchase frequencies are missing in the data*. In particular, we see that no one made *21 category purchases; ditto for 23, 24, and 26*. One solution is to insert manually the missing number of purchases levels with 0 frequencies and then plot the data. However, the observed (relative) frequencies in the right tail are so small that they do not show up in a plot. We can therefore create a **right-censored distribution**. Here we have chosen 15 as the (right) censoring point; we see that 51 households (or 1% of the panellists) made 15 or more category purchases in year 1.
+
+There is nothing magical about our choice of 15. Generally, the choice of censoring point is a function of how many bins you wish to display and the height of the right-most bar with which you feel comfortable.
+
+Note that while the right-censored distribution is useful when creating a summary figure or table, it is of limited value beyond that. For example, it is not possible to compute the **mean purchase frequency** (and therefore PPB) from this summary.
+
+```{python}
+# Create a custom bin list (with an overflow bin) to label categories
+labels = [str(i) if i < 15 else '15+' for i in range(0, 16, 1)]
+chart = freq_dist_plot(
+    data=category_trans_dist,
+    column="# of Purchases",
+    bin_edges=np.arange(0, 15, 1),
+    labels=labels,
+    x_title="Number of Category Transactions",
+    y_title="% of Households",
+    chart_title="Category Transaction Distribution (%)",
+    subtitle="Distribution of category purchasing in year 1",
+    left_closed=False,
+    compute_rel_freq=False
+)
+chart.show()
+```
+
+We see that 9% of the panellists made no category purchases, 13% of the panellists made one category purchase, . . . , and 1% of the panellists made at least 15 category purchases in year 1.
+
+#### The Relationship Between the Mean and PPB
+
+What is the average number of times the category was purchased by a household in year 1?
+
+-   Recall that mean, which we denote by $E(X)$, is given by:
+    -   $E(X)=\sum\frac{xf_{x}}{n}$
+    -   where $f_{x}$ is the frequency with which $x$ occurs in the dataset, $n$ is the sample size, and the summation is over all possible values of $x$.
+-   Denoting the relative frequency with which $x$ occurs (i.e., $f_{x}/n$) by $P(X = x)$, the mean is given by:
+    -   $E(X)=\sum x P(X = x)$
+    -   More formally, we can say that $P(X = x)$ is the empirical probability that a randomly chosen household made $x$ purchases.
+
+```{python}
+# Mean of the relative purchase frequency
+mean = category_trans_dist.select(
+    (pl.col('# of Purchases') * pl.col('% of Total')).sum()
+).item(0,0)
+print(f'{mean = :0.3f}')
+```
+
+We see that average number of category purchases is 4.0. Why is this different from the 4.4 purchases per buyer (PPB) computed above? The mean we have just computed *includes those households that made zero purchases*, whereas *PPB is the average among those households that made at least one* (in this case category) purchase.
+
+We can derive the relationship between these two quantities (mean of the relative frequency and PPB) in the following manner:
+
+$$
+\begin{aligned}
+    PBB &= \sum_{x=1}^{\max x} \frac{xf_{x}}{n-f_{0}} \\
+        &= \sum_{x=0}^{\max x} \frac{xf_{x}}{n-f_{0}} \\
+        &= \sum_{x=0}^{\max x} \left(\frac{xf_{x}}{n-f_{0}}\right)\left(\frac{n}{n}\right) \\
+        &= \sum_{x=0}^{\max x} \left(\frac{xf_{x}}{n}\right)\left(\frac{n}{n-f_{0}}\right) \\
+        &= \left(\frac{n}{n-f_{0}}\right)\sum_{x=0}^{\max x} \left(\frac{xf_{x}}{n}\right) \\
+        &= \frac{E(X)}{1-P(X=0)}
+\end{aligned}
+$$
+
+In other words, **PPB is the mean divided by penetration**.
+
+```{python}
+# All category PPB computations here are equivalent
+ppb_category = mean / penetration.filter(pl.col('brand') == 'Category').item(0,2)
+print(ppb_category)
+print(ppb.filter(pl.col('brand') == 'Category').item(0,2))
+ppb_category = mean / (1 - category_trans_dist['% of Total'][0])
+print(ppb_category)
+```
+
+#### Distribution of Brand Purchase Frequency
+
+Let us now create the distribution of purchase frequency for Alpha, which is. With the one exception noted below, the logic follows that associated with creating the distribution of category purchasing.
+
+In contrast to the `groupby` aggregation output associated with our summary of category purchasing, this aggregation does contain a zero category. However, we must be careful in our interpretation of the associated frequency. We see that 1950 category buyers did not buy Alpha in year 1. However, in order to have a complete summary of brand purchasing, we should also account for those 447 households that made no category purchases that year. The number of panellists making zero purchases of Alpha is the total number of panellists (5021) minus the number of panellists that made 1, 2, 3, . . . purchases.
+
+**Note**: What is Alpha’s penetration of category buyers? (1 − 1950/4574) = 57%. - Category Penetration = (1 - % of category buyers who did not purchase the brand)
+
+```{python}
+# Alpha Brand Transaction Distribution
+alpha_trans_dist = (
+    trans_summary('Alpha', grocery_lf, 1)
+    .group_by(pl.col('# of Purchases'))
+    .agg(pl.len().alias("Frequency"))
+    .collect() 
+    .pipe(
+        lambda df: df.vstack(
+            pl.DataFrame(
+                {
+                    "# of Purchases": [0],
+                    # Calculate zero purchases by subtracting the total sum of all purchases from the full panel size
+                    "Frequency": [panel_size - df["Frequency"].sum()], # This ensures all panelists who made zero purchases are accounted for
+                }
+            ).with_columns(
+                pl.col("# of Purchases").cast(pl.UInt32),
+                pl.col('Frequency').cast(pl.UInt32)
+            )
+        )
+    )
+    .sort(by='# of Purchases')
+    .with_columns(
+        # Add a '% of Total' column
+        (pl.col('Frequency') / pl.col('Frequency').sum()).alias("% of Total")
+    )    
+)
+
+(
+    GT(alpha_trans_dist, rowname_col='# of Purchases')
+    .tab_header(title='Alpha Purchase Distribution')
+    .tab_stubhead(label="# of Purchases")
+    .fmt_integer(columns='Frequency')
+    .fmt_percent(columns='% of Total')
+    .data_color(
+        columns=['% of Total'],
+        domain=[0, 0.5],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+```{python}
+# Create a custom bin list (with an overflow bin) to label categories
+labels = [str(i) if i < 10 else '10+' for i in range(11)]
+
+chart = freq_dist_plot(
+    data=alpha_trans_dist,
+    column="# of Purchases",
+    bin_edges=np.arange(0, 10, 1),
+    labels=labels,
+    x_title="Number of Transactions",
+    y_title="% of Households",
+    chart_title="Alpha Transaction Distribution (%)",
+    subtitle="Distribution of purchase frequency for Alpha in year 1",
+    left_closed=False,
+    compute_rel_freq=False
+)
+chart.show()
+```
+
+### Distribution of Spend
+
+#### Distribution of Category Spend
+
+We now turn our attention to creating summaries of total spend. Our initial goal is to create a histogram of category spend (in dollars) across those panellists that made at least one purchase in the category in year 1. In the following plot, the raw total spend data have been binned in bins with a width of \$5.
+
+We see that 16% of category buyers spent up to \$5 in the category during this one-year period; 23% spent between \$5 and \$10; . . . and 2% spent more than \$50.
+
+Before deciding on what bin width to use when creating the histogram, let us first compute some basic descriptive statistics.
+
+```{python}
+category_spend = spend_summary('Category', grocery_lf, 1).drop('panel_id')
+
+category_spend.describe()
+```
+
+We wish to visualize the variability in category spend. Given this objective, some would automatically think of creating a (kernel) density plot.
+
+```{python}
+alt.Chart(category_spend.collect()).transform_density(
+    'spend',
+    as_=['spend', 'Density']
+).mark_area().encode(
+    x=alt.X("spend:Q").scale(domain=(0,150)),
+    y='Density:Q',
+).properties(
+    width=650,
+    height=250
+)
+```
+
+While this provides a good visualisation of the shape of the distribution, it can be difficult for most “consumers” of the plot to extract some additional information that may be of interest. For example, it is not easy to answer the question “What percentage of category buyers spent \$30 or less in year 1?”.
+
+There appears to be quite a bit of variability in category spend. To get further insight into the distribution of total category spend across the panellists, we need to determine the total spend quantities associate with the various percentile levels.
+
+```{python}
+percentiles = np.arange(5, 96, 5)
+# np.percentile returns the k-th percentile of values in a range
+percentile_values = np.percentile(category_spend.select('spend').collect(), percentiles)
+
+percentile_df = pl.DataFrame({
+    'Percentile Level': percentiles,
+    'Percentile': percentile_values})
+
+(
+    GT(percentile_df, rowname_col='Percentile Level')
+    .tab_header(title='Category Spend Percentile')
+    .tab_stubhead(label="Percentile Level")
+    .fmt_number()
+    .data_color(
+        columns=['Percentile'],
+        domain=[0, 40],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+We see that 5% of the category buyers spent \$2.69 or less in the category during the year, 10% spent \$3.39 or less, and so on. The heaviest 5% of buyers each spent more than \$39.72 in the category during the year.
+
+Looking out this output, we conclude that a bin size of \$5 is probably about right.
+
+How many bins do we go with? This is an empirical question. Since 5% of the panel spent more than \$39.72, we certainly want to go above \$40 in order to get a sense of how they are spread between \$39.72 and the maximum of \$166.70. We will go with \$50. If too many panellists have spent more than \$50, we can always add more bins. If too few panellists fall into this bin, we can always combine the bins we have created.
+
+**Note**: The distributions of many customer behaviours have a long right tail. Accommodating the range of values can make it difficult to get a clear sense of what is happening on the left side of the distribution. It can therefore be helpful to bin the data (as with a histogram) but to right censor the data, assigning all of the observations with a value of $𝑥$ or higher to an $𝑥 +$ bin
+
+We see that 750 panellists spent \$5 or less in the category during year 1, 1073 spent between \$5 and \$10, . . . , and 109 spent more than \$50.
+
+We convert the raw counts into percentages and plot these percentages as a bar chart.
+
+```{python}
+# Create a custom bin list (with an overflow bin) to label categories
+labels = [f"{lb} - {lb + 5 if lb != 50 else '∞'}" for lb in range(-5, 55, 5)]
+chart = freq_dist_plot(
+    data=category_spend,
+    column="spend",
+    bin_edges=np.arange(0, 51, 5),
+    labels=labels,
+    x_title="Category Spend ($)",
+    y_title="% of Households",
+    chart_title="Category Spend Distribution (%)",
+    subtitle="Distribution of category spend across category buyers"
+)
+chart.show()
+```
+
+The general shape of this distribution (i.e., an interior mode, median less than the mean, right-skewed with a long right-tail) is what we typically observe when we look at spend data.
+
+This, of course, depends on the bin width we choose when summarising the data. If we had chosen a bin width of \$10, the left-most bar would be the highest bar and we would no longer observe an interior mode.
+
+#### Distribution of Brand Spend
+
+Let us now create the distribution of spend on Alpha. We will follow the same basic process as for the distribution of category spend with a few minor changes.
+
+Note that there are a number of 0 or NaN values in the Alpha spend column. While these panellists purchased in the category during the year, they did not purchase any of Alpha’s SKUs. The first thing we need to do is remove these observations.
+
+```{python}
+alpha_spend = spend_summary('Alpha', grocery_lf, 1).drop('panel_id')
+
+alpha_spend.describe()
+```
+
+```{python}
+percentiles = np.arange(5, 96, 5)
+
+percentile_values = np.percentile(alpha_spend.select('spend').collect(), percentiles)
+
+percentile_df = pl.DataFrame({
+    'Percentile Level': percentiles,
+    'Percentile': percentile_values})
+
+(
+    GT(percentile_df, rowname_col='Percentile Level')
+    .tab_header(title='Alpha Spend Percentile')
+    .tab_stubhead(label="Percentile Level")
+    .fmt_number()
+    .data_color(
+        columns=['Percentile'],
+        domain=[0, 40],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+Having looked at some basic descriptive stats (as above), we will summarise the data using bins of width \$2, right-censoring at \$40.
+
+```{python}
+labels = [f"{lb} - {lb + 2 if lb != 40 else '∞'}" for lb in range(-2, 41, 2)]
+chart = freq_dist_plot(
+    data=alpha_spend,
+    column="spend",
+    bin_edges=np.arange(0, 41, 2),
+    labels=labels,
+    x_title="Brand Spend ($)",
+    y_title="% of Households",
+    chart_title="Alpha Spend Distribution (%)",
+    subtitle="Distribution of spend on Alpha across brand buyers",
+    label_angle=-45
+)
+chart.show()
+```
+
+The general observation made earlier about category spend distribution about the shape of the distribution of spend holds. It is not so smooth, but this is a function of the smaller bins sizes. There is, however, one obvious aberration—the large spike for \$2–\$4. What is going on here? The average price of most Alpha SKUs is between \$2 and \$4. (Review average SKU prices of Alpha) We recall from Alpha's distribution of purchase frequency plot that 48% of the panel made zero purchases of Alpha and 15% made one transaction. This implies that 0.15/(1 − 0.48) = 29% of Alpha buyers made just one purchase of the brand. Assuming they only purchased only one unit of one Alpha SKU on that purchase occasion, we would expect a large number of Alpha buyers to spend between \$2 and \$4; 24% is not unrealistic.
+
+How would you determine the validity of the assumption that the buyers who purchased Alpha just once mostly bought only one unit of Alpha SKU on that purchase occasion?
+
+#### Analyzing Alpha's One-Time Buyers in Year 1
+
+```{python}
+# One-Time Alpha Buyers
+one_time_alpha_buyers = trans_summary('Alpha',grocery_lf,1).filter(pl.col('# of Purchases') == 1).collect()
+one_time_alpha_buyers
+
+# Alpha buyers who spent between $2 to $4
+spend_range_alpha_buyers = spend_summary('Alpha', grocery_lf, 1).filter(
+    (pl.col('spend') >= 2) &
+    (pl.col('spend') < 4)
+).collect()
+
+res = one_time_alpha_buyers.with_columns(
+    contains=pl.col('panel_id').is_in(spend_range_alpha_buyers.select('panel_id'))
+).select('contains').sum().item()
+
+print(f'There were {one_time_alpha_buyers.count().item(0,'panel_id')} one-time buyers of Alpha brand in Year 1.')
+print(f'{res} of those one-time Alpha buyers spent between [$2, $4).')
+print(f'Given that there are {spend_range_alpha_buyers.count().item(0,'spend')} Alpha buyers in total who spent between $2-$4,')
+print(f'the {res} one-time buyers represent {res / spend_range_alpha_buyers.count().item(0,'spend'):.0%} of the Alpha buyers in that spend range.')
+```
+
+**Validate**:
+
+```{python}
+spend_range_alpha_buyers.filter(
+    pl.col('panel_id').is_in(one_time_alpha_buyers.select('panel_id'))
+).select(pl.col('spend').sum()).item()
+```
+
+```{python}
+grocery_lf.filter(
+    (pl.col('week') <= 52) &
+    (pl.col('panel_id').is_in(spend_range_alpha_buyers.select('panel_id'))) &  # Assuming panel_id is the relevant column
+    (pl.col('panel_id').is_in(one_time_alpha_buyers.select('panel_id'))) &  # Same assumption
+    (pl.col('brand') == 'Alpha')
+).with_columns(
+    ((pl.col('units') * pl.col('price'))).alias('spend')
+).select(pl.col('spend').sum()).collect().item()
+```
+
+### Distribution of Volume Purchase
+
+#### Distribution of Category Volume Purchase Frequency
+
+```{python}
+category_vol = vol_summary('Category', grocery_lf, 1).drop('panel_id')
+
+category_vol.describe()
+```
+
+```{python}
+percentiles = np.arange(5, 96, 5)
+
+with pl.StringCache(): 
+    percentile_values = np.percentile(category_vol.select('volume').collect(), percentiles)
+
+percentile_df = pl.DataFrame({
+    'Percentile Level': percentiles,
+    'Percentile': percentile_values})
+
+(
+    GT(percentile_df, rowname_col='Percentile Level')
+    .tab_header(title='Category Volume Percentile')
+    .tab_stubhead(label="Percentile Level")
+    .fmt_number()
+    .data_color(
+        columns=['Percentile'],
+        domain=[0, 15],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+```{python}
+labels = [f"{lb} - {lb + 1 if lb != 12 else '∞'}" for lb in range(-1, 13, 1)]
+chart = freq_dist_plot(
+    data=category_vol,
+    column="volume",
+    bin_edges=np.arange(0, 13, 1),
+    labels=labels,
+    x_title="Category Volume Purchase ($)",
+    y_title="% of Households",
+    chart_title="Category Volume Purchase Distribution (%)",
+    subtitle="Distribution of category volume purchases across category buyers"
+)
+chart.show()
+```
+
+#### Distribution of Brand Volume Purchase Frequency
+
+Note that there are a number of 0 or NaN values in the Alpha volume purchase column. These panaellists (like the brand spend section) purchased in the category during the year, but they did not purchase any of Alpha's products. Let us remove observations of `panel_ids` that have not at least made 1 purchase from Alpha brand during the year.
+
+```{python}
+alpha_vol = vol_summary('Alpha', grocery_lf, 1).drop('panel_id')
+
+alpha_vol.describe()
+```
+
+```{python}
+percentiles = np.arange(5, 96, 5)
+
+with pl.StringCache(): 
+    percentile_values = np.percentile(alpha_vol.select('volume').collect(), percentiles)
+
+percentile_df = pl.DataFrame({
+    'Percentile Level': percentiles,
+    'Percentile': percentile_values})
+
+(
+    GT(percentile_df, rowname_col='Percentile Level')
+    .tab_header(title='Alpha Volume Percentile')
+    .tab_stubhead(label="Percentile Level")
+    .fmt_number()
+    .data_color(
+        columns=['Percentile'],
+        domain=[0, 15],
+        palette=['white', 'rebeccapurple']
+    )  
+)
+```
+
+```{python}
+labels = [f"{lb} - {lb + 1 if lb != 9 else '∞'}" for lb in range(-1, 10, 1)]
+
+chart = freq_dist_plot(
+    data=alpha_vol,
+    column="volume",
+    bin_edges=np.arange(0, 10, 1),
+    labels=labels,
+    x_title="Brand Volume Purchase ($)",
+    y_title="% of Households",
+    chart_title="Alpha Brand Volume Purchase Distribution (%)",
+    subtitle="Distribution of Alpha volume purchases across brand buyers"
+)
+chart.show()
+```
+
+::: example-text
+*Garbage Collect*
+
+```{python}
+exceptions = [
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 
+    'In', 'exceptions', 'active_variables',
+    'penetration', 'ppb', 'panel_size']
+
+active_variables = [
+    var for var, value in globals().items()
+    if not var.startswith('_')   # Exclude variables that start with "_"
+    and var not in exceptions    # Exclude variables in the exceptions list
+    and isinstance(value, (pl.LazyFrame, pl.DataFrame, pl.Series, alt.Chart, alt.LayerChart, list, int, float, str, np.ndarray, np.int64, np.float32))  # Remove these types only
+]
+
+for var in active_variables:
+    del globals()[var]
+del active_variables, exceptions, var
+
+gc.collect()
+```
+:::
+
+### Performing a Basic Decile Analysis
+
+We have observed that there is a lot of variability in purchase frequency and spend, be it at the product or category level. A useful way of expressing the variability is via a decile analysis. As the name suggests, this sees us **dividing the customer base into 10 equally sized groups and then summarising each group’s buying behaviour**. We will consider two versions of this analysis.
+
+#### Decile analysis of category buying behaviour - Decile based on category buyers
+
+We will first focus on creating the table below. The table captures the decile analysis of category buying behaviour (where each decile equals 10% category buyers). Recall that 4574 households made at least one category purchase in year 1. Having **sorted these households by total category spend**, we create **10 equally sized groups**. Decile 1 is the 10% of households that spent the most in the category during year 1, decile 2 is the next largest 10% of spenders, and so on.
+
+```{python}
+# Create decile cuts in the group_spend data using the sorted and ranked data
+
+# Part 1: Break-tie ranking of total category spend data
+# Part 2: Decile cuts in ranking
+buyer_decile = spend_summary(
+    'Category', grocery_lf, 1
+).with_columns(
+    pl.col('spend').rank(method='ordinal', descending=True).alias('rank'),
+).with_columns(
+    (np.floor(10 * (pl.col('rank') - 1) / pl.col('rank').max()) + 1).cast(pl.UInt16).alias('decile')
+).sort('decile', 'rank').collect()
+
+buyer_decile
+```
+
+```{python}
+# Helper functions
+def calculate_percentage(series):
+    return series / series.sum()
+
+def group_aggregate(data, group_col, agg_col, agg_expr):
+    return data.group_by(group_col).agg(agg_expr(pl.col(agg_col)))
+
+# Decile table creation
+decile_tab = buyer_decile.select("decile").unique().sort("decile").rename({"decile": "Decile"})
+
+# Populate decile statistics
+# Decile counts and % HH
+decile_counts = group_aggregate(buyer_decile, 'decile', 'panel_id', pl.Expr.count)
+decile_tab.insert_column(1, pl.lit(calculate_percentage(decile_counts['panel_id'])).alias('% HH')) 
+
+# % Spend
+decile_spend = group_aggregate(buyer_decile, 'decile', 'spend', pl.Expr.sum)
+decile_tab.insert_column(2, pl.lit(calculate_percentage(decile_spend['spend'])).alias('% Spend')) 
+
+# % Transactions
+group_trans = trans_summary('Category', grocery_lf, 1).collect().join(
+    other=buyer_decile.group_by('panel_id').agg(pl.col('decile').sum()),
+    on='panel_id'
+).sort('decile')
+decile_trans = group_aggregate(group_trans, 'decile', '# of Purchases', pl.Expr.sum)
+decile_tab.insert_column(3, pl.lit(calculate_percentage(decile_trans['# of Purchases'])).alias('% Trans')) 
+
+# Spend/HH, Cat Trans/HH, Avg Spend/Trans (AOV)
+decile_tab.insert_column(4, pl.lit(decile_spend['spend'] / decile_counts['panel_id']).alias('Spend/HH'))
+decile_tab.insert_column(5, pl.lit(decile_trans['# of Purchases'] / decile_counts['panel_id']).alias('Cat Trans/HH'))
+decile_tab.insert_column(6, pl.lit(decile_spend['spend'] / decile_trans['# of Purchases']).alias('Avg Spend/Trans'))
+
+# Unique Brands Purchased
+unique_brands = group_aggregate(group_trans, 'decile', 'Brands Purchased', pl.Expr.mean)
+decile_tab.insert_column(7, pl.lit(unique_brands['Brands Purchased']).alias('# Unique Brands'))
+
+(
+    GT(decile_tab, rowname_col='Decile')
+    .tab_header(title='Decile Analysis of Category Buying Behavior',
+                subtitle= 'Each decile equals 10% of category buyers')
+    .tab_stubhead(label="Decile")
+    .fmt_percent(columns=['% HH', '% Spend', '% Trans'], decimals=1)
+    .fmt_number(columns=['Cat Trans/HH', '# Unique Brands'])
+    .fmt_currency(columns=['Spend/HH','Avg Spend/Trans'])
+)
+```
+
+Reading across the row associated with Decile 1, we see that they accounted for 28% of category spend and 24% of total transactions. On average, they spent \$44.65 in the category across an average of 10.6 purchase occasions. This corresponds to an average category spend per category transaction of \$4.21. On average, these households purchased 1.8 different brands during the year. Contrast this to the 10% of category buyers that spent the least in the category. They account for 2% of category spend and transactions, making on average one category purchase. And so on.
+
+This is a very basic decile table. Some additional information that could be reported includes the *average number of units purchased per transaction* and the *average number of unique SKUs purchased in the year*.
+
+#### Decile analysis of category buying behaviour - Decile based on category spend/revenue
+
+The decile analysis we have just completed uses deciles that represent 10% of the category buyers. An alternative approach is to create deciles that represent **10% of category spend**. In other words, the decile analysis took the entire customer base that purchased the category in year 1 and split the base into ten equal group. In this analysis, we will take the total customer spend or total revenue and split that revenue into ten equal groups. The only change to what we have done above is how we create the decile variable.
+
+```{python}
+# Divide the total revenue into 10 equal parts and generate the decile bins
+spend_total = spend_summary('Category', grocery_lf, 1).select(pl.col('spend')).sum().collect().to_series()[0]
+breaks = np.arange(0, spend_total, spend_total/10)
+labels = [f'{i}' for i in range(0, 11, 1)]
+
+spend_decile = spend_summary(
+    'Category', grocery_lf, 1
+).sort(
+    'spend', descending=True
+).with_columns(
+    pl.col('spend').cum_sum().alias('cum sum') # Create a cumulative sum column for category spend (category revenue)
+).with_columns(
+    pl.col('cum sum').cut( # Cut function determines the decile range for each cumulative sum value
+        breaks=breaks,
+        labels=labels # Function also adds the decile label from 1 to 10
+    ).cast(pl.UInt16).alias('decile')
+).sort('decile').collect()
+
+spend_decile
+```
+
+```{python}
+# Helper functions
+def calculate_percentage(series):
+    return series / series.sum()
+
+def group_aggregate(data, group_col, agg_col, agg_expr):
+    return data.group_by(group_col).agg(agg_expr(pl.col(agg_col)))
+
+# Decile table creation
+decile_tab_spend = spend_decile.select("decile").unique().sort("decile").rename({"decile": "Decile"})
+
+# Populate decile statistics
+# Decile counts and % HH
+decile_counts = group_aggregate(spend_decile, 'decile', 'panel_id', pl.Expr.count)
+decile_tab_spend.insert_column(1, pl.lit(calculate_percentage(decile_counts['panel_id'])).alias('% HH')) 
+
+# % Spend
+decile_spend = group_aggregate(spend_decile, 'decile', 'spend', pl.Expr.sum)
+decile_tab_spend.insert_column(2, pl.lit(calculate_percentage(decile_spend['spend'])).alias('% Spend')) 
+
+# % Transactions
+group_trans = trans_summary('Category', grocery_lf, 1).collect().join(
+    other=spend_decile.group_by('panel_id').agg(pl.col('decile').sum()),
+    on='panel_id'
+).sort('decile')
+decile_trans = group_aggregate(group_trans, 'decile', '# of Purchases', pl.Expr.sum)
+decile_tab_spend.insert_column(3, pl.lit(calculate_percentage(decile_trans['# of Purchases'])).alias('% Trans')) 
+
+# Spend/HH, Cat Trans/HH, Avg Spend/Trans (AOV)
+decile_tab_spend.insert_column(4, pl.lit(decile_spend['spend'] / decile_counts['panel_id']).alias('Spend/HH'))
+decile_tab_spend.insert_column(5, pl.lit(decile_trans['# of Purchases'] / decile_counts['panel_id']).alias('Cat Trans/HH'))
+decile_tab_spend.insert_column(6, pl.lit(decile_spend['spend'] / decile_trans['# of Purchases']).alias('Avg Spend/Trans'))
+
+# Unique Brands Purchased
+unique_brands = group_aggregate(group_trans, 'decile', 'Brands Purchased', pl.Expr.mean)
+decile_tab_spend.insert_column(7, pl.lit(unique_brands['Brands Purchased']).alias('# Unique Brands'))
+
+(
+    GT(decile_tab_spend, rowname_col='Decile')
+    .tab_header(title='Decile Analysis of Category Buying Behavior',
+                subtitle= 'Each decile equals 10% of category spend/revenue')
+    .tab_stubhead(label="Decile")
+    .fmt_percent(columns=['% HH', '% Spend', '% Trans'], decimals=1)
+    .fmt_number(columns=['Cat Trans/HH', '# Unique Brands'])
+    .fmt_currency(columns=['Spend/HH','Avg Spend/Trans'])
+)
+```
+
+Reading across the row associated with Decile 1, we see that the top 2% of households accounted for 10% of category spend. On average, they spent \$63.77 in the category, across an average of 13.4 purchase occasions. This corresponds to an average category spend per category transaction of \$4.74. On average, these households purchased 1.9 different brands during the year.
+
+### Lorenz Curves
+
+#### Lorenz Curves - Transactions/Purchasing - Discrete
+
+A Lorenz curve is a common graphical tool for visualising “concentration” or “inequality” in the distribution of a quantity of interest (e.g., income, buying behaviour). It show the proportion of the overall quantity (e.g., number of transactions, spend) associated with the bottom x% of the unit of observation associated with the distribution (e.g., households). When analysing buyer behaviour, this sees us lining up all customers in ascending order of their level of purchasing and computing the share of total purchasing accounted by each person. The Lorenz curve is created by plotting the cumulative percentage of customers (x-axis) against the cumulative percentage of total purchasing (y-axis).
+
+The Lorenz curve for transactions associated with Alpha is computed and plotted below and interpreted in the following manner. We see that that x = 80% roughly corresponds to y = 54%, which means the 80% of the buyers of Alpha (when sorted from least to most frequent buyers) account for 54% of all the buying of Alpha in year 1. This implies the top 20% of buyers (in terms of purchase frequency) account for 46% of total purchases. The “rule” of 80/20 does not hold here; rather, it is 46/20.
+
+```{python}
+# We are only interested in those panellists that made at least one purchase of Alpha in year 1.
+# Alpha Brand Transaction Distribution of Transactions Greater Than 0
+alpha_trans_dist = (
+    trans_summary('Alpha', grocery_lf, 1)
+    .filter(pl.col('# of Purchases') > 0)
+    .group_by('# of Purchases')
+    # Frequency of the Grouped Transaction Count
+    .agg(pl.col('# of Purchases').count().alias('Frequency'))
+    .sort('# of Purchases')
+    # Add a '% of Buyers' column
+    .with_columns((pl.col('Frequency')/pl.col('Frequency').sum()).alias('% of Buyers'))
+    # Cumulative % of Buyers
+    .with_columns((pl.col('% of Buyers').cum_sum()).alias('Cum % of Buyers'))
+    # Total number of transactions made by those customers who made one purchase of Alpha
+    # Total Transactions = frequency x # of transactions
+    .with_columns((pl.col('Frequency')*pl.col('# of Purchases')).alias('Total Transactions'))
+    # Add a '% of Transactions' column
+    .with_columns((pl.col('Total Transactions')/pl.col('Total Transactions').sum()).alias('% Transactions'))
+    # Cumulative % of Transactions
+    .with_columns((pl.col('% Transactions').cum_sum()).alias('Cum % Transactions'))
+)
+
+(
+    GT(alpha_trans_dist.collect(), rowname_col='# of Purchases')
+    .tab_header(title='Alpha Buyers & Transaction Distribution',
+                subtitle= 'Lorenz Curve Table')
+    .tab_stubhead(label="# of Purchases")
+    .fmt_percent(columns=['% of Buyers', 'Cum % of Buyers', '% Transactions', 'Cum % Transactions'], decimals=1)
+    .fmt_integer(columns=['Frequency', 'Total Transactions'])
+)
+```
+
+-   We are only interested in those panellists that made at least one purchase of Alpha in year 1.
+-   We compute the total number of transactions made by those customers who made one purchase of Alpha: this is obviously the number of transactions times the frequency of the transactions. We see that the 517 households that purchased Alpha twice made a total of 1034 transactions.
+-   What percentage of the total number of buyers of Alpha are the 733 households that made one purchase? The 517 households that made two purchases? What percentage of total purchasing is the 733 purchases made by those households that made one purchase? The 1034 purchases by made by those households that made two purchases? We first compute the total number of Alpha buyers and the total amount of purchasing by this group, and then compute the associated percentages. We see that **28% of Alpha buyers made just one purchase and their purchasing accounted for 8% of all Alpha purchasing**. Similarly, we see that **20% of buyers made two purchases and their purchasing accounted for 11% of all Alpha purchasing**.
+-   We compute the cumulative percentage of both `% of buyers` and `% of transactions` quantities We see, for example, that 48% of all buyers made two or fewer purchases and accounted for 20% of all the purchases of Alpha.
+
+```{python}
+zero_row = pl.DataFrame({
+    'Cum % of Buyers': [0.0],
+    'Cum % Transactions': [0.0]
+})
+
+alpha_lorenz_plot = alpha_trans_dist.select('Cum % of Buyers' ,'Cum % Transactions').collect()
+alpha_lorenz_plot_zero = pl.concat([zero_row, alpha_lorenz_plot])
+
+chart = alt.Chart(alpha_lorenz_plot_zero).mark_line().encode(
+    x=alt.X('Cum % of Buyers:Q', title='Cumulative % Alpha Buyers', axis=alt.Axis(format='.0%')),
+    y=alt.Y('Cum % Transactions:Q', 
+            title='Cumulative % Alpha Transactions', 
+            axis=alt.Axis(format='.0%'),
+            scale=alt.Scale(domain=[0, 1])),
+).properties(
+    title="Lorenz Curve for Alpha Transactions",
+    width=550,
+    height=450
+)
+
+chart.show()
+```
+
+As noted above, we see that x = 80% roughly corresponds to y = 54%. We can compute the exact number by interpolation (linear) in the following manner:
+
+$$
+\frac{y-y_{0}}{x-x_{0}}=\frac{y_{1}-y_{0}}{x_{1}-x_{0}}
+$$
+
+$$
+(y-y_{0})=\frac{(y_{1}-y_{0})}{(x_{1}-x_{0})}(x-x_{0})
+$$
+
+::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
+<img src="references/linear_interp1.png" width="200"/>
+:::
+
+::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
+<img src="references/linear_interp.png" width="200"/>
+:::
+
+-   We see that 73.4% ($x_{0}$) of buyers accounted for 45.0% ($y_{0}$) of purchases, and that 82.1% ($x_{1}$) of buyers accounted for 57.5% ($y_{1}$) of purchases. Therefore, when $x$ = 80%, $y$ can be solved in the following way:
+-   $0.45 + (0.8 - 0.734)\frac{(0.575 - 0.45)}{(0.821 - 0.734)} = 0.5448$
+-   we see that 80% falls 76% of the way between 73.4% and 82.1%. Therefore, the associated percentage of total purchases will lie 76% of the way between 45.0% and 57.5%.
+-   As the “bottom” 80% account for 54% of total purchasing, it follows that the “top” 20% account for 46% of total purchasing.
+
+```{python}
+# Numpy linear interpolation function simplifies the computation, return the interpolated y value
+np.interp(0.8, xp=alpha_lorenz_plot['Cum % of Buyers'], fp=alpha_lorenz_plot['Cum % Transactions'])
+```
+
+A related quantity of interest is the percentage of buyers that account for half of total purchasing. This can be read off the Lorenz curve in the following manner.
+
+-   We see that 73.4% of purchasers account for 45.0% of total purchases, and that 82.1% of purchasers account for 57.5% of total purchases.
+-   We can apply the same linear interpolation function but instead of solving for the $y$, we solve for $x$.
+-   $(x-x_{0})=\frac{(x_{1}-x_{0})}{(y_{1}-y_{0})}(y-y_{0})$
+-   $\frac{(0.821-0.734)}{(0.575-0.45)}(0.5-0.45) + 0.734 = 0.769$
+-   We see that 50% lies 40% of the way between 44.0% and 57.5%. Therefore, the associated percentage of purchasers lies 40% of the way between 73.4% and 82.1%, we see this is 76.9%.
+-   As the “bottom” 77% of buyers account for half of total purchasing, it follows that the “top” 23% also account for half of total purchasing, which we can write as 50/23. This quantity is easy for most people grasp.
+
+```{python}
+# Reversing the axis returns the interpolated x value
+np.interp(0.5, xp=alpha_lorenz_plot['Cum % Transactions'], fp=alpha_lorenz_plot['Cum % of Buyers'])
+```
+
+#### Lorenz Curves - Spend - Continuous
+
+Purchase frequency is a discrete quantity and we created the Lorenz curve off the distribution of transactions. We now consider how to create a Lorenz curve when the quantity of interest is continuous. We will focus on creating the Lorenz curve for the spend associated with Alpha.
+
+```{python}
+alpha_spend_dist = (
+    spend_summary('Alpha', grocery_lf, 1)
+    .filter(pl.col('spend') > 0)
+    # Sort Alpha customer from lowest to highest
+    .sort(pl.col('spend'), descending=False)
+    # Compute spend as a % of total Alpha brand spend in year 1
+    # percentage of total Alpha purchasing accounted for by each panellist
+    .with_columns((pl.col('spend')/pl.col('spend').sum()).alias('% Spend'))
+    # Compute the cumulative percentage of spend numbers
+    .with_columns((pl.col('% Spend').cum_sum()).cast(pl.Float64).alias('Cum % Spend'))
+).collect()
+
+# Compute the cumulative percentage of buyers number
+spend_count = alpha_spend_dist.height
+alpha_spend_dist = alpha_spend_dist.with_columns(
+    pl.lit(np.linspace(1 / spend_count, 1, spend_count)).alias('Cum % Cust')
+)
+
+alpha_spend_dist
+```
+
+```{python}
+zero_row = pl.DataFrame({
+    'Cum % Spend': [0.0],
+    'Cum % Cust': [0.0]
+})
+
+alpha_lorenz_plot = alpha_spend_dist.select('Cum % Spend' ,'Cum % Cust')
+alpha_lorenz_plot_zero = pl.concat([zero_row, alpha_lorenz_plot])
+
+chart = alt.Chart(alpha_lorenz_plot_zero).mark_line().encode(
+    x=alt.X('Cum % Cust:Q', title='Cumulative % Alpha Buyers', axis=alt.Axis(format='.0%')),
+    y=alt.Y('Cum % Spend:Q', 
+            title='Cumulative % Alpha Revenue', 
+            axis=alt.Axis(format='.0%'),
+            scale=alt.Scale(domain=[0, 1])),
+).properties(
+    title="Lorenz Curve for Alpha Spend",
+    width=550,
+    height=450
+)
+
+chart.show()
+```
+
+Looking at `alpha_spend_dist`, we see that the "bottom" 80% of Alpha buyers account for 50.8% of its revenue in year 1, which is equivalent to 49/20. This is higher than the 46/20 we observed for transactions.
+
+```{python}
+np.interp(0.8, xp=alpha_lorenz_plot['Cum % Cust'], fp=alpha_lorenz_plot['Cum % Spend'])
+```
+
+::: example-text
+*Garbage Collect*
+
+```{python}
+exceptions = [
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 
+    'In', 'exceptions', 'active_variables',
+    'penetration', 'ppb', 'panel_size']
+
+active_variables = [
+    var for var, value in globals().items()
+    if not var.startswith('_')   # Exclude variables that start with "_"
+    and var not in exceptions    # Exclude variables in the exceptions list
+    and isinstance(value, (pl.LazyFrame, pl.DataFrame, pl.Series, alt.Chart, alt.LayerChart, list, int, float, str, np.ndarray, np.int64, np.float32))  # Remove these types only
+]
+
+for var in active_variables:
+    del globals()[var]
+del active_variables, exceptions, var
+
+gc.collect()
+```
+:::
+
+## Exploring Multibrand Buying Behaviour
+
+### Introduction
+
+So far, we have explored purchasing at the level of the individual brand or overall category. We now step back and consider panellists’ purchasing of multiple brands (in a given time period).
+
+To set the scene, let us first determine the percentage of category buyers that bought 1, 2, 3, 4, or 5 different brands in the course of year 1. (Note that we only have five brands in the dataset, with Other being an aggregation of several very small share brands).
+
+```{python}
+brand_purchases = (
+    trans_summary('Category', grocery_lf, 1)
+    .group_by('Brands Purchased')
+    .agg(pl.col('panel_id').count().alias('Category Buyer'))
+    .with_columns((pl.col('Category Buyer') / pl.col('Category Buyer').sum()).alias('% Category Buyers'))
+    .sort('Brands Purchased')
+).collect()
+
+(
+    GT(brand_purchases, rowname_col='Brands Purchased')
+    .tab_header(title='Category Buyers That Bought Different Brands',
+                subtitle='Distribution of the number of separate brands purchased by category buyers in year 1')
+    .tab_stubhead(label="Brands Purchased")
+    .fmt_integer(columns=['Category Buyer'])
+    .fmt_percent(columns=['% Category Buyers'], decimals=0)
+    .data_color(
+        columns=['% Category Buyers'],
+        domain=[0, 0.7],
+        palette=['white', 'rebeccapurple']
+    ) 
+)
+```
+
+We note that over two-thirds of the category buyers only ever bought one brand. This is despite the fact that 86% of category buyers made two or more category purchases in the course of the year. No household purchased all five brands that year.
+
+Note: We know from analyzing the distribution of category purchase frequency that 8.9% of the panel made zero category purchases and 13.2% made one category purchase. 1 − 0.132/(1 − 0.089) = 0.855, which means 86% of year 1 category buyers made more than one category purchase that year.
+
+Can also be computed as: (1 - 0.132 - 0.089)/(1 - 0.089) \[% of panellists that more than 1 purchase\] / \[% of category buyers\]
+
+> How does the number of different brands purchased in the year vary as a function of the number of category purchases made during the year?
+
+```{python}
+# number of category purchases made by each household and number of brands purchased by each household
+brand_loyalty = (
+    trans_summary('Category', grocery_lf, 1)
+    .group_by('# of Purchases', 'Brands Purchased')
+    .agg(pl.col('panel_id').count().alias('Count'))
+    .collect()
+    .pivot(
+        on='Brands Purchased',
+        index='# of Purchases',
+        values='Count'
+    ).sort(pl.col('# of Purchases'))
+    .with_columns(pl.col('*'))
+    .select('# of Purchases', '1', '2', '3', '4')
+)
+
+(
+    GT(brand_loyalty, rowname_col='# of Purchases')
+    .tab_header(title='# of Purchase Occasions Vs. Brands Purchased ',
+                subtitle='Brands purchased as function of the number of category purchases made in year 1')
+    .tab_stubhead(label="# of Purchases")
+    .sub_missing(missing_text="")
+    .fmt_integer()
+    .data_color(
+        columns=['1', '2', '3', '4'],
+        domain=[0, 700],
+        palette=['white', 'rebeccapurple'],
+        na_color='white'
+    ) 
+)
+```
+
+Looking at the resulting table output, we see that there is quite a high level of sole-brand loyalty (i.e., only buying one brand), even as the number of category purchases increases. We have two panellists that made 20 category purchases, all with the same brand. That’s some level of loyalty!
+
+We can compute the (weighted) average number of different brands purchased for each level of category purchasing.
+
+```{python}
+wa_brands_purchased = (
+    trans_summary('Category', grocery_lf, 1)
+    .group_by('# of Purchases', 'Brands Purchased')
+    .agg(pl.col('panel_id').count().alias('Count'))
+    .with_columns((pl.col('Brands Purchased') * pl.col('Count')).alias('Product'))
+    .group_by('# of Purchases')
+    .agg(
+        (pl.col('Product').sum() / pl.col('Count').sum()) .alias('Weighted Average')
+    ).sort(by='# of Purchases')
+).collect()
+
+(
+    GT(wa_brands_purchased, rowname_col='# of Purchases')
+    .tab_header(title='W.A. # of Different Brands Purchased')
+    .tab_stubhead(label="# of Purchases")
+    .fmt_number()
+    .data_color(
+        columns=['Weighted Average'],
+        domain=[1, 4],
+        palette=['white', 'rebeccapurple']
+    )
+    .cols_label({'Weighted Average': 'Weighted Average Brands'}) 
+)
+```
+
+We note that the average number of brands purchased does increase as a function of category purchasing. This should not come as a surprise, as more category purchases equals more opportunities to buy different brands. We saw in earlier that two brands (Alpha and Bravo) had a combined value market share of 86%. As such, the relatively low number of different brands purchased in the year is not too surprising.
+
+We now consider three common analyses designed to give insight into the nature of multibrand buying behaviour.
+
+### Duplication of Purchase
+
+We know from our analysis of penetration and PPB earlier that 52% of households purchased Alpha and 51% of households purchased Bravo. What percentage of Alpha buyers also purchased Bravo during the year (and vice-versa)? The answer to these (and similar) questions is provided by a duplication of purchase analysis.
+
+Before performing this analysis on our dataset, let us consider a toy example. The following table summarizes the purchasing of four brands by six households.
+
+|      | A     | B     | C     | D     |
+|------|-------|-------|-------|-------|
+| HH01 | **1** | 0     | **2** | 0     |
+| HH02 | 0     | 1     | 0     | 0     |
+| HH03 | **1** | **3** | 0     | 0     |
+| HH04 | 0     | 0     | 1     | 4     |
+| HH05 | **1** | **1** | 0     | **1** |
+| HH06 | 0     | 0     | 0     | 1     |
+
+We see that three households made at least one purchase of brand A, three households made at least one purchase of brand B, and so on. How many brand A buyers also purchased brand B? Two (HH03 and HH05). How many brand A buyers also purchased brand C? One (HH01). Repeating this for all brands gives us the following table, which we will call a **duplication count table**.
+
+|       | A   | B   | C   | D   |
+|-------|-----|-----|-----|-----|
+| **A** | 3   | 2   | 1   | 1   |
+| **B** | 2   | 3   | 0   | 1   |
+| **C** | 1   | 0   | 2   | 1   |
+| **D** | 1   | 1   | 1   | 3   |
+
+For any given row, the number in each cell is the number of buyers of the brand associated with that row that also purchased the brand associated with that column. (The diagonal is obviously the number of buyers of each brand.) Looking at the row for brand A, we see that three households purchased that brand. Two of these households (67%) also made at least one purchase of brand B, and one of these three households (33%) also made at least one purchase of brand C. These row percentages are reported in the following table, which we call the **duplication of purchase table**. (By convention, we leave the diagonal blank.)
+
+|       |  A  |  B  |  C  |  D  |
+|:-----:|:---:|:---:|:---:|:---:|
+| **A** |     | 67% | 33% | 33% |
+| **B** | 67% |     | 0%  | 33% |
+| **C** | 50% | 0%  |     | 50% |
+| **D** | 33% | 33% | 33% |     |
+
+How can we create this table efficiently when we have a large number of panellists? One approach, which makes use of matrix multiplication, is as follows: - We create what we will call an “**ever buyers**” matrix (or **incidence matrix**), which is a matrix of size (number of panellists) × (number of brands), where each cell takes on a value of 1 if the panellist (row) ever purchased the brand (column) in the period of interest; 0 otherwise.
+
+|      | A   | B   | C   | D   |
+|------|-----|-----|-----|-----|
+| HH01 | 1   | 0   | 1   | 0   |
+| HH02 | 0   | 1   | 0   | 0   |
+| HH03 | 1   | 1   | 0   | 0   |
+| HH04 | 0   | 0   | 1   | 1   |
+| HH05 | 1   | 1   | 0   | 1   |
+| HH06 | 0   | 0   | 0   | 1   |
+
+-   Pre-multiplying the “ever buyers” matrix by its own transpose gives us the **duplication count table** which we created above: $A^{T}\cdot A=B$. (Evaluate the example below.)
+
+Transposed "ever buyer" matrix:
+
+|     | HH01 | HH02 | HH03 | HH04 | HH05 | HH06 |
+|:---:|:----:|:----:|:----:|:----:|:----:|:----:|
+|  A  |  1   |  0   |  1   |  0   |  1   |  0   |
+|  B  |  0   |  1   |  1   |  0   |  1   |  0   |
+|  C  |  1   |  0   |  0   |  1   |  0   |  0   |
+|  D  |  0   |  0   |  0   |  1   |  1   |  1   |
+
+Matrix Multiply By:
+
+|      | A   | B   | C   | D   |
+|------|-----|-----|-----|-----|
+| HH01 | 1   | 0   | 1   | 0   |
+| HH02 | 0   | 1   | 0   | 0   |
+| HH03 | 1   | 1   | 0   | 0   |
+| HH04 | 0   | 0   | 1   | 1   |
+| HH05 | 1   | 1   | 0   | 1   |
+| HH06 | 0   | 0   | 0   | 1   |
+
+-   The 'ever buyer' matrix (**incidence matrix**) effectively creates a binary of 1 (Yes) or 0 (No) to factor in the required inclusions or exclusions of intersection between buyers of different brands. In this case, when we multiply the binary matrix and its transposed form together, we are computing a matrix that records the count of existing intersection of buyers of a brand who also purchased other brands.
+-   Dividing each cell by the number of buyers of the brand associated with each row gives us the **duplication of purchase table**.
+
+[Matrix Multiplication Visualizer](http://matrixmultiplication.xyz)
+
+```{python}
+# m x n matrix where m = # of panellists, n = # of brands and value is number of purchases
+brand_purch = np.array([
+    [1, 0, 2, 0],
+    [0, 1, 0, 0],
+    [1, 3, 0, 0],
+    [0, 0, 1, 4],
+    [1, 1, 0, 1],
+    [0, 0, 0, 1]
+])
+
+# m x n matrix where value is 1 if buyer ever purchased, 0 if never purchased
+ever_buyers = np.where(brand_purch != 0, 1, 0)
+
+# n x n square matrix representing count of row/column brand buyers who also purchased column/row brands
+dup_count = ever_buyers.T @ ever_buyers
+print('Duplication Count Matrix:')
+print(dup_count, dup_count.shape)
+
+print()
+# Diagonal vector of dup_count matrix representing the number of buyers of each ROW brand
+brand_buyers = np.diag(dup_count).reshape(4, 1)
+print('Number of Buyers of Each Brand:')
+print(brand_buyers, brand_buyers.shape)
+
+# n x n square matrix representing the proportion of brand buyers for each ROW brand that also purchased other COLUMN brands
+dup_purchase = dup_count / brand_buyers
+print('Duplication of Purchase Matrix:')
+print(dup_purchase, dup_purchase.shape)
+```
+
+```{python}
+brand_purchases = trans_pivot(grocery_lf, 1).select('Alpha', 'Bravo', 'Charlie', 'Delta', 'Other')
+
+# Step 1: Create ever buyers matrix
+ever_buyers = brand_purchases.select(
+    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
+).to_numpy()
+
+# Step 2: Compute duplication count matrix
+dup_count = ever_buyers.T @ ever_buyers
+brand_buyers = np.diag(dup_count).reshape(5, 1)
+
+# Step 3: Compute duplication of purchase matrix
+dup_purchase = dup_count / brand_buyers
+
+# DataFrame conversion for tabular view
+dup_count_df = (
+    pl.from_numpy(dup_count, schema=brand_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_purchases.columns))
+)
+
+dup_purchase_df = (
+    pl.from_numpy(dup_purchase, schema=brand_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_purchases.columns))
+)
+```
+
+```{python}
+(
+    GT(dup_count_df, rowname_col='Brands')
+    .tab_header(title='Duplication Count Matrix',
+                subtitle='Count of buyers who purchased row AND column brands')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_integer()
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 900],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(['Alpha'],['Alpha']), 
+            loc.body(['Bravo'],['Bravo']),
+            loc.body(['Charlie'],['Charlie']),
+            loc.body(['Delta'],['Delta']),
+            loc.body(['Other'],['Other'])
+        ]
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _# of People who Purchased [Brand] / Who also Purchased [Brand]_"""))
+)
+```
+
+```{python}
+(
+    GT(dup_purchase_df, rowname_col='Brands')
+    .tab_header(title='Duplication of Purchase Matrix',
+                subtitle='% of brand buyers that also purchased other brands')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_percent(decimals=0)
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 0.7],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('white'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _% of People who Purchased [Brand] / Who also Purchased [Brand]_"""))
+)
+```
+
+The duplication of purchase matrix for year 1 is computed above. We see that 34% of those panellists that purchased Alpha in year 1 also made at least one purchase of Bravo that year. We see that 15% of Alpha buyers also bought Charlie, whereas 50% of Charlie buyers also bought Alpha. This asymmetry is not surprising given the relative size of the two brands.
+
+### Share of Category Requirements (SCR)
+
+The duplication of purchase table tells use that 34% of Alpha buyers also purchased Bravo, 15% also purchased Charlie, and so on. This “polygamous purchasing” leads to an obvious question: How “loyal” are they to Alpha? The answer to this question obviously depends on what we mean by “loyal”. One commonly used measure of loyalty is **share of category requirements (SCR)**, which is the percentage of category volume that the brand represents among its buyers.
+
+The SCR numbers for each brand are reported below. We see that Alpha has a share of category requirements of 69%. This means that 69% of the *total category volume purchased by buyers of Alpha goes to Alpha*. Contrast this to Delta, which has an SCR of 40%. This means that 40% of the volume purchased in the category by buyers of Delta goes to that brand.
+
+```{python}
+# List of brands
+brands = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other']
+
+# Initialize results list
+scr_results = []
+
+with pl.StringCache():
+    # Compute total category volume
+    total_vol = vol_summary('Category', grocery_lf, 1)
+
+    for brand in brands:
+        # Join brand-specific volume to total category volume to get total category volume for panelists who purchased the brand
+        scr_lf = (
+            total_vol.join(
+                other=vol_summary(brand, grocery_lf, 1),
+                on='panel_id',
+                how='inner'
+            )
+            .with_columns(
+                # Compute total brand and category volumes
+                # Total purchasing of each brand
+                (pl.col('volume_right').sum()).alias('Brand Volume'),
+                # The total amount of category purchasing conditioned on the fact that at least one purchase of the brand of interest was made.
+                (pl.col('volume').sum()).alias('Category Volume'),          
+            )
+            .with_columns(
+                # Compute SCR - ratio of brand purchasing to category purchasing
+                (pl.col('Brand Volume').sum() / pl.col('Category Volume').sum()).alias('SCR')          
+            )
+            .select('Brand Volume', 'Category Volume', 'SCR')
+            .collect()
+        )
+        
+        # Append results
+        scr_results.append({
+            "Brands": brand,
+            "Brand Purchasing": scr_lf.item(1, "Brand Volume"),
+            "Category Purchasing": scr_lf.item(1, "Category Volume"),
+            "SCR": scr_lf.item(1, "SCR")
+        })
+
+# Create final DataFrame
+scr = pl.DataFrame(scr_results)
+```
+
+```{python}
+(
+    GT(scr, rowname_col='Brands')
+    .tab_header(title='Share of Category Requirements (SCR)',
+                subtitle='% of category volume that the brand represents among its buyers')
+    .tab_stubhead(label="Brands")
+    .fmt_integer(columns=['Brand Purchasing', 'Category Purchasing'])
+    .fmt_percent(columns='SCR', decimals=0)
+    .data_color(
+        domain=[0, 0.7],
+        palette=['white', 'rebeccapurple'],
+        columns='SCR'
+    )
+)
+```
+
+```{python}
+# Method 2
+
+brand_vol = vol_pivot(grocery_lf, 1).fill_null(0)
+
+ever_buyers = brand_vol.select(
+    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_vol.columns]
+).to_numpy()
+
+brand_vol = brand_vol.to_numpy()
+
+cross_purchasing = ever_buyers.T @ brand_vol
+brand_purchasing = np.diag(cross_purchasing)
+category_purchasing = np.sum(cross_purchasing, axis=1)
+scr = brand_purchasing / category_purchasing
+scr
+```
+
+### Cross Purchasing
+
+#### Cross Purchasing - *By Volume Purchase*
+
+We have just seen that 69% of total category volume purchasing by the buyers of Alpha went to that brand. We know from the duplication of purchase analysis that 15% of Alpha buyers also purchased Charlie. How much of their category *volume* purchasing went to Charlie? This is answered via **cross purchase analysis** (sometimes called a **combination purchase analysis**).
+
+To illustrate the logic of the associated calculations, let us revisit the toy problem introduced earlier. We have the following summary of the purchasing of four brands by six households and the associated “ever buyers” matrix. We will assume the "ever buyers" matrix reports volume purchasing in kilograms.
+
+**Brand Purchasing**
+
+|      |   A   |   B   |   C   |   D   | Total |
+|:----:|:-----:|:-----:|:-----:|:-----:|:-----:|
+| HH01 | **1** |   0   | **2** |   0   | **3** |
+| HH02 |   0   |   1   |   0   |   0   |   1   |
+| HH03 | **1** | **3** |   0   |   0   | **4** |
+| HH04 |   0   |   0   |   1   |   4   |   5   |
+| HH05 | **1** | **1** |   0   | **1** | **3** |
+| HH06 |   0   |   0   |   0   |   1   |   1   |
+
+**Ever Buyers Matrix** (*Incidence Matrix*)
+
+|      | A   | B   | C   | D   |
+|------|-----|-----|-----|-----|
+| HH01 | 1   | 0   | 1   | 0   |
+| HH02 | 0   | 1   | 0   | 0   |
+| HH03 | 1   | 1   | 0   | 0   |
+| HH04 | 0   | 0   | 1   | 1   |
+| HH05 | 1   | 1   | 0   | 1   |
+| HH06 | 0   | 0   | 0   | 1   |
+
+We see that buyers of brand A purchased 3 kg (1 + 1 + 1, from A column) of brand A and a total of 10 kg (3 + 4 + 3, from total column) in the category (i.e., SCR = 30%). We see that they also purchased 4 kg (3 + 1, from B column) of brand B, 2 kg (2, from C column) of brand C and 1 kg (1, from D column) of brand D. The associated numbers for all brands are given in the following table:
+
+|       | A   | B   | C   | D   |
+|-------|-----|-----|-----|-----|
+| **A** | 3   | 4   | 2   | 1   |
+| **B** | 2   | 5   | 0   | 1   |
+| **C** | 1   | 0   | 3   | 4   |
+| **D** | 1   | 1   | 1   | 6   |
+
+The sum of the elements of each row gives us the total amount of category purchasing by buyers of the brand of that row. Dividing each row entry by the sum of that row’s elements gives us the following **cross purchasing table**, the *diagonal of which is obviously SCR*.
+
+|       |  A  |  B  |  C  |  D  |
+|:-----:|:---:|:---:|:---:|:---:|
+| **A** | 30% | 40% | 20% | 10% |
+| **B** | 25% | 63% | 0%  | 13% |
+| **C** | 13% | 0%  | 38% | 50% |
+| **D** | 11% | 11% | 11% | 67% |
+
+How do we create the table efficiently when we have a large number of panellists? One approach is to pre-multiply the panellist × brand volume purchasing summary table by the transpose of the “ever buyers” matrix $A^{T}\cdot B$:
+
+Transposed "ever buyer" matrix:
+
+|     | HH01 | HH02 | HH03 | HH04 | HH05 | HH06 |
+|:---:|:----:|:----:|:----:|:----:|:----:|:----:|
+|  A  |  1   |  0   |  1   |  0   |  1   |  0   |
+|  B  |  0   |  1   |  1   |  0   |  1   |  0   |
+|  C  |  1   |  0   |  0   |  1   |  0   |  0   |
+|  D  |  0   |  0   |  0   |  1   |  1   |  1   |
+
+Multiplied by Brand Volume Purchasing:
+
+|      |  A  |  B  |  C  |  D  |
+|:----:|:---:|:---:|:---:|:---:|
+| HH01 |  1  |  0  |  2  |  0  |
+| HH02 |  0  |  1  |  0  |  0  |
+| HH03 |  1  |  3  |  0  |  0  |
+| HH04 |  0  |  0  |  1  |  4  |
+| HH05 |  1  |  1  |  0  |  1  |
+| HH06 |  0  |  0  |  0  |  1  |
+
+The 'ever buyer' matrix creates a binary of 1 (buyer) or 0 (non-buyer) to help factor in the inclusions/exclusions and overlaps between brands purchased by all buyers. In this case, as we multiply the transposed form of the binary matrix with the quantity/volume matrix representing the quantity of purchase of different brands by each buyer, we are solving for a matrix that represents the total volume of purchasing for a set of brands by a set of buyers and their purchases of other brands.
+
+```{python}
+# m x n matrix where m = # of panellists, n = # of brands and value is volume of purchases 
+brand_purch = np.array([
+    [1, 0, 2, 0],
+    [0, 1, 0, 0],
+    [1, 3, 0, 0],
+    [0, 0, 1, 4],
+    [1, 1, 0, 1],
+    [0, 0, 0, 1]
+])
+
+# m x n matrix where value is 1 if buyer ever purchased, 0 if never purchased
+ever_buyers = np.where(brand_purch != 0, 1, 0)
+
+# n x n square matrix representing row brand buyers and their volume/unit purchases from row brand and column brands
+cross_purch_matrix = ever_buyers.T @ brand_purch
+print('Cross Purchasing Matrix:')
+print(cross_purch_matrix, cross_purch_matrix.shape)
+
+print()
+# The sum of the elements of each row gives us the total amount of category purchasing (volume) by buyers of the brand of that row
+category_purch = cross_purch_matrix.sum(axis=1).reshape(4, 1)
+print('Total Amount of Category Purchasing by Buyers of the Row Brand:')
+print(brand_buyers, brand_buyers.shape)
+
+print()
+# n x n square matrix representing the proportion of volume purchased by row brand buyers for each COLUMN brands relative to total purchased of the row brand buyer
+cross_purch = cross_purch_matrix / category_purch
+print('Cross Purchasing Matrix as a % of Total Volume Purchased of Each Brand:')
+print(cross_purch, cross_purch.shape)
+```
+
+The cross purchasing analysis for year 1 is computed and reported below. We see that for those panellists that purchased Alpha at least once in year 1, 69% of their category volume purchased went to Alpha, 18% went to Bravo, 8% to Charlie, and so on.
+
+```{python}
+brand_vol_purchases = vol_pivot(grocery_lf, 1).fill_null(0)
+
+# Step 1: Create ever buyers matrix
+ever_buyers = brand_vol_purchases.select(
+    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
+).to_numpy()
+
+# Step 2: Compute cross purchase matrix
+cross_purch_matrix = ever_buyers.T @ brand_vol_purchases
+total_volume_purchases = np.sum(cross_purch_matrix, axis=1).reshape(5, 1)
+
+# Step 3: Compute cross purchase matrix as a % of total volume purchased of each brand
+cross_purch = cross_purch_matrix / total_volume_purchases
+
+# DataFrame conversion for tabular view
+cross_purch_matrix_df = (
+    pl.from_numpy(cross_purch_matrix, schema=brand_vol_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+)
+
+cross_purch_df = (
+    pl.from_numpy(cross_purch, schema=brand_vol_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+)
+```
+
+```{python}
+(
+    GT(cross_purch_matrix_df, rowname_col='Brands')
+    .tab_header(title='Cross Purchasing Analysis',
+                subtitle='Total Volume of Category Purchasing by Buyers of the Brand (by row)')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_integer()
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 3000],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _Purchasers of [Brands] / Total Volume Purchased of [Brands]_"""))
+)
+```
+
+```{python}
+(
+    GT(cross_purch_df, rowname_col='Brands')
+    .tab_header(title='Cross Purchasing Analysis',
+                subtitle='% of Total Volume of Category Purchasing by Buyers of the Brand (by row)')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_percent(decimals=0)
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 0.7],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_source_note(md("""**Read Row/Column as**: _Purchasers of [Brands] / % Total Volume Purchased of [Brands]_"""))
+)
+```
+
+#### Importance of Competition Plot - *By Volume Purchase*
+
+For a given brand, we can plot the associated row entries as a pie chart, for example, see the *Importance of competition plot*, which plots the percentage of total volume of category purchasing by buyers of Alpha.
+
+```{python}
+cross_purch_plot = (
+    pl.from_numpy(cross_purch.T, schema=brand_vol_purchases.columns, orient='row')
+    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+)
+
+base = alt.Chart(cross_purch_plot).encode(
+    alt.Theta("Alpha:Q").stack(True),
+    alt.Color("Brands:N")
+).properties(
+    width=600,
+    title={
+        'text': 'Importance of Competition to Buyers of Alpha',
+        'subtitle': '% of Total Volume of Category Purchasing by Buyers of Alpha'},
+)
+
+pie = base.mark_arc(outerRadius=145)
+text = base.mark_text(radius=165, size=15).encode(
+    text=alt.Text("Alpha:N", format=".0%"))
+
+pie + text
+```
+
+#### Importance Against Expectation - *By Volume Purchase*
+
+As previously noted when we computed SCR, we see that Alpha accounts for 69% of category purchasing by the buyers of Alpha. We see from the cross purchase analysis see that Bravo accounts for 18% of their category purchasing. Is this large or small? One way of answering this question is to compare actual purchasing against expectation given general purchasing patterns in the category.
+
+```{python}
+# Share of Category Purchasing - Alpha Brand Selected
+share_of_cat_purch = cross_purch[0]
+
+# Market Share - Volume
+market_share = (
+    brand_vol_purchases.sum() / # sum all columns -> returns a single row dataframe
+    brand_vol_purchases.sum_horizontal().sum() # sum of total category volume sales -> retruns a scalar value
+).to_numpy().reshape(5)
+
+# Share of residual purchasing -- Alpha Buyers
+# The percentage of the category purchasing not accounted for by Alpha that goes to each of the other brands
+residual_purch_brand = share_of_cat_purch / (1 - share_of_cat_purch[0])
+
+# Share of residual purchasing -- Category Buyers
+# Residual share of category purchasing (across all category buyers) once Alpha is removed
+# when we exclude Alpha, what percentage of (the remaining) category purchasing goes to each of the other brands)
+residual_purch_category = market_share / (1 - market_share[0])
+
+# Index against expectation
+index_against_expect = 100 * residual_purch_brand/residual_purch_category
+
+# Importance Against Expectations - Create DataFrame
+stack = np.vstack((
+    share_of_cat_purch, 
+    market_share, 
+    residual_purch_brand, 
+    residual_purch_category, 
+    index_against_expect))
+
+cols = pl.DataFrame({'Col': ['Share of Category Purchasing', 
+        'Volume Market Share', 
+        'Share of Residual Purchasing - Alpha Buyers', 
+        'Share of Residual Purchasing - Category Buyers',
+        'Index Against Expectation']})
+
+rows = cross_purch_df.columns[:-1]
+
+importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=cols)
+```
+
+```{python}
+(
+    GT(importance_against_expect, rowname_col='Col')
+    .tab_header(title='Importance Against Expectation',
+                subtitle='Compare Actual Purchasing against Expectation Given General Purchasing Patterns')    
+    .fmt_percent(rows=list(range(4)), decimals=0)
+    .fmt_integer(rows=4)
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        rows=4,
+        domain=[80, 170],
+        palette=['white', 'rebeccapurple'],
+    )
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('white'), 
+        ],
+        locations=[loc.body(0,[2, 3, 4])]
+    )    
+)
+```
+
+```{python}
+index_ae = pl.DataFrame({
+    'Index Against Expectation - By Volume Purchase': index_against_expect[1:],
+    'Brands': cross_purch_df.columns[1:-1]})
+
+# Create the Altair chart
+alt.Chart(index_ae).mark_bar().encode(
+    x=alt.X("Index Against Expectation - By Volume Purchase:Q"),
+    y=alt.Y("Brands:N"),
+).properties(
+    width=650,
+    height=250,
+    title={"text": 'Importance Against Expectation'},
+)
+```
+
+Let us consider *Charlie*. With reference to Charlie's residual share of category purchasing not accounted for by Alpha, we see that it accounted for 26% of the category purchasing by Alpha buyers that did not go to Alpha. If the purchasing of Alpha buyers was consistent with overall market patterns (as reflected in the volume market shares), we would expect Charlie to account for 19% of their purchasing. We can therefore say that Charlie’s share of purchasing amongst the buyers of Alpha is above expectation (when expectation is based on overall patterns of buying behaviour).
+
+The **Index Against Expectation** essentially captures whether or not and to what extent volume purchases of Alpha's buyers went to its competitors above or below expectations / patterns observed in the overall market.
+
+We see that, relative to market share, Bravo is less of threat to Alpha than we would expect (index = 84). Relative to market share, Charlie and Delta are purchased more by buyers of Alpha than we would expect.
+
+#### Cross Purchasing - *By Spend*
+
+We can repeat these analyses using spend rather than volume purchasing.
+
+We see, for example, that buyers of Alpha spent 71% of their category spend on Alpha. This is in contrast to the 69% of their category volume requirements satisfied by Alpha.
+
+```{python}
+brand_spend_purchases = spend_pivot(grocery_lf, 1).fill_null(0)
+
+# Step 1: Create ever buyers matrix
+ever_buyers = brand_spend_purchases.select(
+    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
+).to_numpy()
+
+# Step 2: Compute cross purchase matrix
+cross_purch_matrix = ever_buyers.T @ brand_spend_purchases
+total_spend_purchases = np.sum(cross_purch_matrix, axis=1).reshape(5, 1)
+
+# Step 3: Compute cross purchase matrix as a % of total spend of each brand
+cross_purch = cross_purch_matrix / total_spend_purchases
+
+# DataFrame conversion for tabular view
+cross_purch_matrix_df = (
+    pl.from_numpy(cross_purch_matrix, schema=brand_spend_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_spend_purchases.columns))
+)
+
+cross_purch_df = (
+    pl.from_numpy(cross_purch, schema=brand_spend_purchases.columns)
+    .with_columns(pl.Series('Brands', brand_spend_purchases.columns))
+)
+```
+
+```{python}
+(
+    GT(cross_purch_matrix_df, rowname_col='Brands')
+    .tab_header(title='Cross Purchasing Analysis',
+                subtitle='Total Category Spend by Buyers of the Brand (by row)')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_integer()
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 10_000],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _Purchasers of [Brands] / Total Spend on [Brands]_"""))
+)
+```
+
+```{python}
+(
+    GT(cross_purch_df, rowname_col='Brands')
+    .tab_header(title='Cross Purchasing Analysis',
+                subtitle='% of Total Category Spend by Buyers of the Brand (by row)')
+    .tab_stubhead(label="Brands")
+    .sub_missing(missing_text="")
+    .fmt_percent(decimals=0)
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        domain=[0, 0.8],
+        palette=['white', 'rebeccapurple'],
+    ) 
+    .tab_source_note(md("""**Read Row/Column as**: _Purchasers of [Brands] / % Total Spend on [Brands]_"""))
+)
+```
+
+#### Importance Against Expectation - *By Spend*
+
+We can create a spend-based importance against expectation plot, using value market share as the reference.
+
+```{python}
+# Share of Category Purchasing - Alpha Brand Selected
+share_of_cat_purch = cross_purch[0]
+
+# Market Share - Volume
+market_share = (
+    brand_spend_purchases.sum() / # sum all columns -> returns a single row dataframe
+    brand_spend_purchases.sum_horizontal().sum() # sum of total category volume sales -> retruns a scalar value
+).to_numpy().reshape(5)
+
+# Share of residual purchasing -- Alpha Buyers
+# The percentage of the category purchasing not accounted for by Alpha that goes to each of the other brands
+residual_purch_brand = share_of_cat_purch / (1 - share_of_cat_purch[0])
+
+# Share of residual purchasing -- Category Buyers
+# Residual share of category purchasing (across all category buyers) once Alpha is removed
+# when we exclude Alpha, what percentage of (the remaining) category purchasing goes to each of the other brands)
+residual_purch_category = market_share / (1 - market_share[0])
+
+# Index against expectation
+index_against_expect = 100 * residual_purch_brand/residual_purch_category
+
+# Importance Against Expectations - Create DataFrame
+stack = np.vstack((
+    share_of_cat_purch, 
+    market_share,
+    residual_purch_brand,
+    residual_purch_category,
+    index_against_expect))
+
+cols = pl.DataFrame({'Col': ['Share of Category Purchasing', 
+        'Volume Market Share', 
+        'Share of Residual Purchasing - Alpha Buyers', 
+        'Share of Residual Purchasing - Category Buyers',
+        'Index Against Expectation']})
+
+rows = cross_purch_df.columns[:-1]
+
+importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=cols)
+```
+
+```{python}
+(
+    GT(importance_against_expect, rowname_col='Col')
+    .tab_header(title='Importance Against Expectation',
+                subtitle='Compare Actual Purchasing against Expectation Given General Purchasing Patterns')    
+    .fmt_percent(rows=list(range(4)), decimals=0)
+    .fmt_integer(rows=4)
+    .data_color(
+        columns=['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'],
+        rows=4,
+        domain=[80, 170],
+        palette=['white', 'rebeccapurple'],
+    )
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('white'), 
+        ],
+        locations=[loc.body(0,[2, 3, 4])]
+    )    
+)
+```
+
+```{python}
+index_ae = pl.DataFrame({
+    'Index Against Expectation - By Spend': index_against_expect[1:],
+    'Brands': cross_purch_df.columns[1:-1]})
+
+# Create the Altair chart
+alt.Chart(index_ae).mark_bar().encode(
+    x=alt.X("Index Against Expectation - By Spend:Q"),
+    y=alt.Y("Brands:N"),
+).properties(
+    width=650,
+    height=250,
+    title={"text": 'Importance Against Expectation'}
+)
+```
+
+::: example-text
+*Garbage Collect*
+
+```{python}
+exceptions = [
+    'grocery_lf', 
+    'sku_lf', 
+    'kiwi_lf', 
+    'In', 
+    'exceptions', 
+    'active_variables', 
+    'penetration', 
+    'ppb', 
+    'panel_size']
+
+active_variables = [
+    var for var, value in globals().items()
+    if not var.startswith('_')   # Exclude variables that start with "_"
+    and var not in exceptions    # Exclude variables in the exceptions list
+    and isinstance(value, (pl.LazyFrame, pl.DataFrame, pl.Series, alt.Chart, alt.LayerChart, list, int, float, str, np.ndarray, np.int64, np.float32))  # Remove these types only
+]
+
+for var in active_variables:
+    del globals()[var]
+del active_variables, exceptions, var
+
+gc.collect()
+```
+:::
+
+## Exploring Dynamics in Buyer Behaviour
+
+Up to now, we have been characterizing buyer behavior in a given time period (i.e., one year), be it focusing on one brand or multiple brands. We now consider some standard analyses that give insight into the dynamics of buyer behavior from period to period. We first consider the case of established products and then turn our attention to the analysis of new product buying behavior.
+
+### Established Products
+
+We are interested in summarizing how buyer behavior varies across consecutive periods. We first consider how **temporal variations in total sales** can be understood by **decomposing total sales**. Next we explore **temporal variations in customer-level purchasing** by examining how the distribution of purchasing in one period varies as a function of the level of purchasing in the previous period. Finally, we consider a summary measure of period-to-period purchasing called the **repeat rate**.
+
+#### Understanding Temporal Variations in Sales
+
+Most firms have systems that will report sales over time. As we try to make sense of any observed changes, it is helpful to note a **fundamental (multiplicative) sales decomposition**. For any time period,
+
+$$
+\begin{aligned}
+    \text{Sales}    &= \text{# households (HHs) in the country} \\
+                    &= \times \text{proportion of HHs buying the brand (penetration)} \\
+                    &= \times \text{# purchase occasions per buyer (PPB)} \\
+                    &= \times \text{# packs per purchase} \\
+                    &= \times \text{weight or price per pack} \\
+\end{aligned}
+$$
+
+There is nothing magical about this specific decomposition. We can create variations on a theme that are more relevant for the specific analysis setting at hand. For example, suppose we are doing an analysis at the brand level, where the SKUs associated with the brand come in different sizes. Furthermore, suppose the time period is sufficiently small that households make only one purchase per period, if at all. (In other words, PPB = 1). A more relevant decomposition would be
+
+$$
+\begin{aligned}
+    \text{Sales (\$)}   &= \text{# households (HHs) in the country} \\
+                        &= \times \text{proportion of HHs buying the brand (penetration)} \\
+                        &= \times \text{average volume per purchase} \\
+                        &= \times \text{average price per unit of volume} \\
+\end{aligned}
+$$
+
+The product of the last two quantities is often called **average order value (AOV)**.
+
+$$
+AOV = \text{average volume per purchase} \times \text{average price per unit of volume}
+$$
+
+Recall the plot of Alpha's revenue we created earlier:
+
+```{python}
+weekly_plot(dataframe=weekly_spend_summary('Alpha', grocery_lf).collect(), 
+            y='Weekly Spend', 
+            title='Plot of weekly revenue for Alpha', 
+            y_axis_label='Spend ($)',
+            pct=False,
+            legend=False)
+```
+
+We observe some weeks where this is a massive increase in revenue. How much of this is due to an increase in penetration versus, say, buyers simply buying more product on a given purchase occasion? Let us explore this using the second decomposition given above.
+
+1)  We start by computing Alpha’s **weekly penetration numbers**:
+    -   Check whether purchase purchase occasions per buyer (PPB) = 1.
+    -   We do this by grouping the panel data by '`week`' and aggregating to get the number of unique '`trans_id`' and '`panel_id`' per week. If the '`num_trans`' and '`num_buyers`' is the same for each week, then no panellist made more than one purchase in any given week, which means PPB = 1.
+    -   We produce a new dataframe that is grouped by 104 weeks and aggregates the count of unique number of panellists (*weekly penetration*) and number of transaction IDs each week.
+    -   Output: The number of panellists that made at least one purchase of Alpha; the total number of category purchase occasions on which Alpha was purchased, for each week.
+2)  The next step is to add the **weekly volume and revenue** numbers:
+    -   Join SKU weights data with panel data, group panel data by `week`, compute `volume` and `spend`.
+    -   Output: Alpha’s (dollar and volume) sales.
+3)  Next we compute the numbers associated with the **revenue decomposition**:
+    -   **Weekly penetration** is simply the number of panellists active in any given week divided by the size of the panel.
+    -   **Average order value** is simply total revenue for any given week divided by the number of panellists that made at least one purchase of Alpha in that week.
+        -   As noted above, the AOV quantity can be decomposed into *average order volume* and *average price per unit volume* (in this case, kg).
+    -   **Average order volume** is simply (total) volume sold in any given week divided by the number of panellists that made at least one purchase of Alpha in that week.
+    -   **Average price per unit volume** is simply total revenue for any given week divided by (total) volume sold in that week.
+
+```{python}
+(
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .group_by("week")
+    .agg(
+        pl.col("trans_id").n_unique().alias("num_trans"),
+        pl.col("panel_id").n_unique().alias("num_buyers")
+    ).with_columns(
+        (pl.col('num_trans') / pl.col('num_buyers')).alias('ppb')
+    )
+    .sort('week')
+    .filter(pl.col('ppb') == 1)
+    
+).collect()
+```
+
+We note that the number of transactions (`num_trans`) associated with each week equals the number of panellists (`num_buyers`) associated with each week. In other words, no panellist made more than one purchase in any given week, which means PPB = 1 (`num_trans` / `num_buyers`), as assumed above.
+
+```{python}
+# Filter for rows where the brand is "Alpha"
+alpha_lf = grocery_lf.filter(pl.col("brand") == "Alpha")
+
+# Aggregating to get the number of unique trans_id and panel_id per week
+alpha_weekly_trans = (
+    alpha_lf
+    .group_by("week")
+    .agg(
+        pl.col("trans_id").n_unique().alias("num_trans"),
+        pl.col("panel_id").n_unique().alias("num_buyers")
+    )    
+)
+
+# Aggregating to get the sum of spend and volume per week
+alpha_weekly_spend_vol = (
+    alpha_lf
+    .with_columns(((pl.col('units') * pl.col('price'))).alias('spend'))
+    .join(other=sku_lf, on='sku_id')
+    .with_columns((((pl.col('units') * pl.col('weight'))/1000)).alias('volume'))
+    .group_by('week').agg(
+        pl.col("spend").sum().alias("spend"),
+        pl.col("volume").sum().alias("volume")        
+    )
+)
+
+# The alpha_weekly_trans & alpha_weekly_spend_vol are joined.
+# alpha_weekly_summary now contains week, num_trans, num_buyers, spend, and volume
+alpha_weekly_summary = alpha_weekly_trans.join(alpha_weekly_spend_vol, on="week").sort('week')
+
+alpha_weekly = (
+    alpha_weekly_summary
+    .with_columns(
+        # Weekly penetration = num_buyer / panel_sizes
+        (pl.col('num_buyers') / panel_size).alias('penet'),
+        # PPB = num_trans / num_buyer
+        (pl.col('num_trans') / pl.col('num_buyers')).alias('ppb'),
+        # Average Order Value = spend / num_trans
+        (pl.col('spend') / pl.col('num_trans')).alias('aov'),
+        # Average Order Value = spend / num_trans
+        (pl.col('volume') / pl.col('num_trans')).alias('aovol'),
+        # Average price per unit volume = spend / volume
+        (pl.col('spend') / pl.col('volume')).alias('avg_price_kg')
+    ).select(
+        'week', 'spend', 'penet', 'aov', 'aovol', 'avg_price_kg'
+        
+    )
+)
+```
+
+Now we compute the correlations between weekly revenue and the components of its (multiplicative) decomposition across the two years.
+
+**Correlations between Weekly Revenue & its Components - Over 2 Years**
+
+```{python}
+corr_matrix = alpha_weekly.select(pl.all().exclude('week')).collect().corr()
+
+relabel = pl.Series(['Revenue', 'Penetration', 'AOV', 'AOVOL', 'Price/Unit'])
+
+corr_matrix = corr_matrix.with_columns(pl.Series(relabel).alias("Decomposition"))
+
+(
+    GT(corr_matrix, rowname_col='Decomposition')
+    .tab_header(title='Correlation Matrix of Revenue and the Components of its Decomposition',
+                subtitle='Correlations between weekly revenue and the components of its (multiplicative) decomposition')
+    .cols_label(
+        spend=relabel[0],
+        penet=relabel[1],
+        aov=relabel[2],
+        aovol=relabel[3],
+        avg_price_kg=relabel[4]
+    )
+    .cols_align(align='center')
+    .fmt_number(decimals=3)
+    .data_color(
+        columns=['spend', 'penet', 'aov', 'aovol', 'avg_price_kg'],
+        domain=[-1, 1],
+        palette=['orange', 'white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+)
+```
+
+Below is a plot of the penetration numbers. Comparing this with Alpha's weekly revenue plot over the two years, we see that the fluctuations in revenue go hand-in-hand with fluctuations in penetration. To make this comparison clearer, we overlay the two series of numbers as well. The correlation between these to quantities is 0.98. It would appear that the key driver of revenue increases is simply more people buying the brand that week.
+
+```{python}
+weekly_plot(dataframe=alpha_weekly.select('week', 'penet').collect(), 
+            y='penet', 
+            title='Alpha - Weekly Penetration', 
+            y_axis_label='Penetration',
+            pct=True,
+            legend=False)
+```
+
+```{python}
+# Method 1: Fold Transformation- convert wide-form data to long-form data directly without any preprocessing
+
+source = alpha_weekly.select('week', 'spend', 'penet').collect()
+
+base = alt.Chart(source).mark_line().transform_fold(
+    ['Penetration', 'Revenue'],
+    as_=['Legend', 'Value']
+).encode(
+    alt.Color('Legend:N'),
+    alt.X('week', axis=alt.Axis(
+        values=np.arange(0, 104 + 1, 13), # Explicitly specify quarter-end weeks
+        labelExpr="datum.value", # Show only these labels
+        title='Week'))
+)
+
+spend_line = base.transform_filter(
+    alt.datum.Legend == 'Revenue'
+    ).encode(
+        y = alt.Y(
+            'spend:Q', # Q = a continuous real-valued quantity
+            axis=alt.Axis(format="$,.0f")).title('Revenue ($)')
+)
+
+penet_line = base.transform_filter(
+    alt.datum.Legend == 'Penetration'
+).encode(
+    y = alt.Y(
+        'penet:Q', # Q = a continuous real-valued quantity
+        axis=alt.Axis(format=",.0%")).title('Penetration')
+)
+
+alt.layer(spend_line, penet_line).resolve_scale(
+    y='independent'
+).properties(
+    width=600,
+    height=250,
+    title='Weekly Revenue & Penetration for Alpha'    
+).configure_view(stroke=None).configure_axisY(grid=True)
+```
+
+```{python}
+# Method 2: Pre-processed - Wide-form to long-form conversion
+
+source = alpha_weekly.select('week', 'spend', 'penet').unpivot(
+    index='week',
+    on=['spend', 'penet']
+).collect()
+
+base = alt.Chart(source).mark_line().encode(
+    alt.Color('variable:N'),
+    alt.X('week', axis=alt.Axis(
+        values=np.arange(0, 104 + 1, 13), # Explicitly specify quarter-end weeks
+        labelExpr="datum.value", # Show only these labels
+        title='Week'))
+)
+
+spend_line = base.transform_filter(
+    alt.datum.variable == 'spend'
+    ).encode(
+        y = alt.Y(
+            'value:Q', # Q = a continuous real-valued quantity
+            axis=alt.Axis(format="$,.0f")).title('Revenue ($)')
+)
+
+penet_line = base.transform_filter(
+    alt.datum.variable == 'penet'
+).encode(
+    y = alt.Y(
+        'value:Q', # Q = a continuous real-valued quantity
+        axis=alt.Axis(format=",.0%")).title('Penetration')
+)
+
+alt.layer(spend_line, penet_line).resolve_scale(
+    y='independent'
+).properties(
+    width=600,
+    height=250,
+    title='Weekly Revenue & Penetration for Alpha'    
+).configure_view(stroke=None).configure_axisY(grid=True)
+```
+
+However, the lack of a perfect correlation means there is some variability in average order value that is not highly correlated with penetration. We plot this quantity below. (The correlation between penetration and average order value is 0.39.) In order to get a sense of what lies behind the variability in average order value, we also plot weekly average order volume and average price per kg, respectively.
+
+```{python}
+def weekly_plot(dataframe, y, year=2, title="", y_axis_label="", fmt='currency'):
+    
+    if fmt == 'currency':
+        format = "$,.1f"
+    elif fmt == 'percent':
+        format = ",.0%"
+    else:
+        format = ",.1f"
+    
+    chart = alt.Chart(dataframe).mark_line(strokeWidth=1).encode(
+        x = alt.X(
+            'week',
+            axis=alt.Axis(
+                values=np.arange(0, (year*52) + 1, 13), # Explicitly specify quarter-end weeks
+                labelExpr="datum.value", # Show only these labels
+                title='Week'
+            )
+        ),
+        y = alt.Y(
+            f'{y}:Q', # Q = a continuous real-valued quantity
+            title=y_axis_label,
+            axis=alt.Axis(format=format)
+        )
+    ).properties(
+        width=650,
+        height=250,
+        title=title
+    ).configure_view(
+        stroke=None
+    )
+
+    return chart 
+```
+
+```{python}
+weekly_plot(dataframe=alpha_weekly.select('week', 'aov').collect(), 
+            y='aov', 
+            title='Alpha - Weekly Average Order Value', 
+            y_axis_label='Average Order Value ($)',
+            fmt='currency')
+```
+
+```{python}
+weekly_plot(dataframe=alpha_weekly.select('week', 'aovol').collect(), 
+            y='aovol', 
+            title='Alpha - Weekly Average Order Volume (kg)', 
+            y_axis_label='Average Order Volume (kg)',
+            fmt='number')
+```
+
+```{python}
+weekly_plot(dataframe=alpha_weekly.select('week', 'avg_price_kg').collect(), 
+            y='avg_price_kg', 
+            title='Alpha - Weekly Average Price/kg', 
+            y_axis_label='Average $/kg ',
+            fmt='currency')
+```
+
+Looking at the weekly average price per kg plot, there was much less variability in price/kg in weeks 1–52 compared to weeks 53–104. It would appear that there was some change in promotion policy between years 1 and 2. We do not have the data to explore this further, however.
+
+**Correlations between Weekly Revenue & its Components - Year 1**
+
+```{python}
+corr_matrix = alpha_weekly.filter(pl.col('week') <= 52).select(pl.all().exclude('week')).collect().corr()
+
+relabel = pl.Series(['Revenue', 'Penetration', 'AOV', 'AOVOL', 'Price/Unit'])
+
+corr_matrix = corr_matrix.with_columns(pl.Series(relabel).alias("Decomposition"))
+
+(
+    GT(corr_matrix, rowname_col='Decomposition')
+    .tab_header(title='Correlation Matrix of Revenue and the Components of its Decomposition',
+                subtitle='Correlations between weekly revenue and the components of its (multiplicative) decomposition')
+    .cols_label(
+        spend=relabel[0],
+        penet=relabel[1],
+        aov=relabel[2],
+        aovol=relabel[3],
+        avg_price_kg=relabel[4]
+    )
+    .cols_align(align='center')
+    .fmt_number(decimals=3)
+    .data_color(
+        columns=['spend', 'penet', 'aov', 'aovol', 'avg_price_kg'],
+        domain=[-1, 1],
+        palette=['orange', 'white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+)
+```
+
+**Correlations between Weekly Revenue & its Components - Year 2**
+
+```{python}
+corr_matrix = alpha_weekly.filter(pl.col('week') >= 53).select(pl.all().exclude('week')).collect().corr()
+
+relabel = pl.Series(['Revenue', 'Penetration', 'AOV', 'AOVOL', 'Price/Unit'])
+
+corr_matrix = corr_matrix.with_columns(pl.Series(relabel).alias("Decomposition"))
+
+(
+    GT(corr_matrix, rowname_col='Decomposition')
+    .tab_header(title='Correlation Matrix of Revenue and the Components of its Decomposition',
+                subtitle='Correlations between weekly revenue and the components of its (multiplicative) decomposition')
+    .cols_label(
+        spend=relabel[0],
+        penet=relabel[1],
+        aov=relabel[2],
+        aovol=relabel[3],
+        avg_price_kg=relabel[4]
+    )
+    .cols_align(align='center')
+    .fmt_number(decimals=3)
+    .data_color(
+        columns=['spend', 'penet', 'aov', 'aovol', 'avg_price_kg'],
+        domain=[-1, 1],
+        palette=['orange', 'white', 'rebeccapurple'],
+    ) 
+    .tab_style(
+        style=[
+            style.text(color="white"),
+            style.fill('lightgrey'),
+            
+        ],
+        locations=[
+            loc.body(0,0),
+            loc.body(1,1),
+            loc.body(2,2),
+            loc.body(3,3),
+            loc.body(4,4)
+        ]
+    )
+)
+```
+
+**Annual Revenue Decomposition**
+
+This same logic can be used to analyse change across longer time periods. For example, we note from our analysis earlier that Alpha’s revenue increased from \$33,571 in year 1 to \$35,251 in year 2, a 5% increase. As we are looking at a **static sample** (i.e., the same group of panellists over the two years), the **increase cannot be due to population growth**. Are we observing this growth because more households are buying the product (increase in buyers), and/or because those that are buying it are buying it more often (increase in frequency), and/or because the average spend per transaction has increased (increase in AOV)?
+
+In order to explore this, we will use the following (multiplicative) sales decomposition:
+
+$$
+\begin{aligned}
+    \text{Annual Revenue}&= \text{# households (HHs) in the panel} \\
+                        &= \times \text{proportion of HHs buying the brand (penetration)} \\
+                        &= \times \text{# purchase occasions per buyer (PPB)} \\
+                        &= \times \text{average order volume} \\
+                        &= \times \text{average price per unit of volume} \\
+\end{aligned}
+$$
+
+In order to perform a similar decomposition of annual revenue, we first need to create a dataset that summarises, for each year, (1) the number of panellists that made at least one purchase of Alpha, (2) the total number of category purchase occasions on which Alpha was purchased, and (3) Alpha’s (dollar and volume) sales. We use the same logic as above, aggregating by year as opposed to week.
+
+1)  compute the number of panellists that made at least one transaction
+2)  compute total number of category purchase occasions (number of transactions) on which Alpha was purchased
+3)  compute total revenue and volume for Alpha by year
+4)  compute the components of the revenue decomposition
+    -   **Penetration** is the number of households that made at least purchase of Alpha in the year divided by the size of the panel.
+    -   **PPB** is the total number of transactions associated with Alpha divided by the number of households that made at least purchase of Alpha in the year.
+    -   **Average Order Value** is annual revenue divided by the total number of transactions associated with Alpha.
+    -   **Average Order Volume** is annual total volume divided by the total number of transactions associated with Alpha.
+    -   **Average price/kg** is revenue divided by total volume.
+5)  Computing the percentage changes
+
+```{python}
+alpha_yearly_summary = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .join(other=sku_lf, on='sku_id')
+    .with_columns(
+        (pl.col('units') * pl.col('price')).cast(pl.Float64).alias('spend'),
+        (pl.col('units') * pl.col('weight')/1000).alias('volume'),
+        (pl.col('week') / 52).ceil().cast(pl.UInt16).alias('year')
+    ).group_by('year')
+    .agg(
+        # Total number of category purchase occasions each year
+        pl.col('trans_id').n_unique().alias('num_trans'),
+        # The number of panellists that made at least one transaction each year
+        pl.col('panel_id').n_unique().alias('num_buyers'),
+        # Total revenue generated each year
+        pl.col('spend').sum(),
+        # Total volume purchased each year
+        pl.col('volume').sum()
+    )
+)
+
+alpha_yearly = (
+    alpha_yearly_summary
+    .with_columns(
+        # Yearly penetration = num_buyer / panel_sizes
+        (pl.col('num_buyers') / panel_size).alias('penet'),
+        # PPB = num_trans / num_buyer
+        (pl.col('num_trans') / pl.col('num_buyers')).alias('ppb'),
+        # Average Order Value = spend / num_trans
+        (pl.col('spend') / pl.col('num_trans')).alias('aov'),
+        # Average Order Value = spend / num_trans
+        (pl.col('volume') / pl.col('num_trans')).alias('aovol'),
+        # Average price per unit volume = spend / volume
+        (pl.col('spend') / pl.col('volume')).alias('avg_price_kg')
+    ).with_columns(pl.col('year').cast(pl.String))
+    .collect()
+)
+
+# Transpose to cross-tabulate summary for presentation
+alpha_yearly_T = alpha_yearly.transpose(
+    include_header=True, header_name='Summary', column_names='year'
+)
+
+# Compute percentage change for each variable from year 1 to year 2
+alpha_yearly_pct_change = (
+    alpha_yearly
+    .with_columns(pl.col('*').exclude('year').pct_change())
+    .transpose(include_header=True, header_name='Summary', column_names='year')  
+    .select('Summary' , pl.col('2').alias('pct_change'))  
+)
+# Join summary variables and percentage change coss-tabular data for presentation
+alpha_yearly_T = alpha_yearly_T.join(alpha_yearly_pct_change, on='Summary')
+```
+
+```{python}
+relabel = pl.Series([
+    '# of Trans.', 
+    '# of Buyers',
+    'Revenue',
+    'Volume',
+    'Penetration', 
+    'PPB',
+    'AOV', 
+    'AOVOL', 
+    'Avg. Price/Unit'])
+
+group = pl.Series(['Sales Summary']*4 + ['Revenue Decomposition']*5)
+
+alpha_yearly_T = alpha_yearly_T.with_columns(
+    pl.Series(relabel).alias('Summary'), 
+    pl.Series(group).alias('Group')
+)
+
+(
+    GT(alpha_yearly_T, rowname_col='Summary', groupname_col='Group')
+    .tab_header(title='Alpha - Annual Summary',
+                subtitle='Transactions, Buyers, Volume, Revenue & Revenue Decomposition')
+    .cols_label({
+        '1': 'Year 1', 
+        '2': 'Year 2',
+        'pct_change': '% Change'})
+    .fmt_integer(rows=[0,1])
+    .fmt_number(rows=[2,3,5,7])
+    .fmt_currency(rows=[6,8])
+    .fmt_percent(rows=4)
+    .fmt_percent(columns=[3])
+    .data_color(
+        columns=3,
+        domain=[-1,1],
+        palette=['orange', 'white', 'rebeccapurple']
+    )
+)
+```
+
+We note that the *5% increase in revenue* from year 1 to year 2 is associated with a *5% increase in the number of households making at least one purchase* of Alpha in the year. While PPB drops, average order value increases, with these two changes effectively cancelling out each other. (The product of these two quantities changes by one cent between the two years. i.e, $(PPB_{2} \times AOV_{2})-(PPB_{1} \times AOV_{1})$.) While the average price/kg drops from year 1 to year 2, this is more than compensated by the increase in average order volume, resulting in a 3% increase in average order value between the two years (AOR = Average Order Volume x Avearge Price/Unit).
+
+#### Temporal Variation in Customer-level Purchasing - by Brand Transactions
+
+We have observed that the number of buyers has increased, yet the average number of transactions (PPB) has dropped. Does this mean the “new” buyers are light buyers? Or are the existing buyers buying less?
+
+In order to dig deeper, we need to examine **temporal variation in customer-level purchasing**. A natural starting point is to examine the **joint distribution of purchasing** for two consecutive periods.
+
+1)  We first need to process the panel data so it summarizes *the number of times Alpha was purchased in years 1 and 2 by each panellist* (`num_trans`).
+2)  Then we prepare the **joint distribution** of purchasing table that summarizes customer-level purchasing for all combinations of transaction levels in year 1 and year 2. The values essentially is a count of panellists that made $x_{1}$ transactions in year 1 and $x_{2}$ transactions in year 2.
+3)  Next, we compute the **conditional distribution** using the joint distribution matrix computed earlier. We divide each element of the matrix by their respective row total (row percentages). The conditional distribution of transaction counts is essentially the empirical probability of making $𝑥_{2}$ transactions in year 2 given the panellist made $𝑥_{1}$ transactions in year 1.
+    -   Given that we have computed the joint distribution of panellist count for all transaction-levels for years 1 and 2 (or simply: joint distribution of transaction counts), it is a simple exercise to compute the row percentages, giving us the conditional distributions of transaction counts.
+4)  Finally, we compute and plot the **marginal distribution** of all transaction levels each year. Marginal distribution is the proportion of panellists who made $x_{t}$ transactions in year 1 and year 2 relative to the count of total panellists.
+
+```{python}
+# Summarizes the number of times Alpha was purchased in years 1 and 2 by each panellist
+alpha_yearly_trans = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .with_columns((pl.col('week') / 52).ceil().cast(pl.UInt16).alias('year'))
+    # Aggregate to count unique 'trans_id' by 'panel_id' and 'year'
+    .group_by('panel_id','year')
+    .agg(pl.col('trans_id').n_unique().alias('num_trans'))
+)
+
+alpha_yearly_trans = (
+    # Reshape from long format to wide format
+    # Pivoting the dataframe based on 'year' to create a wide format.
+    alpha_yearly_trans.collect().pivot(
+        on='year',          # Each unique year will create a new column
+        values='num_trans', # The column to aggregate
+        index='panel_id'    # Rows will be indexed by 'panel_id'
+    )
+    # Rename the columns to 'Year 1' and 'Year 2'
+    .rename({'1': 'Year 1', '2': 'Year 2'})   
+    # Replace any null values with 0
+    .fill_null(0) 
+)
+
+# Create a basic joint distribution
+joint_dist_trans = (
+    alpha_yearly_trans
+    .group_by('Year 1', 'Year 2')
+    .agg(pl.col('panel_id').count().alias('count'))
+)
+
+# Add in the number of panellists that made no purchase of Alpha in either year
+# The processed dataframe so far is a subset of the main panel data containing the purchasing of those that bought Alpha at least once in the two years, there are 3142 such households.
+# The panel contains 5021 panellists. Therefore the correct number of households that made zero purchases of Alpha in years 1 and 2 should be included in the processed dataframe.
+tmp = panel_size - joint_dist_trans.select((pl.col('count')).sum()).item(0,0)
+zero_purch = pl.DataFrame({'Year 1': 0, 'Year 2': 0, 'count': tmp})
+
+# Right censor the distribution at 10+
+joint_dist_trans = (
+    joint_dist_trans.with_columns(
+        pl.when(pl.col('Year 1') > 9)
+        .then(10)
+        .otherwise(pl.col('Year 1'))
+        .alias('Year 1')
+    )
+    .with_columns(
+        pl.when(pl.col('Year 2') > 9)
+        .then(10)    
+        .otherwise(pl.col('Year 2'))
+        .alias('Year 2')   
+    )
+    .vstack(zero_purch.cast(pl.UInt32))
+)
+
+# Unpivot the right censor data to create a year 1 x year 2 distribution matrix of the count of panellists who made x_{1} in year 1 & x_{2} in year 2
+joint_dist_trans_pivot = (
+    joint_dist_trans
+    .sort('Year 2')
+    .pivot(
+        index='Year 1',
+        on='Year 2',
+        values='count',
+        aggregate_function='sum'  
+    )
+    .rename({'Year 1': 'Year'}) 
+    .sort('Year')   
+    .fill_null(0)    
+)
+
+# Compute the row percentages, giving us the conditional distributions of transaction counts (the % of panellists from year 1 and their associated transaction counts in year 2)
+# The conditional probability here is he empirical probability of making 𝑥_{2} transactions in year 2 given the panellist made 𝑥_{1} transactions in year 1
+year1_trans_total = joint_dist_trans_pivot.select(
+    pl.col('*').exclude('Year')
+).sum_horizontal()
+
+pct_year1_total = joint_dist_trans_pivot.with_columns(
+    (pl.col('*').exclude('Year') / year1_trans_total)
+)
+```
+
+```{python}
+# Summarizes Alpha transactions by year and panelist
+alpha_yearly_trans = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .with_columns((pl.col('week') / 52).ceil().cast(pl.UInt16).alias('year'))
+    .group_by(['panel_id', 'year'])
+    .agg(pl.col('trans_id').n_unique().alias('num_trans'))
+    .collect()
+    .pivot(
+        values='num_trans',
+        index='panel_id',
+        on='year'
+    )
+    .rename({'1': 'Year 1 Trans', '2': 'Year 2 Trans'})
+    .fill_null(0)
+)
+
+# Create joint distribution
+joint_dist_trans = (
+    alpha_yearly_trans
+    .group_by(['Year 1 Trans', 'Year 2 Trans'])
+    .agg(pl.len().alias('count'))
+)
+
+# Add zero-purchase panellists
+zero_purchasers = panel_size - joint_dist_trans['count'].sum()
+joint_dist_trans = joint_dist_trans.vstack(
+    pl.DataFrame({'Year 1 Trans': [0], 'Year 2 Trans': [0], 'count': [zero_purchasers]}).cast(pl.UInt32)
+)
+
+# Right-censor transactions at 10+
+joint_dist_trans = joint_dist_trans.with_columns([
+    pl.when(pl.col('Year 1 Trans') > 9).then(10).otherwise(pl.col('Year 1 Trans')).alias('Year 1 Trans'),
+    pl.when(pl.col('Year 2 Trans') > 9).then(10).otherwise(pl.col('Year 2 Trans')).alias('Year 2 Trans')
+])
+
+# Create the year 1 x year 2 distribution matrix
+joint_dist_trans_pivot = (
+    joint_dist_trans
+    .sort('Year 2 Trans')
+    .pivot(
+        values='count',
+        index='Year 1 Trans',
+        on='Year 2 Trans',
+        aggregate_function='sum'
+    )
+    .rename({'Year 1 Trans': '# Trans'})
+    .sort('# Trans')
+    .fill_null(0)
+)
+
+# Compute conditional distribution (row percentages)
+row_totals = joint_dist_trans_pivot.select(pl.col('*').exclude('# Trans')).sum_horizontal()
+pct_joint_dist = joint_dist_trans_pivot.with_columns(
+    (pl.col('*').exclude('# Trans') / row_totals)
+)
+
+# Display final results
+print("Alpha Yearly Transactions:")
+display(alpha_yearly_trans)
+print("Joint Distribution:")
+display(joint_dist_trans)
+print("Joint Distribution - Year 1 x Year 2 Distribution Matrix:", )
+display(joint_dist_trans_pivot)
+print("Conditional Distribution (% of Year 1 Transactions):")
+display(pct_joint_dist)
+```
+
+```{python}
+relabel = pl.Series([f'{i}' if i < 10 else '10+' for i in range(11)])
+joint_dist_trans_pivot = joint_dist_trans_pivot.select(pl.col('*').exclude('# Trans')).with_columns(relabel.alias('# Trans'))
+(
+    GT(joint_dist_trans_pivot, rowname_col='# Trans')
+    .tab_header(title='Joint Distribution of the Purchasing of Alpha in Year 1 & 2')
+    .tab_spanner(label='# of Transactions in Year 2', columns=joint_dist_trans_pivot.columns[:-1])
+    .tab_stubhead(label='Y1 / Y2')
+    .cols_label({'10': '10+'})
+    .cols_align(align='center')
+    .fmt_integer()
+    .data_color(
+        columns=[str(i) for i in range(10)],
+        domain=[0, 1900],
+        palette=['white', 'rebeccapurple'],
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _# of Transactions in Year 1 / # of Transactions in Year 2_""")) 
+)
+```
+
+How do we read this table? *Year 1*, *Row 2* tell us how many people who bought Alpha once in year 1 bought Alpha 0, 1, 2, . . . times in year 2. For example, 259 households didn’t buy Alpha in year 2, 201 bought Alpha once in year 2, and so on.
+
+```{python}
+relabel = pl.Series([f'{i}' if i < 10 else '10+' for i in range(11)])
+pct_joint_dist = pct_joint_dist.select(pl.col('*').exclude('# Trans')).with_columns(relabel.alias('# Trans'))
+(
+    GT(pct_joint_dist, rowname_col='# Trans')
+    .tab_header(title='Conditional Distribution of Transaction Counts',
+                subtitle=md('Empirical probability of making year 2 transaction given year 1 transaction'))
+    .tab_spanner(label='# of Transactions in Year 2', columns=pct_joint_dist.columns[:-1])
+    .tab_stubhead(label='Y1 / Y2')
+    .cols_label({'10': '10+'})
+    .cols_align(align='center')
+    .fmt_percent(decimals=0)
+    .data_color(
+        columns=[str(i) for i in range(11)],
+        domain=[0, 1],
+        palette=['white', 'rebeccapurple'],
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _# of Transactions in Year 1 / # of Transactions in Year 2_""")) 
+)
+```
+
+How do we interpret this table? Looking at *Year 1*, *Row 2*, we see that 35.3% of the panellists that made one purchase of Alpha in year 1 made no purchases of Alpha in year 2, 27.4% purchased Alpha once, 17.5% purchased Alpha twice, and so on.
+
+```{python}
+# Compute marginal transaction distribution for each year: count of # of panellists who made x_{t} transactions as a % of total panellists
+def marginal_dist():
+    years = ['Year 1 Trans', 'Year 2 Trans']
+    dfs = []
+    for year in years:
+        y_dist = (
+            joint_dist_trans
+            .group_by(year)
+            .agg((pl.col('count').sum() / panel_size).alias(f'% of Total - {year}'))
+            .rename({year: 'num_trans'})
+            .sort('num_trans')        
+        )
+        dfs.append(y_dist)
+    
+    marginal_dist = dfs[0].hstack(dfs[1].drop('num_trans'))
+    
+    return marginal_dist
+
+marginal_dist()
+```
+
+```{python}
+# marginal distribution for each year and the associated clustered bar chart
+
+# Step 1a: Compute marginal transaction distribution for each year: count of # of panellists who made x_{t} transactions as a % of total panellists
+# Step 1b: Convert Wide-form data to long-form data
+def marginal_dist():
+    years = ['Year 1 Trans', 'Year 2 Trans']
+    dfs = []
+    for year in years:
+        y_dist = (
+            joint_dist_trans
+            .group_by(year)
+            .agg((pl.col('count').sum() / panel_size).alias('% of Total'))  # marginal distribution of purchasing of Alpha in the first & second year.
+            .with_columns(pl.lit(year).alias('Year'))
+            .rename({year: 'num_trans'})        
+        )
+        dfs.append(y_dist)
+    
+    marginal_dist = dfs[0].vstack(dfs[1])
+    
+    return marginal_dist
+
+# Step 2: Plot long-form data as grouped bar chart
+alt.Chart(marginal_dist()).mark_bar().encode(
+    x=alt.X("num_trans:O", axis=alt.Axis(labelAngle=0, title='Number of Transactions')),
+    xOffset="Year:N",
+    y=alt.Y("% of Total:Q", axis=alt.Axis(format=".0%", title='% of Households')),
+    color='Year:N'
+).properties(
+    width=650,
+    height=250,
+    title={"text": 'Distribution of Alpha Transactions', "subtitle": 'Marginal Distribution'},
+)
+```
+
+Let us made two immediate observations: - The **marginal distribution** of purchasing in the first year is reasonably similar to that for the second year. Some differences that stand out are the smaller percentage of households making zero purchases in year 2, which corresponds to the higher penetration, and the smaller percentage of households buying Alpha ten or more times in year 2. - When first seeing a table that shows the distribution of year 2 purchasing broken down by the level of year 1 purchasing, many expect there to be a strong diagonal in the table and are alarmed by the fact that this is rarely the case. It is important to realize that **buying behaviour is not deterministic**. From the perspective of the analyst, it can be viewed as-if *random*, bouncing around each *person’s underlying propensity to buy* the product. Someone who makes one purchase in year 1 is possibly a light buyer and so is the fact that 35.3% did not buy the product again in the second year that surprising? It does not mean that they are “lost”; most of them will buy Alpha again sometime the following year (year 3). Similarly, are those who did not buy the product in period 1 but did in period 2 new customers? Some probably are. But, for any established product category, most are probably people who have purchased the product in previous years and who, for whatever reason, did not buy it that year. The key to analysing such tables is to *compare them to a benchmark that assumes stable underlying purchasing patterns*.
+
+#### Temporal Variation in Customer-level Spend - by Category Spend
+
+Let’s explore how to create the joint distribution of category spend in years 1 and 2. The logic follows that of the binning of spend used to create the distribution of category spend in year 1 in the earlier section.
+
+It is important to note that the initial aggregation by `panel_id` and `year` in the long-form DataFrame does not include entries for panellists who made no category purchases in either year 1 or year 2. However, we want to account for panellists who made a category purchase in one year but not the other, as well as those who did not make a category purchase in either year. When the data is pivoted, some spend range combinations for year 1 and year 2 contain `null` values, indicating that those panellists made a purchase in one year but not the other. Additionally, the DataFrame is missing panellists who made no purchases in both year 1 and year 2. To address the first issue, we replace the `null` values with `float('-inf')` (negative infinity) in place of the (-inf, 0\] bin. To resolve the second issue, we calculate the total number of panellists in the DataFrame, subtract the count of existing panellists from the total `panel_size`, and add this difference back to the DataFrame.
+
+```{python}
+# Summarizes Category Spend by year and panelist
+joint_dist_spend = (
+    grocery_lf
+    .with_columns(
+        (pl.col('week') / 52).ceil().cast(pl.UInt16).alias('year'),
+        (pl.col('units') * pl.col('price')).cast(pl.Float32).alias('spend')
+    )
+    .group_by(['panel_id', 'year'])
+    .agg(pl.col('spend').sum())
+    .with_columns(pl.col('spend').cut(breaks=np.arange(0, 51, 5), include_breaks=True).alias('cut'))
+    .with_columns(pl.col('cut')).unnest('cut')
+    .collect()
+    .pivot(
+        values='breakpoint',
+        index='panel_id',
+        on='year'
+    )
+    .fill_null(float('-inf'))
+    # Create joint distribution
+    .rename({'1': 'Year 1', '2': 'Year 2'})
+    .group_by(['Year 1', 'Year 2'])
+    .agg(pl.len().alias('count'))       
+)
+
+# Add zero-spend panellists
+# The joint distribution of spend so far is for those panellists that made at least one category purchase across the two years. 
+# We want to also include those panellists that didn’t make a category purchase
+zero_purchasers = pl.Series([panel_size - joint_dist_spend['count'].sum()]).cast(pl.UInt32)
+joint_dist_spend = joint_dist_spend.vstack(
+    pl.DataFrame({'Year 1': [float('-inf')], 'Year 2': [float('-inf')], 'count': zero_purchasers})
+)
+
+# Create the year 1 x year 2 distribution matrix
+joint_dist_spend_pivot = (
+    joint_dist_spend
+    .sort('Year 2')
+    .pivot(
+        values='count',
+        index='Year 1',
+        on='Year 2',
+        aggregate_function='sum'
+    )
+    .rename({'Year 1': 'Spend'})
+    .sort('Spend')
+    .fill_null(0)
+)
+
+print('Joint Distribution:')
+display(joint_dist_spend)
+print('Joint Distribution - Year 1 x Year 2 Distribution Matrix:')
+display(joint_dist_spend_pivot)
+```
+
+```{python}
+relabel = pl.Series([
+    '-∞ - 0' if lb < 0 else f'{lb} - {lb + 5}' if lb != 50 else f'{lb} - ∞'
+    for lb in range(-5, 55, 5)
+])
+
+joint_dist_spend_pivot = joint_dist_spend_pivot.select(pl.col('*').exclude('Spend')).with_columns(relabel.alias('Spend'))
+
+(
+    GT(joint_dist_spend_pivot, rowname_col='Spend')
+    .tab_header(title='Joint Distribution of Category Spend in Year 1 & 2')
+    .tab_spanner(label='Range of Spend in Year 2', columns=joint_dist_spend_pivot.columns[:-1])
+    .tab_stubhead(label='Year')
+    .cols_label({joint_dist_spend_pivot.columns[:-1][i]: relabel[i] for i in range(len(relabel))})
+    .cols_align(align='center')
+    .fmt_integer()
+    .data_color(
+        columns=joint_dist_spend_pivot.columns[:-1],
+        domain=[0, 400],
+        palette=['white', 'rebeccapurple'],
+    )
+    .tab_source_note(md("""**Read Row/Column as**: _Range of Spend in Year 1 / Range of Spend in Year 2_""")) 
+)
+```
+
+#### Repeat Rates
+
+One common summary measure is the **repeat rate** (or **repeat-buying rate**), which is defined as the percentage of the brand’s customers in a given period who also purchase the product in the following period. We now explore how to compute quarter-by-quarter repeat rates.
+
+We will carry out the analysis and plot the results for Alpha.
+
+1)  The first thing we do is create a quarterly **incidence matrix** that indicates whether or not each panellist purchased Alpha each quarter, i.e. a table that indicates whether or not each panellist made at least one purchase of Alpha in each of the eight quarters in our dataset (i.e., an **ever-buyers** (by quarter) table for Alpha).
+
+    -   We create a pivot table where rows represent `panel_id` and columns represent `quarter`.
+    -   Each cell indicates whether a panelist purchased in that quarter (`1` for yes, `0` for no).
+
+2)  Recall that the repeat rate is the percentage of a brand’s customers in a given period who also purchase the product in the following period. We compute the **repeat-buying rate** (RBR) using the function:
+
+$$
+\text{RBR}(q \to q+1) = \frac{\sum_{i=1}^{N} Q_{q,i} \cdot Q_{q+1,i}}{\sum_{i=1}^{N} Q_{q,i}}
+$$
+
+-   where, $Q_{q,i}$ represent the value of quarter $q$ for panellist $i$. It is $1$ if the panellist purchased in quarter $q$, and $0$ otherwise.
+
+-   $N$ represent the total number of panellists.
+
+-   $Q_{q,i} \cdot Q_{q+1,i}$ represents element-wise multiplication for panellist $i$. It is $1$ if the panellist purchased in both quarters $q$ and $q+1$, and $0$ otherwise.
+
+-   $\sum_{i=1}^{N} Q_{q,i} \cdot Q_{q+1,i}$ counts the number of panellists who purchased in **both** quarter $q$ and quarter $q+1$, at least once.
+
+-   $\sum_{i=1}^{N} Q_{q,i}$ counts the total number of panellists (households) who purchased in quarter $q$.
+
+-   $\text{RBR}(q \to q+1)$ measures the proportion of buyers in quarter $q$ who purchased again in quarter $q+1$.
+
+-   The element-wise operation ensures the calculation is based on individual panellists' purchase patterns.
+
+-   $Q_{q,i} \cdot Q_{q+1,i}$ leverages the binary nature of $Q$, where the product is $1$ only when both values are $1$. The formula aggregates over all panellists ($i$) to compute both the numerator and denominator.
+
+```{python}
+alpha_qtrly_incidence = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .with_columns((np.floor((pl.col('week') - 1) / 13) + 1).cast(pl.UInt16).alias('quarter'))
+    .group_by('panel_id', 'quarter')
+    .agg(pl.lit(1).alias('incidence'))  # Mark 1 for incidence
+    .collect()
+    .pivot(
+        values='incidence',
+        index='panel_id',
+        on='quarter',
+        aggregate_function='max'  # Ensures presence is represented as 1
+    )
+    .fill_null(0)  # Replace missing quarters with 0
+)
+
+# Calculate Repeat Buying Rate (RBR)
+rbr = []
+
+num_quarters = alpha_qtrly_incidence.shape[1] - 1  # Exclude 'panel_id' column
+for q in range(1, num_quarters):  # Iterate through quarter pairs dynamically
+    prev_col = str(q)
+    next_col = str(q + 1)
+
+    # Compute RBR for each quarter pair
+    rbr_value = (
+        (alpha_qtrly_incidence[prev_col] * alpha_qtrly_incidence[next_col]).sum() /
+        alpha_qtrly_incidence[prev_col].sum()
+    )
+    rbr.append(rbr_value)
+
+# Convert RBR values to a DataFrame for clarity
+rbr = pl.DataFrame({"Quarter Pair": [f"{q}->{q+1}" for q in range(1, num_quarters)], "RBR": rbr})
+
+display(alpha_qtrly_incidence)
+
+display(rbr)
+```
+
+```{python}
+# Prepare the incidence matrix
+alpha_qtrly_incidence = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .with_columns((np.floor((pl.col('week') - 1) / 13) + 1).cast(pl.UInt16).alias('quarter'))
+    .group_by('panel_id', 'quarter')
+    .agg(pl.lit(1).alias('incidence'))  # Mark 1 for incidence
+    .collect()
+    .pivot(
+        values='incidence',
+        index='panel_id',
+        on='quarter',
+        aggregate_function='max'  # Ensures presence is represented as 1
+    )
+    .fill_null(0)  # Replace missing quarters with 0
+)
+
+# Get all quarters dynamically
+quarters = alpha_qtrly_incidence.columns[1:]  # Exclude 'panel_id'
+
+# Compute RBR for all quarter pairs using vectorized operations
+rbr = (
+    pl.DataFrame(
+        {
+            f"Q{q} -> Q{q+1}": [
+                (
+                    (alpha_qtrly_incidence[str(q)] * alpha_qtrly_incidence[str(q + 1)]).sum() /
+                    alpha_qtrly_incidence[str(q)].sum()
+                )
+            ]  # Wrap in a list for DataFrame creation
+            for q in range(1, len(quarters))
+        }
+    )
+    .transpose(include_header=True, header_name='Quarter Pair', column_names=['RBR'])  # Transpose for desired layout & rename resulting columns
+)
+```
+
+```{python}
+alt.Chart(rbr).mark_line(strokeWidth=1).encode(
+    x = alt.X('Quarter Pair:O', title='Quarter', axis=alt.Axis(labelAngle=0)),
+    y = alt.Y('RBR:Q', title='Repeat Rate', axis=alt.Axis(format=",.0%"), scale=alt.Scale(domain=[0, 0.8]))
+).properties(
+    width=650, height=250,title='Plot of quarterly repeat rates for Alpha'
+).configure_view(stroke=None)
+```
+
+We see that there is some variability in the repeat rate. Is it possibly in decline? One thing to realise is that the variability can be driven by the firm’s promotional activities. Aggressive promotions may attract a segment of consumers that only buy on promotion. If the firm promotes heavily in one quarter and has fewer promotions the following quarter, we could expect to a drop in the repeat rate. We can explore this by looking at how Alpha’s promotional activity (as reflected in price/kg) varied across quarters.
+
+```{python}
+alpha_qtrly_price_avg = (
+    grocery_lf
+    .filter(pl.col('brand') == 'Alpha')
+    .join(sku_lf, on='sku_id')
+    .with_columns(
+        (np.floor((pl.col('week') - 1) / 13) + 1).cast(pl.UInt16).alias('quarter'),
+        (((pl.col('units') * pl.col('weight'))/1000)).alias('volume'),
+        (pl.col('units') * pl.col('price')).cast(pl.Float32).alias('spend')
+    )
+    .with_columns((pl.col('spend') / pl.col('volume')).alias('price/kg'))
+    .select('quarter', 'price/kg')
+    .group_by('quarter')
+    .agg(pl.col('price/kg').mean().alias('avg_price_per_kg'))
+    .collect()
+)
+
+alt.Chart(alpha_qtrly_price_avg).mark_line(strokeWidth=1).encode(
+    x = alt.X('quarter:O', title='Quarter', axis=alt.Axis(labelAngle=0)),
+    y = alt.Y('avg_price_per_kg:Q', title='Price/kg', axis=alt.Axis(format="$,.2f"), scale=alt.Scale(domain=[3, 4.5]))
+).properties(
+    width=650, height=250,title="Quarterly Average Price/kg - Alpha"
+).configure_view(stroke=None)
+```
+
+::: example-text
+*Garbage Collect*
+
+```{python}
+exceptions = ['kiwi_lf', 'In', 'exceptions', 'active_variables']
+
+active_variables = [
+    var for var, value in globals().items()
+    if not var.startswith('_')   # Exclude variables that start with "_"
+    and var not in exceptions    # Exclude variables in the exceptions list
+    and isinstance(value, (pl.LazyFrame, pl.DataFrame, pl.Series, alt.Chart, alt.LayerChart, list, int, float, str, np.ndarray, np.int64, np.float32))  # Remove these types only
+]
+
+for var in active_variables:
+    del globals()[var]
+del active_variables, exceptions, var
+
+gc.collect()
+```
+:::
+
+### New Products
+
+*Refer to Depth-of-Repeat Sales Summary for more details*
+
+Central to diagnosing the performance of a new product is the decomposition of its total sales into **trial** and **repeat sales**. A given overall aggregate sales history could be the realization of very different purchasing scenarios. For example, a low sales level for a new product could be the result of (i) many consumers making a trial (i.e., first-ever) purchase but few of them making a repeat purchase (because the product does not meet their expectations), or (ii) a low trial rate but a high level of repeat purchasing amongst the triers (because the product meets a real need among a relatively small set of buyers). Without a **trial/repeat sales decomposition**, it is impossible to determine which of these scenarios best describes the sales data. (And of course it is impossible to make such decompositions without access to household-level purchasing data (i.e., consumer panel data).)
+
+We conduct a **trail/repeat sales decomposition** below, the plot produced shows the week-by-week sales of Kiwi Bubbles (dataset 2) broken down into trial and repeat sales (i.e., first-ever purchases of the new product by a panellist vs. subsequent purchases of the new product by a panellist).
+
+Another variant of the sales decomposition is conducted in the section **decomposing cumulative sales into its trial, first repeat, and additional repeat components** in which we plot cumulative sales and separates repeat sales into first repeat (second-ever) purchases and additional repeat (second repeat (third-ever) purchases + third repeat (fourth-ever) purchases + . . . ). For this plot, we see that 45% of Kiwi Bubble’s year 1 sales came from trial purchases and 38% were due to additional repeat purchases.
+
+Given the data summary from which these two plots are created, we can create further plots that give us insight into buyer behaviour. For example, we can plot **cumulative trial** (growth in cumulative trial over time), which shows the percentage of households in the market that have made a trial purchase by any week in the new product’s first year on the market. (We see that just under 10% of households have tried the new product by year end. This still appears to be growing but at a far slower rate than earlier on in the year.)
+
+People can be induced to try a new product by promotions, etc. but the **key to success is repeat purchasing**. The first step is making a first-repeat purchase. One useful metric to track is “percent triers repeating”—the percentage of panellists that made a trial purchase that have gone on to make a (first) repeat purchase. The associated plot for Kiwi Bubbles is constructed in the section **Evolution of the percentage of triers that have made a repeat purchase**.
+
+#### Data Preparation for Basic Analyses of New Product Performance
+
+Our initial goal is to create a summary of new product purchasing from which decompositions can be computed and associated plots can be created.
+
+We will focus on purchasing by those panellists in **Market 2**. Here are the steps:
+
+1.  Set `num_panellists` for Market 2 as 1,499
+
+2.  Filter dataset for column `Market` where market is equal to `2`.
+
+3.  Add a day of year (`DoY`) column which is computed as: (Week of the Year - 1) \* 7 + Day of the Week = Day of Year
+
+4.  Create a **Depth of Repeat (DoR)** level associated with each transaction, where 0 = Trial Purchase, 1 = First Repeat Purchase, 2 = Second Repeat Purchase, and so on. This is done by using Polars' `cum_count()` and `over()` expression. Note: this operations requires the records to be sorted chronologically for each panellist.
+
+    -   `cum_count()` computes a running count of rows within each group, starting from 0 for the first appearance of the ID. -
+
+    -   `over()` expression is a **window function**. It performs calculations across a subset of rows, grouped by one or more columns, without collapsing or aggregating the data at the group level.
+
+        -   The `over("ID")` groups rows by ID and calculates the cumulative count only within each group.
+
+        -   Results are returned in the same row layout, preserving the original structure.
+
+5.  Once we start to process the data further to summarize how many trails, first repeat purchase, etc. purchase occured in each week, we want there to be all 52 weeks of the year, to be available in the summary. However, it turns out that this panel of 1499 households only purchased the test product in 49 weeks; no purchases occurred in weeks 25, 39, and 41. We need to append the missing weeks to the dataframe constructed so far and consider `null` values for rest of the columns.
+
+6.  We create a pivoted, **Transaction DoR by Week** and **Total Unit Sales DoR by Week** copy of the processed dataframe.
+
+```{python}
+# Number of panellists in Market 2
+num_panellists = 1499
+
+kiwi_df = (
+    kiwi_lf
+    .filter(pl.col('Market') == 2)
+    .drop('Market')
+    # DoY -> day of year variable, where the 1 corresponds to the day the new product was launched.
+    .with_columns(((pl.col('Week') - 1) * 7 + pl.col('Day')).alias('DoY'))
+    .sort(by=['ID', 'DoY'])
+    .with_columns(
+        (pl.col("ID").cum_count().over("ID") - 1).alias("DoR")
+    )
+    .collect()
+)
+
+kiwi_df
+```
+
+```{python}
+# The smallest unit of time for our analyses is day. Ensure we do not have any panellist with more than one transaction on any day.
+tmp_kiwi = (
+    kiwi_df
+    .group_by('ID', 'DoY') # group_by function aggregates columns passed as parameters together by collapsing the data at the group level if values are the same or overlapping.
+    .agg(pl.col('Units').sum())
+)
+
+print("1) There aren't multiple transaction records (rows) by the same panellist on the same day:")
+print(len(kiwi_df) == len(tmp_kiwi)) # If comparison return True, then length of the two datasets is the same and the group_by function did not find same/overlapping transactions by the same ID on the same DoY.
+
+# Did at least one panellist make a purchase of this new product each week?
+print("2) Number of weeks where at least one unit of the new product was purchased/sold:")
+print(len(kiwi_df['Week'].unique())) # No, there are only 49 weeks of the year where at least one unit of the new product was sold
+
+# Which weeks are missing?
+print("3) Weeks with no transactions:")
+missing_weeks = list(set(np.arange(1, 53, dtype='int16')) - set(kiwi_df['Week'].unique()))
+print(missing_weeks)
+```
+
+```{python}
+missing_df = pl.DataFrame(
+    {col: [None]*len(missing_weeks) for col in kiwi_df.columns}
+    ).with_columns(
+        pl.Series('Week', values = missing_weeks)
+    )
+
+kiwi_df = kiwi_df.vstack(missing_df)
+kiwi_df
+```
+
+```{python}
+trans_dor_week = (
+    kiwi_df
+    .group_by(['Week', 'DoR'])
+    .agg(pl.len().cast(pl.UInt8).alias('Count'))  # Count occurrences for each (Week, DoR) pair
+    .sort('DoR')
+    .pivot(index='Week', on='DoR', values='Count')  # Pivot the data
+    .fill_null(0)  # Fill any missing values with 0
+    .sort('Week')  # Ensure the rows are sorted by 'Week'
+    .drop('null')
+    .with_columns(pl.sum_horizontal(pl.col('*').exclude('Week')).alias('Total'))  # Calculate total count per Week
+)
+
+trans_dor_week
+```
+
+```{python}
+qty_dor_week = (
+    kiwi_df
+    .group_by(['Week', 'DoR'])
+    .agg((pl.col('Units').sum()).alias('Total Units'))  # Count occurrences for each (Week, DoR) pair
+    .sort('DoR')
+    .pivot(index='Week', on='DoR', values='Total Units', aggregate_function='sum')  # Pivot the data
+    .fill_null(0)  # Fill any missing values with 0
+    .sort('Week')  # Ensure the rows are sorted by 'Week'
+    .drop('null')
+    .with_columns(pl.sum_horizontal(pl.col('*').exclude('Week')).alias('Total'))  # Calculate total count per Week
+)
+
+qty_dor_week
+```
+
+#### Basic Analyses of New Product Performance
+
+#### Trial/Repeat Decomposition of Sales
+
+Now we will plot the trial/repeat decomposition of sales, which breaks weekly sales into its trial and repeat components, in the following manner:
+
+```{python}
+trial_repeat_decomp = (
+    trans_dor_week[['Week', '0', 'Total']]
+    .with_columns((pl.col('Total') - pl.col('0')).alias('Repeat'))
+    .rename({'0': 'Trial'})
+    .unpivot(index='Week', on=['Trial', 'Repeat'], variable_name='TrialRepeat', value_name='Sales')
+)
+
+alt.Chart(trial_repeat_decomp).mark_area().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 13), labelExpr="datum.value")),
+    y=alt.Y('Sales:Q', title='Sales (Transactions)'),
+    color="TrialRepeat:N"
+).properties(
+    width=650, height=250, title='Trial/Repeat Decomposition of Sales'
+).configure_view(stroke=None)
+```
+
+```{python}
+trial_repeat_decomp_stacked = (
+    trans_dor_week[['Week', '0', 'Total']]
+    .with_columns((pl.col('Total') - pl.col('0')).alias('Repeat'))
+    .drop('Total')
+    .rename({'0': 'Trial'})    
+    .with_columns(pl.sum_horizontal(pl.col('*').exclude('Week')).alias('Total'))
+    .with_columns(
+        (pl.col('Trial') / pl.col('Total')).alias('Trial'),
+        (pl.col('Repeat') / pl.col('Total')).alias('Repeat')
+    )
+    .unpivot(index='Week', on=['Trial', 'Repeat'], variable_name='TrialRepeat', value_name='Sales')    
+    .fill_nan(0)
+)
+
+alt.Chart(trial_repeat_decomp_stacked).mark_area().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0,values=np.arange(0, 53, 13), labelExpr="datum.value")),
+    y=alt.Y('Sales:Q', title='Sales (Transactions)', axis=alt.Axis(format=".0%")),
+    color="TrialRepeat:N"
+).properties(
+    width=650, height=250, title='% Decomposition of Sales'
+).configure_view(stroke=None)
+```
+
+```{python}
+trial_repeat_decomp_qty = (
+    qty_dor_week[['Week', '0', 'Total']]
+    .with_columns((pl.col('Total') - pl.col('0')).alias('Repeat'))
+    .rename({'0': 'Trial'})
+    .unpivot(index='Week', on=['Trial', 'Repeat'], variable_name='TrialRepeat', value_name='Sales')
+)
+
+alt.Chart(trial_repeat_decomp_qty).mark_area().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 13), labelExpr="datum.value")),
+    y=alt.Y('Sales:Q', title='Sales (Units)'),
+    color="TrialRepeat:N"
+).properties(
+    width=650, height=250, title='Trial/Repeat Decomposition of Sales by Total Units'
+).configure_view(stroke=None)
+```
+
+#### Decomposing Cumulative Sales into its Trial, First Repeat (FR), and Additional Repeat (AR) Components
+
+Our next plot breaks cumulative sales into its trial, first repeat (FR), and additional repeat (AR) components, in the following manner:
+
+```{python}
+fr_ar_decomp = (
+    trans_dor_week[['Week', '0', '1', 'Total']]
+    .with_columns((pl.col('Total') - pl.col('0') - pl.col('1')).alias('AR'))
+    .rename({'0': 'Trial', '1': 'FR'})
+    .with_columns(
+        pl.col('Trial').cum_sum().alias('Trial'),
+        pl.col('FR').cum_sum().alias('FR'),
+        pl.col('AR').cum_sum().alias('AR')
+    )
+    .unpivot(index='Week', on=['Trial', 'FR', 'AR'], variable_name='TrialRepeat', value_name='Sales')
+)
+
+alt.Chart(fr_ar_decomp).mark_area().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 13), labelExpr="datum.value")),
+    y=alt.Y('Sales:Q', title='Sales (Transactions)'),
+    color="TrialRepeat:N"
+).properties(
+    width=650, height=250, title='Decomposition of Cumulative Sales (Transactions)'
+).configure_view(stroke=None)
+```
+
+```{python}
+fr_ar_decomp_units = (
+    qty_dor_week[['Week', '0', '1', 'Total']]
+    .with_columns((pl.col('Total') - pl.col('0') - pl.col('1')).alias('AR'))
+    .rename({'0': 'Trial', '1': 'FR'})
+    .with_columns(
+        pl.col('Trial').cum_sum().alias('Trial'),
+        pl.col('FR').cum_sum().alias('FR'),
+        pl.col('AR').cum_sum().alias('AR')
+    )
+    .unpivot(index='Week', on=['Trial', 'FR', 'AR'], variable_name='TrialRepeat', value_name='Sales')
+)
+
+alt.Chart(fr_ar_decomp_units).mark_area().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 13), labelExpr="datum.value")),
+    y=alt.Y('Sales:Q', title='Sales (Units)'),
+    color="TrialRepeat:N"
+).properties(
+    width=650, height=250, title='Decomposition of Cumulative Sales (by Total Units)'
+).configure_view(stroke=None)
+```
+
+#### Growth in Cumulative Trial Over Time
+
+We not plot the cumulative growth in the percentage of households (% of panel size) that have made a trial purchase (sometimes called cumulative penetration), in the following manner:
+
+```{python}
+cum_trials = (
+    fr_ar_decomp
+    .filter(pl.col('TrialRepeat') == 'Trial')
+    .with_columns((pl.col('Sales') / num_panellists).alias('pct_cum_total'))
+    .drop('TrialRepeat','Sales')
+)
+
+alt.Chart(cum_trials).mark_line().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 4), labelExpr="datum.value")),
+    y=alt.Y('pct_cum_total:Q', title='% of Households', axis=alt.Axis(format='.0%')),
+).properties(
+    width=650, height=250, title='Kiwi Bubbles Cumulative Trials'
+).configure_view(stroke=None)
+```
+
+##### Evolution of the percentage of triers that have made a repeat purchase
+
+We now plot the evolution of the percentage of panellists that made a trial purchase that have gone on to make a (first) repeat purchase, in the following manner:
+
+```{python}
+pct_triers_repeating = (
+    fr_ar_decomp
+    .filter((pl.col('TrialRepeat') == 'Trial') | (pl.col('TrialRepeat') == 'FR'))
+    .pivot(on='TrialRepeat', index='Week', values='Sales')
+    .with_columns((pl.col('FR') / pl.col('Trial')).alias('pct_triers_rpting'))
+    .drop('Trial','FR')
+)
+
+alt.Chart(pct_triers_repeating).mark_line().encode(
+    x=alt.X('Week:O', title='Week', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 4), labelExpr="datum.value")),
+    y=alt.Y('pct_triers_rpting:Q', title='% of Triers', axis=alt.Axis(format='.0%')),
+).properties(
+    width=650, height=250, title='% of Triers Repeating'
+).configure_view(stroke=None)
+```
+
+#### Exploring Time to First Repeat
+
+Looking at the percentage of triers repeat purchasing plot from earlier, we see that the appeal of the new product is such that just over 37% of those customers that made a trial purchase in the first year it was on the market ended up making a repeat purchase of the new product in that year. Note that these % triers repeating numbers plotted are in calendar time (or, more precisely, time since the launch of the product). We can compute a related measure that tells us how many weeks after their trial purchase a panellist makes their (first) repeat purchase.
+
+#### First Repeat Curve
+
+The goal of the code is to compute and visualize the cumulative percentage of triers (consumers) who made their first repeat purchase a certain number of weeks after their trial purchase. The analysis includes: 1. Identifying trial weeks (`Trial Week`) and the time difference (`FR Delta`) between the trial purchase and the first repeat purchase. 2. Aggregating data to determine the counts of first repeats per *trial week* and calculating cumulative first repeat as a percentage of total trial week class buyers. 3. Visualizing these cumulative percentages for triers making their first repeat purchase.
+
+As a first step, we create a summary that tells us the **cumulative percentage of triers that have made a (first) repeat purchase so many weeks after their trial purchase, broken down by time of trial**.
+
+**Step 1: Trial Week and First Repeat Delta (`FR Delta`) Computation**
+
+We start by creating a “week of trial purchase” variable (`Trial Week`) and a variable the counts the number of weeks between a panellist’s trial and first repeat purchase (`FR Delta`). - `Trial Week` variable equals the value of the `week` if this is a trial purchase and `None` otherwise. - The week of the trial purchase is recorded if it is the panellist's first purchase (`DoR = 0`). Otherwise, it is set to `None`.
+
+$$
+\text{Trial Week} = 
+\begin{cases} 
+\text{Week}, & \text{if DoR} = 0 \\
+\text{None}, & \text{otherwise}.
+\end{cases}
+$$
+
+-   `FR Delta` varilable tells us how many weeks after the trail purchase the panellist's first repeat purchase occured (assuming it was observered). This is computed using `shift` method as follows:
+
+    -   We shift the `DoR` and `Week` columns by 1 row to get access to the next row's values.
+    -   Then, use a `pl.when` condition to compute the `FR Delta` based on whether the next row's `DoR` is 1.
+    -   If the `DoR` in the next row is 1, compute the difference between the next row's `Week` and the current row's `Trial Week`. Otherwise, assign `None`.
+    -   `None` indicates that a first repeat purchase was not observed for this panellist in the 52-week observation period. Strictly speaking, `FR delta = 0` if the first-repeat purchase occurs in the same *calendar* week as the trial purchase, `1` if the first-repeat purchase occurs in the *calendar* week immediately after that in which the trial purchase occurred, etc.
+
+    $$
+    \text{FR Delta} = 
+    \begin{cases} 
+    \text{Next\_Week} - \text{Trial Week}, & \text{if Next\_DoR} = 1 \\
+    \text{None}, & \text{otherwise}.
+    \end{cases}
+    $$
+
+**Step 2: Aggregate Counts of First Repeats & Total Triers**
+
+Next, we aggregate the number of IDs (`Count`) for each combination of `Trial Week` and `FR Delta`. Rows with `Trial Week` and `FR Delta` both being `None` are excluded.
+
+Additionally, we aggreate the total number of triers in each `Trial Week` class. (Sum of ID counts for each Trial Week class) This aggregation includes both, triers that did make a repeat purchase and triers that did not make a repeat purchase. As expeceted, not all triers made a repeat purchase. - For example, we see that eight panellists made a trial purchase during the first week Kiwi Bubbles was on the market. One panellist purchased the product again that same week. Another made their first repeat purchase two weeks after their trial. Summing the count of week-1 triers who made their first repeat purchase within the 52-week observation period, we see that five of the eight week-1 triers (62.5%) had made a first repeat purchase.
+
+**Step 3: Include Missing Combinations & Perform Cumulative Operations**
+
+We cannot assume that all the trial and “time from trial to FR” weeks are observed in the dataset, so we need to fill in the missing values.
+
+1.  **Meshgrid of Trial Week and FR Delta**:
+    -   Create a dummy dataset of all possible combinations of `Trial Week` (1–52) and `FR Delta` (0–51). This ensures all potential weeks are included, even if they are absent in the observed data.
+        -   There are 52 weeks in a year and if a trier were to purchase in Week 1, the latest he/she can do their first repeat purchase and still be included in our analysis is by Week 52 or 51 weeks after the trail purchase (FR Delta). Additionally, given that a trier can do a first repeat purchase in the same week as the week of purchase, FR Delta can be 0. Thus the range for FR Delta is 0 to 51.
+        -   As we have 52 weeks of data, the only time someone who made a trial purchase in week 52 could make a repeat purchase is in week 52. (One week after trial would be week 53, which we do not observe.)
+2.  **Join with Aggregated Data**:
+    -   Combine the dummy dataset with:
+        -   `agg_trial_fr`: Aggregated counts of first repeat purchases grouped by `Trial Week` and `FR Delta`.
+        -   `trial_week_total`: Total triers in each `Trial Week`.
+3.  **Cumulative Percentage of Triers that made a First Repeat Purchase**:
+    -   We must compute the cumulative percentage of triers that have made a first repeat purchase so many weeks after their trial purchase.
+
+    -   First, we calculate cumulative counts of first repeat purchases (`Cum FR by Week`) within each `Trial Week` class.
+
+    -   Second, we compute the cumulative percentages of first repeats (`Cum FR by Trial`):
+
+        $$
+          \text{Cum FR by Trial} = 
+          \begin{cases} 
+          \frac{\text{Cum FR by Week}}{\text{Total Triers}}, & \text{if Total Triers} > 0 \\
+          0, & \text{otherwise}.
+          \end{cases}
+          $$
+4.  **Handling Missing Values**:
+    -   If the number of remaining weeks after the trial is less than the `FR Delta` (e.g., Week 52 triers cannot have an `FR Delta` greater than 0), assign `None` to such rows.
+5.  **Compute Weights**:
+    -   The cumulative percentage values (`Cum FR by Trial`) are weighted by the number of triers (`Total Triers`) to compute a weighted average for visualization.
+
+        $$
+          \text{Weights}(\text{Trial Week}, \text{FR Delta}) = \text{Cum FR by Trial} \times \text{Total Triers}
+          $$
+
+    -   Ensures that larger trial cohorts contribute proportionally more to the overall average, avoiding bias from small sample sizes.
+
+    -   These weights are later used to calculate the weighted cumulative percentage of first repeat purchases across all trial weeks.
+
+**Step 4: Filter and Compute Time to First Repeat Curve**
+
+This step takes the cumulative dataset (`cum_fr_by_trial`), filters it to focus on valid ranges for visualization, and computes the weighted average of cumulative first repeat percentages across trial weeks.
+
+1.  **Filter Data to Valid Range**
+
+    -   Focus on the first 26 weeks of trial (`Trial Week <= 26`) and corresponding first repeat purchases up to 26 weeks after the trial (`FR Delta <= 26`).
+    -   We restrict the analysis to a meaningful range to ensure only cohorts with sufficient observation time are included in the visualization.
+    -   For instance, triers in `Trial Week 26` have exactly 26 weeks to make their first repeat purchase. Including them for longer periods would be misleading since no data is observed beyond 26 weeks.
+    -   While we could create a weighted average of all 52 rows, it would be misleading in that we would be mixing groups of triers with different numbers of weeks in which they could have made a repeat purchase. (A week-51 trier has only two weeks in which to make a first repeat purchase: weeks 51 and 52.) Given a 52-week observation period and desire to compute the percentage of triers making a first repeat purchases 0, 1, . . . , x weeks after their trial purchase, we can only consider those triers that made a trial purchase in the first 52−x weeks the product was on the market. For this illustrative example, we will create a plot of the cumulative percentage of triers that have a made a first repeat purchase within 26 weeks of their trial purchase.
+
+2.  **Aggregate Across Trial Weeks**
+
+    -   The filtered data is grouped by `FR Delta` (weeks after trial purchase) to aggregate:
+
+        -   **`Total Triers`**: Total number of trial purchases within the valid range.
+        -   **`Weights`**: Summed weights for cumulative first repeat percentages across all `Trial Week` cohorts.
+
+        $$
+        \text{Weights (Summed)} = \sum_{\text{Trial Week}} \left( \text{Cum FR by Trial} \times \text{Total Triers} \right)
+        $$
+
+3.  **Compute Weighted Time to First Repeat**
+
+    -   Using the aggregated `Weights` and `Total Triers`, compute the **weighted average of cumulative first repeat percentages**:
+
+    $$
+    \text{Time to FR} = \frac{\text{Weights (Summed)}}{\text{Total Triers (Summed)}}
+    $$
+
+    -   This formula ensures that the percentage of first repeats for each `FR Delta` is weighted by the size of the trial cohort (`Total Triers`) contributing to that value.
+    -   Larger cohorts (e.g., triers in Week 4) have a proportional impact on the overall trend, avoiding distortion caused by smaller cohorts (e.g., triers in Week 13 or 22).
+
+```{python}
+kiwi_trial_fr = (
+    kiwi_lf
+    .filter(pl.col('Market') == 2)
+    .drop('Market')
+    # DoY -> day of year variable, where the 1 corresponds to the day the new product was launched.
+    .with_columns(((pl.col('Week') - 1) * 7 + pl.col('Day')).alias('DoY'))
+    .sort(by=['ID', 'DoY']) # Sorting is necessary to organize the data so that DoR can be computed
+    .with_columns((pl.col("ID").cum_count().over("ID") - 1).alias("DoR"))
+    .with_columns(
+        # Trial Week = Week when DoR == 0, else None
+        pl.when(pl.col('DoR') == 0).then(pl.col('Week')).otherwise(None).alias('Trial Week'),
+        # Shift DoR and Week to get the next row's values
+        pl.col('DoR').shift(-1).alias('Next_DoR'),
+        pl.col('Week').shift(-1).alias('Next_Week')
+    ).with_columns(
+        # Compute FR Delta based on next row's DoR and Week
+        pl.when(pl.col('Next_DoR') == 1)
+        .then(pl.col('Next_Week') - pl.col('Trial Week'))
+        .otherwise(None)
+        .alias('FR Delta')
+    ).select('ID', 'Trial Week', 'FR Delta')   # Drop unused & temporary columns
+)
+
+# Count of panellists for each combination of Trial Week and FR Delta
+agg_trial_fr = (
+    kiwi_trial_fr
+    .group_by(['Trial Week', 'FR Delta'])
+    .agg(pl.len().alias('Count'))
+    .filter(
+        ~pl.all_horizontal(pl.col('*').exclude('Count').is_null()) # Drop rows if 'Trial Week' and 'FR Delta' columns are null
+    )    
+)
+
+# Sum of triers in each Trial Week class
+trial_week_total = (
+    agg_trial_fr
+    .group_by('Trial Week')
+    .agg(pl.col('Count').sum().alias('Total Triers'))
+    .sort('Trial Week')
+    .fill_null(0)    
+)
+
+# Dummy dataset of all combinations of Trial Weeks and FR Delta within the period of analysis - handle missing combinations
+trial_week_range, fr_delta_range = np.meshgrid(np.arange(1, 53, dtype='int16'), np.arange(0, 52, dtype='int16'))
+trial_fr_range = pl.LazyFrame({'Trial Week': trial_week_range.reshape(-1), 'FR Delta': fr_delta_range.reshape(-1)})
+
+# Join dummy dataset with aggregated 
+cum_fr_by_trial = (
+    trial_fr_range
+    .join(trial_week_total, on='Trial Week', how='left')
+    .join(agg_trial_fr, on=['Trial Week', 'FR Delta'], how='left')
+    .fill_null(0)
+    .with_columns(pl.col('Count').cum_sum().over('Trial Week').alias('Cum FR by Week')) # calculate cumulative counts of first repeat purchases within each Trial Week class
+    .with_columns(
+        pl.when(pl.col('Trial Week') > (52 - pl.col('FR Delta')))
+        .then(None) # If the number of remaining weeks after the trial is less than the `FR Delta` (e.g., Week 52 triers cannot have an `FR Delta` greater than 0), assign `None` to such rows.
+        .otherwise(
+            pl.when(pl.col('Total Triers') > 0)
+            .then(pl.col('Cum FR by Week') / pl.col('Total Triers')) # compute the cumulative percentages of first repeats
+            .otherwise(0)
+        )
+        .alias('Cum FR by Trial') 
+    )
+    .with_columns(
+        (pl.col('Cum FR by Trial') * pl.col('Total Triers')).alias('Weights') # Compute weights
+    )
+)
+```
+
+```{python}
+time_to_fr_filtered = (
+    cum_fr_by_trial
+    .filter(
+        (pl.col('Trial Week') <= 26) &
+        (pl.col('FR Delta') <= 26)
+    )
+    .group_by('FR Delta')
+    .agg(
+        pl.col('Total Triers').sum(),
+        pl.col('Weights').sum()
+    )
+    .with_columns((pl.col('Weights') / pl.col('Total Triers')).alias('Time to FR')) # compute the weighted average of cumulative first repeat percentages across trial weeks
+    .sort('FR Delta')
+    .collect()
+)
+
+time_to_fr_filtered
+```
+
+```{python}
+alt.Chart(time_to_fr_filtered).mark_line().encode(
+    x=alt.X('FR Delta:O', title='Weeks After Trial', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 2), labelExpr="datum.value")),
+    y=alt.Y('Time to FR:Q', title='% of Triers', axis=alt.Axis(format='.0%')),
+).properties(
+    width=650, height=250, title='Time to First Repeat - Empirical distribution of the time from trial to first repeat purchase'
+).configure_view(stroke=None)
+```
+
+We see that 42% of triers have made a first repeat purchase within a year of their trial purchase. This is higher than the 37% of triers that have made a repeat purchase by the end of week 52 reported in the % of triers repeat purchasing plot from earlier. Why is this the case? This is because the plot in the earlier section considered the all triers in the first year, whereas the plot in this section look at the triers up until the 26th week. Considering a small trier base acquired earlier in the year, we aloow for more sufficient time for triers to make their first repeat purchase. Given that the earlier plot considers all triers up until the last week of the obeservation period, we are unable to provide sufficient time for those triers make a repeat purchase.
+
+##### Exploring Time to Second Repeat
+
+```{python}
+kiwi_fr_2r = (
+    kiwi_lf
+    .filter(pl.col('Market') == 2)
+    .drop('Market')
+    .with_columns(((pl.col('Week') - 1) * 7 + pl.col('Day')).alias('DoY'))
+    .sort(by=['ID', 'DoY'])
+    .with_columns((pl.col("ID").cum_count().over("ID") - 1).alias("DoR"))
+    .with_columns(
+        pl.when(pl.col('DoR') == 1).then(pl.col('Week')).otherwise(None).alias('FR Week'), # FR Week = Week when DoR == 1, else None
+        pl.col('DoR').shift(-1).alias('Next_DoR'),
+        pl.col('Week').shift(-1).alias('Next_Week')
+    ).with_columns(
+        pl.when(pl.col('Next_DoR') == 2) # Compute 2R Delta based on next row's DoR and Week
+        .then(pl.col('Next_Week') - pl.col('FR Week'))
+        .otherwise(None)
+        .alias('2R Delta')
+    ).select('ID', 'FR Week', '2R Delta') 
+)
+
+agg_fr_2r = (
+    kiwi_fr_2r
+    .group_by(['FR Week', '2R Delta'])
+    .agg(pl.len().alias('Count'))
+    .filter(
+        ~pl.all_horizontal(pl.col('*').exclude('Count').is_null())
+    )    
+)
+
+fr_week_total = (
+    agg_fr_2r
+    .group_by('FR Week')
+    .agg(pl.col('Count').sum().alias('Total FRs'))
+    .sort('FR Week')
+    .fill_null(0)    
+)
+
+fr_week_range, delta_2r_range = np.meshgrid(np.arange(1, 53, dtype='int16'), np.arange(0, 52, dtype='int16'))
+fr_2r_range = pl.LazyFrame({'FR Week': fr_week_range.reshape(-1), '2R Delta': delta_2r_range.reshape(-1)})
+
+cum_2r_by_trial = (
+    fr_2r_range
+    .join(fr_week_total, on='FR Week', how='left')
+    .join(agg_fr_2r, on=['FR Week', '2R Delta'], how='left')
+    .fill_null(0)
+    .with_columns(pl.col('Count').cum_sum().over('FR Week').alias('Cum 2R by Week')) 
+    .with_columns(
+        pl.when(pl.col('FR Week') > (52 - pl.col('2R Delta')))
+        .then(None) 
+        .otherwise(
+            pl.when(pl.col('Total FRs') > 0)
+            .then(pl.col('Cum 2R by Week') / pl.col('Total FRs'))
+            .otherwise(0)
+        )
+        .alias('Cum 2R by FR') 
+    )
+    .with_columns(
+        (pl.col('Cum 2R by FR') * pl.col('Total FRs')).alias('Weights')
+    )
+)
+
+time_to_2r_filtered = (
+    cum_2r_by_trial
+    .filter(
+        (pl.col('FR Week') <= 26) &
+        (pl.col('2R Delta') <= 26)
+    )
+    .group_by('2R Delta')
+    .agg(
+        pl.col('Total FRs').sum(),
+        pl.col('Weights').sum()
+    )
+    .with_columns((pl.col('Weights') / pl.col('Total FRs')).alias('Time to 2R'))
+    .sort('2R Delta')
+    .collect()
+)
+
+time_to_2r_filtered
+```
+
+```{python}
+alt.Chart(time_to_2r_filtered).mark_line().encode(
+    x=alt.X("2R Delta:O", title='Weeks After First Repeat', axis=alt.Axis(labelAngle=0, values=np.arange(0, 53, 2), labelExpr="datum.value")),
+    y=alt.Y('Time to 2R:Q', title='% of First Repeaters', axis=alt.Axis(format='.0%')),
+).properties(
+    width=650, height=250, title='Time to Second Repeat - Empirical distribution of the time from first repeat to second repeat purchase'
+).configure_view(stroke=None)
+```

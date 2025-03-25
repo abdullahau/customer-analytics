@@ -34,18 +34,6 @@ format:
         html-math-method:
             method: mathjax
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-jupyter:
-    jupytext:
-        formats: ipynb,qmd
-        text_representation:
-            extension: .qmd
-            format_name: quarto
-            format_version: '1.0'
-            jupytext_version: 1.16.7
-    kernelspec:
-            display_name: main
-            language: python
-            name: main
 ---
 
 ## Imports

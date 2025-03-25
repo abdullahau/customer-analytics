@@ -31,18 +31,6 @@ format:
         html-math-method:
             method: mathjax
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-jupyter:
-    jupytext:
-        formats: ipynb,qmd
-        text_representation:
-            extension: .qmd
-            format_name: quarto
-            format_version: '1.0'
-            jupytext_version: 1.16.7
-    kernelspec:
-        display_name: main
-        language: python
-        name: main
 ---
 
 In this notebook we show how to fit a BG/NBD model in Stan. We compare the results with the [`lifetimes`](https://github.com/CamDavidsonPilon/lifetimes) package. The model is presented in the paper: Fader, P. S., Hardie, B. G., & Lee, K. L. (2005). [“Counting your customers” the easy way: An alternative to the Pareto/NBD model. Marketing science, 24(2), 275-284.](http://www.brucehardie.com/papers/bgnbd_2004-04-20.pdf)

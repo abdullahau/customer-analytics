@@ -1,0 +1,83 @@
+---
+title: Index
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: ../quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+jupyter:
+    jupytext:
+        formats: ipynb,qmd
+        text_representation:
+            extension: .qmd
+            format_name: quarto
+            format_version: '1.0'
+            jupytext_version: 1.16.7
+    kernelspec:
+            display_name: main
+            language: python
+            name: main
+---
+
+## Pages:
+
+- [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
+- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-panel-data)
+- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-transaction-log)
+
+## Source Files
+
+Github Page: [https://github.com/abdullahau/customer-analytics](https://github.com/abdullahau/customer-analytics)
+
+## Build from Source
+
+Required Packages:
+
+```
+stan
+bridgestan
+xarray
+altair
+great-tables
+ipykernel
+ipython
+ipywidgets
+jupyterlab
+Lifetimes
+quarto
+marimo
+matplotlib
+narwhals
+numpy
+pandas
+plotly
+polars
+pymdown-extensions
+scikit-learn
+scikit-optimize
+scipy
+statsmodels
+vegafusion
+jinja2
+```
+

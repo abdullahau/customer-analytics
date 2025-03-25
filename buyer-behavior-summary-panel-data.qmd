@@ -71,11 +71,6 @@ import altair as alt
 import numpy as np
 from great_tables import GT, style, loc, md
 import gc
-
-# https://altair-viz.github.io/user_guide/display_frontends.html
-# alt.renderers.enable('mimetype')
-# alt.JupyterChart.enable_offline()
-# alt.renderers.enable("jupyter", offline=True)
 ```
 
 ### Import Panel Data
@@ -4227,20 +4222,21 @@ We cannot assume that all the trial and “time from trial to FR” weeks are ob
     -   Second, we compute the cumulative percentages of first repeats (`Cum FR by Trial`):
 
         $$
-          \text{Cum FR by Trial} = 
-          \begin{cases} 
-          \frac{\text{Cum FR by Week}}{\text{Total Triers}}, & \text{if Total Triers} > 0 \\
-          0, & \text{otherwise}.
-          \end{cases}
-          $$
+        \text{Cum FR by Trial} = 
+        \begin{cases} 
+        \frac{\text{Cum FR by Week}}{\text{Total Triers}}, & \text{if Total Triers} > 0 \\
+        0, & \text{otherwise}.
+        \end{cases}
+        $$
+
 4.  **Handling Missing Values**:
     -   If the number of remaining weeks after the trial is less than the `FR Delta` (e.g., Week 52 triers cannot have an `FR Delta` greater than 0), assign `None` to such rows.
 5.  **Compute Weights**:
     -   The cumulative percentage values (`Cum FR by Trial`) are weighted by the number of triers (`Total Triers`) to compute a weighted average for visualization.
 
         $$
-          \text{Weights}(\text{Trial Week}, \text{FR Delta}) = \text{Cum FR by Trial} \times \text{Total Triers}
-          $$
+        \text{Weights}(\text{Trial Week}, \text{FR Delta}) = \text{Cum FR by Trial} \times \text{Total Triers}
+        $$
 
     -   Ensures that larger trial cohorts contribute proportionally more to the overall average, avoiding bias from small sample sizes.
 

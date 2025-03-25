@@ -3,39 +3,39 @@ title: BG/NBD Model - Stan Implementation
 author: Abdullah Mahmood
 date: last-modified
 format:
-  html:
-    theme: cosmo
-    highlight-style: atom-one
-    mainfont: Palatino
-    fontcolor: black
-    monobackgroundcolor: white
-    monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
-    fontsize: 13pt
-    linestretch: 1.4
-    toc: true
-    toc-location: right
-    toc-depth: 4
-    code-fold: true
-    code-copy: true
-    cap-location: bottom
-    format-links: false
-    embed-resources: true
-    anchor-sections: true
-    html-math-method:
-      method: mathjax
-      url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+    html:
+        theme: cosmo
+        highlight-style: atom-one
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        toc: true
+        toc-location: right
+        toc-depth: 4
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 jupyter:
-  jupytext:
-    formats: ipynb,qmd
-    text_representation:
-      extension: .qmd
-      format_name: quarto
-      format_version: '1.0'
-      jupytext_version: 1.16.7
-  kernelspec:
-    display_name: main
-    language: python
-    name: main
+    jupytext:
+        formats: ipynb,qmd
+        text_representation:
+            extension: .qmd
+            format_name: quarto
+            format_version: '1.0'
+            jupytext_version: 1.16.7
+    kernelspec:
+        display_name: main
+        language: python
+        name: main
 ---
 
 In this notebook we show how to fit a BG/NBD model in Stan. We compare the results with the [`lifetimes`](https://github.com/CamDavidsonPilon/lifetimes) package. The model is presented in the paper: Fader, P. S., Hardie, B. G., & Lee, K. L. (2005). [“Counting your customers” the easy way: An alternative to the Pareto/NBD model. Marketing science, 24(2), 275-284.](http://www.brucehardie.com/papers/bgnbd_2004-04-20.pdf)
@@ -595,10 +595,12 @@ pl.DataFrame(
 ```
 
 ```{python}
-x = [stan_model.opt_model.optimized_params_pd['r'][0],
-     stan_model.opt_model.optimized_params_pd['alpha'][0],
-     stan_model.opt_model.optimized_params_pd['a'][0],
-     stan_model.opt_model.optimized_params_pd['b'][0]]
+x = [
+    stan_model.opt_model.optimized_params_pd['r'][0],
+    stan_model.opt_model.optimized_params_pd['alpha'][0],
+    stan_model.opt_model.optimized_params_pd['a'][0],
+    stan_model.opt_model.optimized_params_pd['b'][0]
+]
 
 print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
 # print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
@@ -700,10 +702,12 @@ pl.DataFrame(
 ```
 
 ```{python}
-x = [stan_model.opt_model.optimized_params_pd['r'][0],
-     stan_model.opt_model.optimized_params_pd['alpha'][0],
-     stan_model.opt_model.optimized_params_pd['a'][0],
-     stan_model.opt_model.optimized_params_pd['b'][0]]
+x = [
+    stan_model.opt_model.optimized_params_pd['r'][0],
+    stan_model.opt_model.optimized_params_pd['alpha'][0],
+    stan_model.opt_model.optimized_params_pd['a'][0],
+    stan_model.opt_model.optimized_params_pd['b'][0]
+]
 
 print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
 # print(negative_log_likelihood(np.log(np.array(x)), p1x, t_x, T))
@@ -774,19 +778,19 @@ Note that in addition to generating random numbers of the priors or sampling par
 -   In Stan, we will us @eq-numtrans and @eq-numtrans2 given the nature of the dropout process and the time between transactions:
 
     -   Transaction Process: 
-  $$
-  \text{Time between transactions} \sim \text{Exponential}(\lambda)
-  $$
+    $$
+    \text{Time between transactions} \sim \text{Exponential}(\lambda)
+    $$
 
     -   Dropout Process:
-  $$
-  \text{Dropout after transaction} \sim \text{Bernoulli}(p)
-  $$
+    $$
+    \text{Dropout after transaction} \sim \text{Bernoulli}(p)
+    $$
 
     -   Population Distributions:
-  $$
-  \lambda \sim \text{Gamma}(r, \alpha), \quad p \sim \text{Beta}(a, b)
-  $$
+    $$
+    \lambda \sim \text{Gamma}(r, \alpha), \quad p \sim \text{Beta}(a, b)
+    $$
 
 -   We will also compute the number of transactions for each customer using @eq-numtrans3.
 

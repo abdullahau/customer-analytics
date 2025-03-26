@@ -1,0 +1,65 @@
+---
+title: Calculating Customer Acquisition Cost
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+Source: [Video Series - Customer Acquisition Cost (by Dan McCarthy)](https://www.youtube.com/watch?v=PZe6LUAyREQ)
+
+## Doing the CACulation
+
+*Main aspects to account for*
+
+1. Repeat sales/marketing should be excluded from CAC
+2. Lead-lag between spend and aquisition
+3. CAC expense is more than ad spend
+
+*Outline*
+
+1. Unadjusted S&M CAC
+2. Unadjusted acquisition-related S&M CAC
+3. Lag-adjusted acquisition-related S&M CAC
+4. Lag-adjusted acquisition-related Total CAC
+
+
+```{python}
+import numpy as np
+import pandas as pd
+```
+
+
+```{python}
+
+```

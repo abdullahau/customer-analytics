@@ -54,6 +54,8 @@ What the analysis summarize:
 
 ![Workflow Lifetimes Library — CLV Model](references/Workflow-Lifetimes-Library-CLV-Model.png)
 
+![CBCV Infographic](references/CBCV-Infograhic.png)
+
 ## Reference
 
 - [Bruce Hardie](https://www.brucehardie.com/)

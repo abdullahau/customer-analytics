@@ -41,9 +41,10 @@ jupyter:
 
 ## Pages:
 
-- [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-panel-data)
 - [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-transaction-log)
+- [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
+- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
 
 ## Source Files
 

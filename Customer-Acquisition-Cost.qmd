@@ -3,63 +3,152 @@ title: Calculating Customer Acquisition Cost
 author: Abdullah Mahmood
 date: last-modified
 format:
-    html:
-        theme: cosmo
-        css: quarto-style/style.css        
-        highlight-style: atom-one        
-        mainfont: Palatino
-        fontcolor: black
-        monobackgroundcolor: white
-        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
-        fontsize: 13pt
-        linestretch: 1.4
-        number-sections: true
-        number-depth: 5
-        toc: true
-        toc-location: right
-        toc-depth: 5
-        code-fold: true
-        code-copy: true
-        cap-location: bottom
-        format-links: false
-        embed-resources: true
-        anchor-sections: true
-        code-links:   
-        -   text: GitHub Repo
-            icon: github
-            href: https://github.com/abdullahau/customer-analytics/
-        -   text: Quarto Markdown
-            icon: file-code
-            href: https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd
-        html-math-method:
-            method: mathjax
-            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  html:
+    theme: cosmo
+    css: quarto-style/style.css
+    highlight-style: atom-one
+    mainfont: Palatino
+    fontcolor: black
+    monobackgroundcolor: white
+    monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+    fontsize: 13pt
+    linestretch: 1.4
+    number-sections: true
+    number-depth: 5
+    toc: true
+    toc-location: right
+    toc-depth: 5
+    code-fold: true
+    code-copy: true
+    cap-location: bottom
+    format-links: false
+    embed-resources: true
+    anchor-sections: true
+    code-links:
+      - text: GitHub Repo
+        icon: github
+        href: https://github.com/abdullahau/customer-analytics/
+      - text: Quarto Markdown
+        icon: file-code
+        href: https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd
+    html-math-method:
+      method: mathjax
+      url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
-Source: [Video Series - Customer Acquisition Cost (by Dan McCarthy)](https://www.youtube.com/watch?v=PZe6LUAyREQ)
-
-## Doing the CACulation
-
-*Main aspects to account for*
-
-1. Repeat sales/marketing should be excluded from CAC
-2. Lead-lag between spend and aquisition
-3. CAC expense is more than ad spend
-
-*Outline*
-
-1. Unadjusted S&M CAC
-2. Unadjusted acquisition-related S&M CAC
-3. Lag-adjusted acquisition-related S&M CAC
-4. Lag-adjusted acquisition-related Total CAC
-
+## Imports
 
 ```{python}
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+
+%config InlineBackend.figure_formats = ['svg']
 ```
 
+### Import Data
+
+**Younger Eats**
+
+Younger Eats is a fast-growing meal kit company, specializing in meals for young children.
+
+#### Sales and Marketing Expense data (in *\$ Thousands*):
 
 ```{python}
+# Sales and marketing expenses
+snm_exp = pd.read_csv("data/CAC-data.csv")
 
+snm_exp['Total Sales and Marketing'] = (
+    snm_exp.sum(axis=1) - 
+    snm_exp['Acquisition-related onboarding expense'] - 
+    snm_exp['Month']
+)
+snm_exp
 ```
+
+The data contains the following channels:
+
+-   Referral Program
+-   TV Advertising
+-   Out-of-Home (OOH) Advertising / Outdoor Advertising
+-   New Customer Promotions
+-   Facebook Ads for Acquistion
+-   Facebook Ads for Repeat Orders
+-   Google Ads for Acquistion
+-   Google Ads for Repeat Orders
+-   Prospecting Sales Team
+-   Account Manager Team
+-   Acquistion-Related Onboarding Expense
+
+We note that the following features about the channels:
+
+-   TV Ads: Spend equally impacts customer acquisition in current and subsequent 3 months. 80% earmarked for customer acquisition.
+-   OOH: Spend equally impacts customer acquisition in current and subsequent 2 months. 80% earmarked for customer acquisition.
+-   Prospecting Sales Team: 3-month lag, on average, between sales activity and adoption
+-   Account Manager Team: This team facilitates transactions from existing accounts
+-   Acquisition-Related Onboarding Expenses: 2-month lead -- money is spent for customers acquired 2 months ago
+
+#### Customer Acquistions Data (in *Thousands*) - Last Touch Attribution:
+
+```{python}
+# Acquisitions (last touch attribution)
+acquisitions = pd.read_csv('data/CAC-Acquisition-Data.csv')
+acquisitions['Total Acquisitions'] = (
+    acquisitions.sum(axis=1) - 
+    acquisitions['Month']
+)
+acquisitions
+```
+
+## CAC Measurements
+
+### Unadjusted Sales & Marketing CAC
+
+Computed as *Total Sales & Marketing Cost / Total Acquisitions*
+
+```{python}
+# Unadjusted sales and marketing CAC
+unadj_snm_cac = snm_exp['Total Sales and Marketing'][:-2] / acquisitions['Total Acquisitions']
+unadj_snm_cac
+```
+
+```{python}
+plt.bar(x=unadj_snm_cac.index+1, height=unadj_snm_cac, color='k', width=0.5)
+plt.ylim(0, 100)
+plt.xlabel('Month')
+plt.ylabel('Customer Acquisition Cost ($)')
+plt.title('Unadjusted Sales & Marketing CAC');
+```
+
+### Unadjusted Acquisition-related S&M CAC
+
+Computed as *Unadjusted Acquisition-Related Sales & Marketing Cost / Total Acquisitions*
+
+```{python}
+# Unadjusted acquisition-related sales and marketing ($k)
+unadj_acq_cost = (
+    snm_exp['Referral program (marketing)'] +
+    snm_exp['TV ads'] * 0.8 +
+    snm_exp['OOH'] * 0.8 +
+    snm_exp['New customer promotions (marketing)'] +
+    snm_exp['Facebook ads for acquisition'] + 
+    snm_exp['Google ads for acquisition'] + 
+    snm_exp['Prospecting sales team']
+)
+unadj_acq_cost
+```
+
+```{python}
+unadj_acq_cac = unadj_acq_cost[:-2] / acquisitions['Total Acquisitions']
+unadj_acq_cac
+```
+
+```{python}
+plt.bar(x=unadj_acq_cac.index+1, height=unadj_acq_cac, color='k', width=0.5)
+plt.ylim(0, 100)
+plt.xlabel('Month')
+plt.ylabel('Customer Acquisition Cost ($)')
+plt.title('Unadjusted Acquisition-Related Sales & Marketing CAC');
+```
+
+### Lag-adjusted Acquisition-related S&M CAC

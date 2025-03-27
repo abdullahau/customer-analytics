@@ -1,0 +1,118 @@
+---
+title: Estimating Concentration in Champagne Purchasing
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/Estimating-Purchasing-Concentration.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+## Import
+
+```{python}
+import numpy as np
+import pandas as pd
+from scipy.optimize import minimize
+import matplotlib.pyplot as plt
+
+%config InlineBackend.figure_formats = ['svg']
+```
+
+## Concentration 101
+
+- Concentration in customer purchasing means that a small proportion of customers make a large proportion of the total purchases of the product (e.g., “80/20”). 
+
+$$
+\text{Higher Concentration} \Leftrightarrow \text{Greater Inequality} 
+$$
+
+- The *Lorenz curve* is used to illustrate the degree of inequality in the distribution of a quantity of interest (e.g., purchasing, income, wealth).
+- The greater the curvature of the Lorenz Curve, the greater the concentration/inequality.
+- Every point on the Lorenz curve represents the $y%$ of the quantity of interest accounted for by the bottom $x%$ of all relevant individuals:
+
+$$
+y = L(x)
+$$
+
+- $80/20$ represents a spcific point on the Lorenz Curve: $20=L(80)$
+- The *Gini coefficient* is the ratio of the area between the $45^{\circ}$ line (“line of perfect equality”) and the Lorenz curve to the area under the line of perfect equality.
+
+```{python}
+d = pd.DataFrame({
+    'num_units': range(6),
+    'num_people': [70, 45, 25, 15, 10, 5],
+    'total_units': [0, 45, 50, 45, 40, 25]
+})
+
+total_units = d.where(d.num_units > 0).total_units
+total_buyers = d.where(d.num_units > 0).num_people
+
+print('Total Units = ', total_units.sum())
+print('Total Buyers = ', total_buyers.sum())
+```
+
+```{python}
+d = pd.DataFrame({
+    'num_units': range(6),
+    'num_people': [70, 45, 25, 15, 10, 5],
+    'total_units': [0, 45, 50, 45, 40, 25]
+})
+
+d['pct_buyers'] = total_buyers / total_buyers.sum()
+d['pct_purchases'] = total_units / total_units.sum()
+d['cum_pct_buyers'] = d.pct_buyers.cumsum()
+d['cum_pct_purchases'] = d.pct_purchases.cumsum()
+
+d = d.fillna(0)
+```
+
+
+```{python}
+plt.clf()
+plt.bar(d.num_units, d.num_people, color='k')
+plt.xlabel('# Units')
+plt.ylabel('# People')
+plt.title('Hypothetical distribution of purchases (n = 170 people)');
+```
+
+
+```{python}
+plt.clf()
+plt.plot(d.cum_pct_buyers, d.cum_pct_purchases, color='k', marker='o', label='Lorenz Curve')
+x = np.linspace(0, 1)
+plt.plot(x,x,'k--', label='Line of Perfect Equality') 
+plt.xlabel('Cumulative % Buyers')
+plt.ylabel('Cumulative % Purchases')
+plt.title('Lorenz Curve')
+plt.legend();
+```
+

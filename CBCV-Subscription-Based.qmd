@@ -36,6 +36,5 @@ format:
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
-Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data
-](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
+Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
 

@@ -47,6 +47,8 @@ jupyter:
 - [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
 - [Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/DoR-Model)
 - [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric)
+- [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/gamma-gamma)
+- [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/CDNOW-Dataset)
 
 ## Source Files
 

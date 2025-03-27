@@ -1,0 +1,273 @@
+---
+title: Gamma-Gamma Model of Monetary Value
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: false
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/gamma-gamma.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+**Source**:
+
+-   [The Gamma-Gamma Model of Monetary Value](https://www.brucehardie.com/notes/025/)
+
+```{python}
+import polars as pl
+import numpy as np
+from sklearn.neighbors import KernelDensity
+from scipy.optimize import minimize
+from scipy.special import gammaln
+from utils import CDNOW, modified_silverman
+
+import altair as alt
+from IPython.display import display_markdown
+
+alt.renderers.enable("html")
+```
+
+```{python}
+cdnow = CDNOW(master=False, calib_p=273)
+
+# For the Gamma-Gamma model, we need to filter out customers who have made only one purchase.
+rfm_data = cdnow.rfm_summary().filter(pl.col('P1X') > 0)
+
+rfm_data_array = rfm_data.select('P1X', 't_x', 'T', 'zbar').collect().to_numpy()
+x = rfm_data_array[:,0] # frequency
+zbar = rfm_data_array[:,3] / 100 # monetary value
+t_x = rfm_data_array[:,1]
+T = rfm_data_array[:,2]
+```
+
+The Gamma-Gamma model assumes that there is no relationship between the monetary value and the purchase frequency. We can check this assumption by calculating the correlation between the average spend and the frequency of purchases.
+
+```{python}
+corr_data = rfm_data.select('P1X', 'zbar').collect()
+(
+    corr_data.corr()
+    .with_columns(pl.Series(corr_data.columns).alias("index"))
+    .style.tab_header(title="Correlations Between Frequency & Monetary Value")
+    .tab_stub(rowname_col="index")
+    .fmt_number(decimals=3)
+)
+
+# The value of this correlation is close to 0.11, which in practice is considered low enough to proceed with the model.
+```
+
+```{python}
+# Descriptive statistics of the average spend per repeat transaction
+summary = rfm_data.select('zbar').with_columns(pl.col('zbar') / 100).describe()
+summary
+
+# We note that the distribution of observed individual means is highly skewed to the right.
+```
+
+Probability density estimate of the sample
+
+```{python}
+m = np.arange(2.5, 301, 2.5) # Average transaction value range
+
+# Apply log transformation for boundary correction
+m_log = np.log(m)
+zbar_log = np.log(zbar)
+
+bw = modified_silverman(zbar_log)
+print('Kernel Smoothing Bandwidth:', bw) 
+```
+
+```{python}
+# Estimate the probability density function
+# Method 1 - Using sklearn
+kde = KernelDensity(kernel='gaussian', bandwidth=bw).fit(zbar_log.reshape(-1,1))
+log_density = kde.score_samples(m_log.reshape(-1,1))
+f = np.exp(log_density) / m # Transform the density back to the original scale
+
+# Method 2 - Using statsmodels
+# import statsmodels.api as sm
+# kde = sm.nonparametric.KDEUnivariate(zbar_log)
+# kde.fit(kernel='gau', bw=bw)
+# f_log = kde.evaluate(m_log)
+# f = f_log / m 
+```
+
+The distribution of average spend per (repeat) transaction across the 946 individuals who made a repeat transaction in the calibration period. Each customer’s average
+is computed across a (typically very) small number of transactions.
+
+```{python}
+act_dist_plot = (
+    alt.Chart(pl.DataFrame({'Average Transaction Value (z)': m, 'f(z)': f}))
+    .mark_line().encode(
+        x=alt.X(
+            'Average Transaction Value (z)', 
+            axis=alt.Axis(values=np.arange(0, 301, 50), 
+            labelExpr='"$"+datum.value')),
+        y=alt.Y('f(z)', scale=alt.Scale(domain=[0, 0.04]))
+    )
+)
+
+act_dist_plot.properties(
+            width=500,
+            height=400,
+            title='Observed distribution of average transaction values across customers'
+).configure_view(stroke=None).configure_axisY(grid=False).configure_axisX(grid=False) 
+```
+
+## Parameter Estimation
+
+```{python}
+def gammagamma(x, zbar, guess={'p': 0.01, 'q': 0.01, 'gamma': 0.01}):
+        
+    def log_likelihood(param):
+        p, q, gamma = param[0], param[1], param[2]
+        ll = (
+            gammaln(p*x+q) -
+            gammaln(p*x) -
+            gammaln(q) +
+            q*np.log(gamma) +
+            (p*x-1)*np.log(zbar) +
+            (p*x)*np.log(x) -
+            (p*x+q)*np.log(gamma+x*zbar)
+        )
+        return -np.sum(ll)
+    
+    bnds = [(1e-6, np.inf) for _ in range(3)]
+    
+    return minimize(log_likelihood, x0=list(guess.values()), bounds=bnds, method='L-BFGS-B')
+        
+res = gammagamma(x=x, zbar=zbar)
+p, q, gamma = res.x
+ll = res.fun
+
+# Sample Parameters
+# p = 6.24983547654959
+# q = 3.7441106896737
+# gamma = 15.4423198312514
+
+display_markdown(f'''$p$ = {p:0.4f}
+
+$q$ = {q:0.4f}
+
+$\\gamma$ = {gamma:0.4f}
+
+Log-Likelihood = {-ll:0.4f}''', raw=True)
+```
+
+The distribution where the means have been computed across $x → ∞$ transactions
+
+```{python}
+zeta = np.arange(300) + 1
+f_zeta = (p * gamma)**q * zeta**(-q-1) * np.exp(-p*gamma/zeta) / np.exp(gammaln(q))
+
+(
+    alt.Chart(pl.DataFrame({'Unobserved mean transaction value (ζ)': zeta, 'f(ζ)': f_zeta}))
+    .mark_line().encode(
+        x=alt.X(
+            'Unobserved mean transaction value (ζ)', 
+            axis=alt.Axis(values=np.arange(0, 301, 50), 
+            labelExpr='"$"+datum.value')),
+        y=alt.Y('f(ζ)', scale=alt.Scale(domain=[0, 0.04]))
+    ).properties(
+            width=500,
+            height=400,
+            title='Distribution of the (unobserved) mean transaction value (ζ)'
+        ).configure_view(stroke=None).configure_axisY(grid=False).configure_axisX(grid=False) 
+)
+```
+
+```{python}
+# compute the density of average transaction value
+
+# how many people with each level of x?
+repeat_trans_dist = (
+    cdnow.rfm_summary()
+    .group_by('P1X')
+    .agg(pl.len().alias('Count'))
+    .sort('P1X')
+    .collect()
+    .to_numpy()
+
+)
+nx = repeat_trans_dist[1:, 1]
+x_trans = repeat_trans_dist[1:, 0]
+
+# compute the density of zbar for each x
+y = np.arange(300) + 1
+x_trans, y = np.meshgrid(x_trans,y)
+a1 = gammaln(p*x_trans+q)-gammaln(p*x_trans)-gammaln(q)
+a2 = q*np.log(gamma)
+a3 = (p*x_trans-1)*np.log(y)
+a4 = (p*x_trans)*np.log(x_trans)
+a5 = (p*x_trans+q)*np.log(gamma+y*x_trans)
+g1 = np.exp(a1+a2+a3+a4-a5)
+
+# compute the weighted average
+g = np.dot(nx, g1.T) / np.sum(nx)
+```
+
+```{python}
+est_dist_plot = (
+    alt.Chart(pl.DataFrame({'Average Transaction Value (z)': np.arange(300) + 1, 'f(z)': g}))
+    .mark_line(strokeDash=[4,4]).encode(
+        x=alt.X(
+            'Average Transaction Value (z)', 
+            axis=alt.Axis(values=np.arange(0, 301, 50), 
+            labelExpr='"$"+datum.value')),
+        y=alt.Y('f(z)', scale=alt.Scale(domain=[0, 0.04]))
+    )
+)
+
+chart = act_dist_plot + est_dist_plot
+
+chart.properties(
+            width=500,
+            height=400,
+            title='Observed versus theoretical distribution of average transaction value across customers'
+).configure_view(stroke=None).configure_axisY(grid=False).configure_axisX(grid=False) 
+```
+
+## Computing Conditional Expectations
+
+```{python}
+E_Z = p*gamma/(q-1)
+
+ce = (
+    cdnow.rfm_summary()
+    .select('ID', 'P1X', 'zbar')   
+    .with_columns(((q - 1)/(p * pl.col('P1X') + q - 1)).alias('Weight'))
+    .with_columns(
+        (pl.col('Weight')*E_Z+(1-pl.col('Weight'))*pl.col('zbar')/100)
+        .alias('E(Z|x,zbar)')
+    )
+)
+
+ce.collect()
+```
+

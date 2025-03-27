@@ -1,0 +1,390 @@
+---
+title: CDNOW Data Set & Summaries
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: false
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/CDNOW-Dataset.qmd
+        -   text: CDNOW_master.csv
+            icon: database
+            href: https://github.com/abdullahau/customer-analytics/blob/main/data/CDNOW/CDNOW_master.csv
+        -   text: CDNOW_sample.csv
+            icon: database
+            href: https://github.com/abdullahau/customer-analytics/blob/main/data/CDNOW/CDNOW_sample.csv
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+The file `CDNOW_master.csv` contains the entire purchase history up to the end of June 1998 of the cohort of 23,570 individuals who made their first-ever purchase at CDNOW in the first quarter of 1997. Each record in this file, 69,659 in total, comprises four fields: the **customer’s ID**, the **date of the transaction**, the **number of CDs purchased**, and the **dollar value of the transaction**. A 1/10th systematic sample of the whole cohort (2357 customers) is also available for developing models of buyer behaviour in noncontractual settings. The primary purpose of this notebook is to document the process of creating the 1/10th sample of the complete dataset. We also show how to create the summary of this dataset used in [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric), and how the full dataset is used in “RFM and CLV: Using Iso-value Curves for Customer Base Analysis".
+
+## Imports
+
+```{python}
+import polars as pl
+import numpy as np
+from great_tables import GT
+```
+
+## Import Master Dataset
+
+```{python}
+CDNOW_master = (
+    pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
+                has_header=False, 
+                separator=',', 
+                schema={'CustID': pl.Int32,     # customer id
+                        'Date': pl.String,      # transaction date
+                        'Quant': pl.Int16,      # number of CDs purchased
+                        'Spend': pl.Float64})   # dollar value (excl. S&H)
+    .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
+    .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
+    .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
+    .group_by('CustID', 'Date')
+    .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max()) # Multiple transactions by a customer on a single day are aggregated into one
+    .sort('CustID', 'Date')
+    .with_columns((pl.col("CustID").cum_count().over("CustID") - 1).cast(pl.UInt16).alias("DoR"))  # DoR = Depth of Repeat ('Transaction' time: starts with 0 as trial, 1 as 1st repeat and so on)
+)
+
+display(CDNOW_master.head().collect())
+```
+
+## Creating the 1/10th Sample
+
+Our goal is to extract a 1/10 sample from the full CDNOW database that is based on total repeat spend in the first 39 weeks, stratified by week of trial.
+
+1. We first compute the number of repeat purchases made by each customer in the first 39 weeks (273 days) of 1997 and the dollar value of these purchases (`RptSpend`).
+2. For each trial week, we sort customers (in descending order) on repeat spend in the first 39 weeks and determine the ID of every 10th customer (`sampledID`).
+
+```{python}
+#| code-fold: true
+# Sampling technique - Python Method:
+
+# RptSpend = (
+#     CDNOW_master
+#     .filter(pl.col('PurchDay') <= 273)
+#     .with_columns(pl.when(pl.col('DoR') > 0)
+#                   .then(pl.col('Spend Scaled'))
+#                   .otherwise(0)
+#                   .alias('Repeat Spend (Scaled)'))
+#     .with_columns(pl.col('PurchDay').filter(pl.col('DoR') == 0)
+#                   .first()
+#                   .over('CustID')
+#                   .alias('Trial Day'))
+#     .group_by('CustID')
+#     .agg(pl.col('Repeat Spend (Scaled)').sum(), pl.col('Trial Day').max())
+#     .sort('CustID')
+# )
+
+# id_df = (
+#     RptSpend.collect()
+#     .with_columns(((pl.col('Trial Day') - 1) // 7 + 1).alias('Trial Week'))
+#     .sort(['Trial Week','Repeat Spend (Scaled)', 'CustID'], descending=[False, True, False], maintain_order=True)
+# )
+
+# sampledID = id_df[9::10].select('CustID')
+```
+
+```{python}
+# MATLAB Sampling (due to numerical float precision handling differences, original sampling results cannot be replicated unless spend is scaled in MATLAB)
+CDNOW_sample = (
+    pl.scan_csv(source='data/CDNOW/CDNOW_sample.csv',
+                has_header=False,
+                separator=',',
+                schema={'CustID': pl.Int32,
+                        'NewID': pl.Int32,
+                        'Date': pl.String,
+                        'Quant': pl.Int16,
+                        'Spend': pl.Float64})
+    .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
+    .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
+    .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
+    .group_by('CustID', 'Date')
+    .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max())
+    .sort('CustID', 'Date')
+    .with_columns((pl.col("CustID").cum_count().over("CustID") - 1).cast(pl.UInt16).alias("DoR"))      
+)
+```
+
+## Creating Summaries of 1/10th Sample Data
+
+We divide the 78 weeks in half: Period 1 is a 39-week calibration period while Period 2 is a 39-week longitudinal holdout used for model validation.
+
+### The number of repeat transactions made by each customer in calibration and validation period
+
+```{python}
+calwk = 273 # 39 week calibration period
+
+# The number of repeat transactions made by each customer in calibration and validation period
+px = (
+    CDNOW_sample
+    .group_by('CustID', maintain_order=True)
+    .agg(
+        pl.col('PurchDay')
+        .filter((pl.col('PurchDay') <= calwk) & (pl.col('DoR') > 0))
+        .count()
+        .alias('P1X'), # Period 1: Calibration Period
+
+        pl.col('PurchDay')
+        .filter((pl.col('PurchDay') > calwk) & (pl.col('DoR') > 0))
+        .count()
+        .alias('P2X')  # Period 2: Longitudinal Holdout Period      
+    )
+)
+```
+
+### The number of CDs purchased and total spend across these repeat transactions
+
+```{python}
+# The number of CDs purchased and total spend across these repeat transactions
+pSpendQuant = (
+    CDNOW_sample
+    .join(px, on='CustID', how='left')
+    .group_by('CustID', maintain_order=True)
+    .agg(
+        
+        pl.col('Spend Scaled')
+        .filter((pl.col('DoR') > 0) & (pl.col('DoR') <= pl.col('P1X')) & (pl.col('P1X') != 0))
+        .sum()
+        .alias('P1X Spend'),
+        
+        pl.col('Quant')
+        .filter((pl.col('DoR') > 0) & (pl.col('DoR') <= pl.col('P1X')) & (pl.col('P1X') != 0))
+        .sum()
+        .alias('P1X Quant'),        
+        
+        pl.col('Spend Scaled')
+        .filter((pl.col('DoR') > 0) & (pl.col('DoR') > pl.col('P1X')))
+        .sum()
+        .alias('P2X Spend'),
+        
+        pl.col('Quant')
+        .filter((pl.col('DoR') > 0) & (pl.col('DoR') > pl.col('P1X')))
+        .sum()
+        .alias('P2X Quant')                
+    )
+)
+```
+
+### The average spend per repeat transaction
+
+```{python}
+# The average spend per repeat transaction
+mx = (
+    pSpendQuant
+    .join(px, on='CustID', how='left')
+    .with_columns(
+        (pl.col('P1X Spend') / pl.col('P1X')).alias('Avg Spend per Repeat')
+    ).fill_nan(0)
+)
+```
+
+### Recency & effective calibration period
+
+The next step is to compute *recency*, as well as the length of time over which we have observed each customer’s purchasing behavior.
+
+When fitting models such as the Pareto/NBD and BG/NBD to these data, we also want to know the “recency” information for each customer, as well as their effective calibration period:
+
+For modeling purposes, “recency” is not the calendar date of the last observed purchase; rather the time origin for $t_x$ is the start of the observation period. Since we track customers’ purchasing from their first-ever purchase at CDNOW, the date of this first purchase is the time origin. Therefore, $t_x$ is the length of time between the first-ever purchase and the last observed purchase (in the calibration period), i.e., Last Purchase − First Purchase.
+
+$T$ is the length of time we observe each customer (i.e., the time between the customer’s first-ever purchase at CDNOW and the end of the calibration period, 1997-09-30).
+
+```{python}
+# time of last calibration period repeat purchase (in weeks)
+ttlrp = (
+    CDNOW_sample
+    .join(px, on='CustID', how='left')
+    .with_columns(
+        pl.col('PurchDay').filter(pl.col('DoR') == 0)
+        .first()
+        .over('CustID')
+        .alias('Trial Day')
+    )
+    .group_by('CustID', maintain_order=True)
+    .agg(
+        pl.col('PurchDay', 'Trial Day')
+        .filter(pl.col('DoR') <= pl.col('P1X'))
+        .max()
+        # .alias('LastPurch')
+    )
+    .with_columns(
+        (pl.col('PurchDay')/7).alias('p1rec'), # Calendar week of the last observed purchase - Calendar Recency
+        ((pl.col('PurchDay') - pl.col('Trial Day')) / 7).alias('t_x'), # Time to Last Repeat Purchase from Trial - Model Recency
+        ((calwk - pl.col('Trial Day'))/7).alias('T') # effective calibration period (in weeks)
+    )  
+    .drop('PurchDay', 'Trial Day')
+)
+```
+
+## Creating Number of Units Purchased by Week of Purchase Matrix
+
+### What is the total number of CDs purchased each week?
+
+```{python}
+# What is the total number of CDs purchased each week?
+weeklysales = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .group_by('Week')
+    .agg(pl.col('Quant').sum())
+    .sort('Week')
+)
+```
+
+### How many people made their first-ever (“trial”) purchase each week?
+
+```{python}
+# How many people made their first-ever (“trial”) purchase each week?
+weeklytriers = (
+    CDNOW_master
+    .filter(pl.col('DoR') == 0)
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .group_by('Week')
+    .agg(pl.len().alias('Incremental Triers'))
+    .sort('Week')
+    
+)
+weeklytriers.collect()
+```
+
+### What is the total number of CDs purchased by triers in their trial week?
+
+```{python}
+weeklytrierquant = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .with_columns(pl.when(pl.col('DoR') == 0).then(pl.col('Week')).fill_null(strategy='forward').over('CustID').alias('Trial Week'))  
+    .filter(pl.col('Trial Week') == pl.col('Week'))  # Any repeat purchasing by a customer in their trial week is added to their trial purchase
+    .group_by('Week')
+    .agg(pl.col('Quant').sum().alias('Triers Quant'))
+    .sort('Week')
+)
+
+weeklytrierquant.collect()
+```
+
+### What is the weekly total sales split between "trial" and "repeat"?
+
+```{python}
+weeklysalessplit = (
+    weeklysales
+    .join(weeklytrierquant, on='Week', how='left')
+    .fill_null(0)
+    .with_columns(
+        (pl.col('Quant') - pl.col('Triers Quant')).alias('Repeat Quant')
+    )
+    .rename({'Quant': 'Total', 'Triers Quant': 'Trial', 'Repeat Quant': 'Repeat'})
+)
+
+weeklysalessplit.collect()
+```
+
+### What is the distribution of the number of units purchased in each of the first 12 weeks?
+
+```{python}
+dist_table = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .filter(pl.col('Week') <= 12)
+    .group_by('Week', 'CustID')
+    .agg(pl.col('Quant').sum())    
+    .sort('Week').collect()
+    .pivot(on='Week', index='Quant', values='Quant', aggregate_function='len')
+    .sort('Quant')
+    .fill_null(0)
+    .to_numpy().astype(np.int32)
+)
+TableOne = np.zeros((11,13), dtype=np.int32)
+TableOne[1:11,0] = dist_table[0:10,0]
+TableOne[1:10,1:] = dist_table[0:9,1:]
+TableOne[10,1:] = np.sum(dist_table[9:,1:], axis=0)
+TableOne[0,1:] = weeklytriers.collect()['Incremental Triers'].cum_sum() - np.sum(TableOne[1:,1:], axis=0)
+TableOne_df = pl.from_numpy(TableOne, schema=[str(i) for i in range(13)], orient='row').with_columns(pl.col('0').cast(pl.String))
+
+(
+    GT(TableOne_df, rowname_col='0')
+    .tab_header(title="Distribution of the Number of CDNOW Units Purchased", subtitle='First 12 Weeks')
+    .tab_stubhead('Units Purchased')
+    .fmt_integer()
+    .tab_spanner(label='Week', columns=[str(i) for i in range(1, 13)])
+    .opt_stylize()
+)
+```
+
+```{python}
+dist_table = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))  
+    .filter(pl.col('Week') <= 12)  
+    .group_by('CustID', 'Week')
+    .agg(pl.col('Quant').cast(pl.Int32).sum()) # Sum quantity purchased by each customer within each week 
+    .group_by('Week', 'Quant')
+    .agg(pl.col('CustID').len().alias('Count'))
+    .sort('Quant')
+    .collect()
+)
+
+dist_table_10_plus = (
+    dist_table.filter(pl.col('Quant') >= 10)
+    .group_by('Week')
+    .agg(pl.col('Count').sum())
+    .sort('Week')
+    .with_columns(pl.lit(10).alias('Quant'))
+    .select('Week', 'Quant', 'Count')
+)
+
+dist_table_1 = dist_table.filter(pl.col('Quant') < 10).vstack(dist_table_10_plus)
+
+cumweeklytriers = (
+    weeklytriers.collect()
+    .with_columns(pl.col('Incremental Triers').cum_sum())
+    .join(dist_table_1.group_by('Week').agg(pl.col('Count').sum()), on='Week', how='left')
+    .with_columns((pl.col('Incremental Triers') - pl.col('Count')).alias('Count'))
+    .with_columns(pl.lit(0).alias('Quant')).select('Week', 'Quant', 'Count')
+)
+
+TableOne = (
+    dist_table_1.vstack(cumweeklytriers).sort('Week', 'Quant')
+    .pivot(on='Week', index='Quant', values='Count')
+)
+
+(
+    GT(TableOne, rowname_col='Quant')
+    .tab_header(title="Distribution of the Number of CDNOW Units Purchased", subtitle='First 12 Weeks')
+    .tab_stubhead('Units Purchased')
+    .fmt_integer()
+    .tab_spanner(label='Week', columns=[str(i) for i in range(1, 13)])
+    .opt_stylize()
+)
+```
+
+## RFM and CLV Data Preparation
+
+The initial exploratory analysis presented in the paper uses the full dataset (23,570 customers) excluding the purchasing data for ten buyers who purchased more than $4,000 worth of CDs (repeat purchases, excluding trial) across the 78-week period. Having validated the model on the 1/10 sample, the final RFM-group analysis is based on the revised “full” dataset of 23,560 customers.
+

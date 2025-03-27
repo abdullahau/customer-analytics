@@ -245,7 +245,11 @@ where $P(T_2 = x)$ is the probability that a randomly chosen customer making her
 Similarly, the column corresponding to week 3 reports the distribution of purchase quantity for the 5038 customers who could have made a purchase that week: 3216 of these customers made their first purchase in weeks 1 or 2, and 3033 of these people made no (repeat) purchase in week 3. We therefore have 183 week 1 and week 2 trialists making repeat purchases in this week, but we do not observe the specific number of week 1 versus week 2 triers, nor each of these groups' respective distribution of units purchased. Extending the same logic from above, however, we can express the probability of observing $x$ purchases in week 3 as a weighted average of the probability that a week 3 trier made $x$ purchases, the probability that a week 2 trier made $x$ repeat purchases in week 3, and the probability that a week 1 trier made $x$ repeat purchases in week 3, i.e.,
 
 $$
-P(X_3 = x) = \frac{1822}{1574 + 1642 + 1822} \times P(T_{3} = x) + \frac{1642}{1574 + 1642 + 1822} \times P(T_{3 \mid 2} = x) + \frac{1574}{1574 + 1642 + 1822} \times + P (R_{3\mid 1}= x)
+\begin{align*}
+P(X_3 = x) &= \frac{1822}{1574 + 1642 + 1822} \times P(T_{3} = x) \\
+&+ \frac{1642}{1574 + 1642 + 1822} \times P(T_{3 \mid 2} = x) \\
+&+ \frac{1574}{1574 + 1642 + 1822} \times + P (R_{3\mid 1}= x)
+\end{align*}
 $$
 
 where the weights are determined by the number of triers in weeks 1-3.

@@ -1,0 +1,936 @@
+---
+title: "Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution"
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/Sales-Forecast-Finite-Mixture-Beta-Geometric.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+## Introduction
+
+The model discussed here is applicable for the following two-dimensional classification of customer base: 
+
+1. **Opportunities for transactions: Continuous-Time**
+    - By “continuous-time” we mean that transactions can occur at any point in time.
+2. **Type of relationship with customers: Noncontractual**
+    - In a “noncontractual” setting, the absence of a contract or subscription means that the point in time at which the customer becomes inactive is not observed by the firm (e.g., a catalog retailer). The challenge is how to differentiate between a customer who has ended a “relationship” with the firm versus one who is merely in the midst of a long hiatus between transactions.
+
+**Source**: 
+
+-   [Forecasting Repeat Sales at CDNOW: A Case Study](https://www.jstor.org/stable/25062705)
+-   [A Note on Implementing the Fader and Hardie "CDNOW Model"](https://www.brucehardie.com/notes/002/)
+-   [Notes on the CDNOW Master Data Set](https://www.brucehardie.com/notes/026/)
+
+The objective here is to incorporate an easily implementable model of buyer behavior capable of generating a medium-term forecast of aggregate purchasing by a cohort of customers. Aggregate-level forecasts are a critical input to any attempt to value a customer base, and serve as a diagnostic to help gauge the effectiveness of various short-term marketing programs (e.g., the provision of a baseline sales estimate against which the performance of a promotion can be evaluated).
+
+First, we discuss the background to the modeling exercise and present the [dataset](@sec-import_data) on which this work is based. We then develop the [stochastic model](@sec-sec-model_development) of buyer behavior which is used to generate forecasts of future CD purchasing. This is followed by the empirical analysis where we examine the fit of the proposed model and its forecasting ability.
+
+Note to user interested in using this model:
+
+1. The data being modeled are counts of relatively homogeneous units (e.g., CDs). This model must not be used to model dollar sales or counts of products that are not very similar (e.g., the number of products purchased at Amazon.com where the units include such disparate items as books, electronic equipment, lawn furniture, and so on).
+2. Use of the shifted-geometric/geometric distributions implies that the *modal trial quantity* is 1 unit and that the *modal* number of units purchased in subsequent weeks, conditional on being a “possible repeat buyer”, is 0. If this is not that case, it will be necessary to change the underlying model structure. For example, the shifted beta-geometric model of trial counts could be replaced by the truncated or shifted NBD (which can have a mode away from 1). Similarly, the beta-geometric repeat purchasing distribution could be replaced by the NBD (which can have a non-zero mode).
+3. A number of other assumptions made, implicitly or explicitly, in the paper should also be acknowledged and taken into account (e.g., the independence of quantity decisions across transactions).
+
+## Imports
+
+### Import Packages
+
+```{python}
+import polars as pl
+import numpy as np
+import altair as alt
+from utils import ChartTemp, layered_line_prop
+
+from scipy.optimize import minimize
+from scipy.stats import chi2, beta
+from scipy.linalg import toeplitz
+
+from great_tables import GT 
+from IPython.display import display_markdown
+alt.renderers.enable("html")
+```
+
+### Import Transaction Data {#sec-import_data}
+
+For the purposes of this work, we focus on a **single cohort of new customers** who made their first purchase at the CDNOW website in the first quarter of 1997. We have data covering their **initial ("trial")** and **subsequent ("repeat") purchases** for the three month period (1/97 - 3/97) during which over 23,000 individuals purchased nearly 70,000 units (CDs). We are interested in **forecasting the future (repeat) purchasing of these customers** using a model calibrated with these quarter 1 data.
+
+```{python}
+CDNOW_master = (
+    pl.scan_csv(source = 'data/CDNOW/CDNOW_master.csv', 
+                has_header=False, 
+                separator=',', 
+                schema={'CustID': pl.Int32,     # customer id
+                        'Date': pl.String,      # transaction date
+                        'Quant': pl.Int16,      # number of CDs purchased
+                        'Spend': pl.Float64})   # dollar value (excl. S&H)
+    .with_columns(pl.col('Date').str.to_date("%Y%m%d"))
+    .with_columns((pl.col('Date') - pl.date(1996,12,31)).dt.total_days().cast(pl.UInt16).alias('PurchDay'))
+    .with_columns((pl.col('Spend')*100).round(0).cast(pl.Int64).alias('Spend Scaled'))
+    .group_by('CustID', 'Date')
+    .agg(pl.col('*').exclude('PurchDay').sum(), pl.col('PurchDay').max()) # Multiple transactions by a customer on a single day are aggregated into one
+    .sort('CustID', 'Date')
+    .with_columns((pl.col("CustID").cum_count().over("CustID") - 1).cast(pl.UInt16).alias("DoR"))  # DoR = Depth of Repeat ('Transaction' time: starts with 0 as trial, 1 as 1st repeat and so on)
+)
+
+display(CDNOW_master.head().collect())
+```
+
+### Create Number of Units Purchased by Week of Purchase Summary
+
+For the cohort of customers who first purchased at the CDNOW website in the first quarter of 1997, we choose to work with the summary of total purchasing as presented in the last table below (`TableOne`). This gives the distribution of the number of units purchased for each of the twelve weeks, along with details of total purchasing (`weeklysales`) and the number of new customers (triers) in each week (`weeklytriers`).
+
+```{python}
+# What is the total number of CDs purchased each week?
+weeklysales = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .group_by('Week')
+    .agg(pl.col('Quant').sum())
+    .sort('Week')
+)
+
+(
+    ChartTemp(weeklysales.collect())
+    .line_encode(y_col='Quant', y_title='Units Purchased', x_range=78)
+    .line_prop('Total Weekly Sales')
+)
+```
+
+```{python}
+# How many people made their first-ever (“trial”) purchase each week?
+weeklytriers = (
+    CDNOW_master
+    .filter(pl.col('DoR') == 0)
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .group_by('Week')
+    .agg(pl.len().alias('Incremental Triers'))
+    .sort('Week')
+)
+```
+
+```{python}
+# What is the total number of CDs purchased by triers in their trial week?
+weeklytrierquant = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))
+    .with_columns(pl.when(pl.col('DoR') == 0).then(pl.col('Week')).fill_null(strategy='forward').over('CustID').alias('Trial Week'))  
+    .filter(pl.col('Trial Week') == pl.col('Week'))  # Any repeat purchasing by a customer in their trial week is added to their trial purchase
+    .group_by('Week')
+    .agg(pl.col('Quant').sum().alias('Triers Quant'))
+    .sort('Week')
+)
+```
+
+```{python}
+# What is the weekly total sales split between "trial" and "repeat"?
+weeklysalessplit = (
+    weeklysales
+    .join(weeklytrierquant, on='Week', how='left')
+    .fill_null(0)
+    .with_columns(
+        (pl.col('Quant') - pl.col('Triers Quant')).alias('Repeat Sales')
+    )
+    .rename({'Quant': 'Total Sales', 'Triers Quant': 'Trial Sales'})
+)
+
+# Weekly total sales split for the 12 weeks (corresponding to trial purchases) - Long-Form Data
+weeklysalessplit_lf = (
+    weeklysalessplit
+    .filter(pl.col('Week') <= 12)
+    .unpivot(index='Week', on=['Total Sales', 'Trial Sales', 'Repeat Sales'], variable_name='Actual Sales', value_name='Sales')
+)
+
+# Weekly repeat sales
+weekly_repeat_df = (
+    weeklysalessplit
+    .select('Week', 'Repeat Sales')
+)
+```
+
+```{python}
+dist_table = (
+    CDNOW_master
+    .with_columns(((pl.col('PurchDay') - 1) // 7 + 1).alias('Week'))  
+    .filter(pl.col('Week') <= 12)  
+    .group_by('CustID', 'Week')
+    .agg(pl.col('Quant').cast(pl.Int32).sum()) # Sum quantity purchased by each customer within each week 
+    .group_by('Week', 'Quant')
+    .agg(pl.col('CustID').len().alias('Count'))
+    .sort('Quant')
+    .collect()
+)
+
+dist_table_10_plus = (
+    dist_table.filter(pl.col('Quant') >= 10)
+    .group_by('Week')
+    .agg(pl.col('Count').sum())
+    .sort('Week')
+    .with_columns(pl.lit(10).alias('Quant'))
+    .select('Week', 'Quant', 'Count')
+)
+
+dist_table_1 = dist_table.filter(pl.col('Quant') < 10).vstack(dist_table_10_plus)
+
+cumweeklytriers = (
+    weeklytriers.collect()
+    .with_columns(pl.col('Incremental Triers').cum_sum())
+    .join(dist_table_1.group_by('Week').agg(pl.col('Count').sum()), on='Week', how='left')
+    .with_columns((pl.col('Incremental Triers') - pl.col('Count')).alias('Count'))
+    .with_columns(pl.lit(0).alias('Quant')).select('Week', 'Quant', 'Count')
+)
+
+TableOne = (
+    dist_table_1.vstack(cumweeklytriers).sort('Week', 'Quant')
+    .pivot(on='Week', index='Quant', values='Count')
+)
+
+(
+    GT(TableOne, rowname_col='Quant')
+    .tab_header(title="Distribution of the Number of CDNOW Units Purchased", subtitle='First 12 Weeks')
+    .tab_stubhead('Units Purchased')
+    .fmt_integer()
+    .tab_spanner(label='Week', columns=[str(i) for i in range(1, 13)])
+    .opt_stylize()
+)
+```
+
+While this is a very convenient summary of the customers' purchasing, it suffers from two critical shortcomings: (1) we have no explicit information on the breakdown of trial vs. repeat sales in each week, and (2) we cannot see the longitudinal series of purchase events at the household level, thereby making it impossible to construct a standard model of repeat purchasing (i.e., depth of repeat or counting). We must therefore develop a model of week-by-week repeat purchasing whose parameters can be estimated using the above data.
+
+## Model Development {#sec-model_development}
+
+### Introduction
+
+Our objective to is develop a simple stochastic model of buyer behavior capable of producing a medium-term forecast of unit purchases by the cohort of new customers whose total purchasing during the first quarter of 1997 is summarized in `TableOne`. 
+
+Let us consider these data more carefully, focusing first on the column corresponding to week 2. This reports the distribution of purchase quantity for that week by the 3216 customers who could have made a purchase. This set is comprised of 1642 customers who made their first purchases at the CDNOW website in week 2, as well as 1574 customers who first purchased at it in week 1 and who therefore may be back in the market for additional (repeat) purchases in week 2. By definition, the 1642 week 2 triers must have purchased at least one unit. This implies that the 1478 people who made no purchase at the website in week 2 must be customers who made a trial purchase in week 1. Thus we have 1574 − 1478 = 96 week 1 triers who made repeat purchases in week 2. In other words, this observed distribution of week 2 purchasing represents a *mixture* of purchases by those whose first purchase occasion occurred in week 2 and repeat purchases by those who tried in week 1.
+
+Therefore, the probability of observing someone purchasing $x$ units in week 2 is simply a weighted average of the probability that a week 2 trier bought $x$ units during her initial week, and the probability that a week 1 trier bought $x$ units on at least one *repeat* purchase occasion in week 2. The weights are determined by the number of triers in weeks 1 and 2, i.e.,
+
+$$
+P(X_2 = x) = \frac{1642}{1574 + 1642} \times P(T_{2} = x)+ \frac{1574}{1574 + 1642} \times + P (R_{2\mid 1}= x)
+$$
+
+where $P(T_2 = x)$ is the probability that a randomly chosen customer making her first purchase(s) at CDNOW in week 2 buys $x$ units, and $P(R_{2 \mid 1} = x)$ is the probability that a randomly chosen customer who first purchased in week 1 purchases $x$ units in week 2.
+
+Similarly, the column corresponding to week 3 reports the distribution of purchase quantity for the 5038 customers who could have made a purchase that week: 3216 of these customers made their first purchase in weeks 1 or 2, and 3033 of these people made no (repeat) purchase in week 3. We therefore have 183 week 1 and week 2 trialists making repeat purchases in this week, but we do not observe the specific number of week 1 versus week 2 triers, nor each of these groups' respective distribution of units purchased. Extending the same logic from above, however, we can express the probability of observing $x$ purchases in week 3 as a weighted average of the probability that a week 3 trier made $x$ purchases, the probability that a week 2 trier made $x$ repeat purchases in week 3, and the probability that a week 1 trier made $x$ repeat purchases in week 3, i.e.,
+
+$$
+P(X_3 = x) = \frac{1822}{1574 + 1642 + 1822} \times P(T_{3} = x) + \frac{1642}{1574 + 1642 + 1822} \times P(T_{3 \mid 2} = x) + \frac{1574}{1574 + 1642 + 1822} \times + P (R_{3\mid 1}= x)
+$$
+
+where the weights are determined by the number of triers in weeks 1-3.
+
+```{python}
+# Week 2 
+print('Week 2')
+# Number of potential buyers in week 2:
+print('- # of potential buyers in week 2:', TableOne['2'].sum())
+# Number of triers:
+w2treirs =  weeklytriers.filter(pl.col('Week') == 2).select('Incremental Triers').collect().item(0,0)
+print('- # of triers:', w2treirs)
+# Week 1 triers:
+print('- # of week 1 triers in week 2:', TableOne['2'].sum() - w2treirs)
+# Week 1 triers who made no purchase in week 2:
+print('- # of week 1 triers who made no repeat purchase in week 2:', TableOne['2'][0])
+# Week 1 triers who made a purchase in week 2:
+print('- # of week 1 triers who made a purchase in week 2:', TableOne['2'].sum() - w2treirs - TableOne['2'][0])
+
+# Week 3
+print('Week 3')
+# Number of potential buyers in week 3:
+print('- # of potential buyers in week 3:', TableOne['3'].sum())
+# Number of triers:
+w3treirs =  weeklytriers.filter(pl.col('Week') == 3).select('Incremental Triers').collect().item(0,0)
+print('- # of triers:', w3treirs)
+# Week 1 & 2 triers:
+print('- # of week 1 & 2 triers in week 3:', TableOne['3'].sum() - w3treirs)
+# Week 1 & 2 triers who made no purchase in week 2:
+print('- # of week 1 & 2 triers who made no repeat purchase in week 3:', TableOne['3'][0])
+# Week 1 & 2 triers who made a purchase in week 3:
+print('- # of week 1 triers who made a purchase in week 2:', TableOne['3'].sum() - w3treirs - TableOne['3'][0])
+```
+
+More generally, the distribution of purchases in week $w$ can be modeled using a finite mixture model with known mixing weights:
+
+$$
+P(X_{w} = x)=\frac{1}{\sum^{w}_{i=1}n_{i}} \Biggl[n_{w}P(T_{w}=x) + \sum^{w-1}_{i=1}n_{i}P(R_{w\mid i}=x)\Biggr]
+$$
+
+where $n_{i}$ is the number of triers in week $i$ (i.e., customers making their first purchase(s) at the CDNOW website), $P(T_w = x)$ is the probability that a randomly chosen customer making her first purchase(s) at CDNOW in week $w$ buys $x$ units, and $P(R_{w \mid i} = x)$ is the probability that a randomly chosen customer who first purchased in week $i$ buys $x$ units in week $w$. We therefore need to develop submodels for $P(T_w = x)$ and $P(R_{w \mid i} = x)$.
+
+### Modeling Trial Purchases
+
+Let the random variable $T_w$ denote the number of units purchased in week $w$ by a customer whose trial purchase occurs in week $w$. (Note that, by definition, $T_w$ is a zero-truncated discrete random variable.) Our submodel for the distribution of $T_w$ is based on the following two assumptions:
+
+- At the level of the individual customer, $T_w$ is distributed according to a **shifted geometric distribution** with parameter $q_T$ and probability mass function
+
+$$
+P(T_w = x \mid q_T) =
+\begin{cases}
+q_T (1 - q_T)^{x-1} & x = 1, 2, \dots; \, 0 < q_T < 1, \\[10pt]
+0 & x = 0.
+\end{cases}
+$$
+
+- $q_T$ is distributed across the population according to a beta distribution with parameters $\alpha_T$ and $\beta_T$ , and probability density function
+
+$$
+g(q_T) = \frac{1}{B(\alpha_T, \beta_T)} q_T^{\alpha_T - 1} (1 - q_T)^{\beta_T - 1}, \quad 0 < q_T < 1; \; \alpha_T, \beta_T > 0
+$$
+
+The intuition associated with these two assumptions is as follows. The geometric distribution corresponds to purchasing following a "coin-flipping" process in which the individual customer keeps buying until she tosses a "head". The beta distribution is simply a means of allowing P("heads") to vary across the customer base.
+
+It follows that the aggregate distribution of the number of units purchased by a week $w$ trialist is given by
+
+$$
+\begin{aligned}
+P(T_{w} = x) &= \int^{1}_{0}P(T_{w} = x \mid q_{T})g(q_{T})dq_{T} \\
+    &=\begin{cases}
+    \frac{B(\alpha_{T} + 1,\beta_{T} + x - 1)}{B(\alpha_{T}+1,\beta_{T})} &\quad x=1,2,\ldots \\
+    0 &\quad x=0 \\
+    \end{cases}
+\end{aligned}
+$$
+
+which we call the **shifted beta-geometric distribution**. Elsewhere in the marketing literature, this distribution was used by Morrison and Perry (1970) as a quantity submodel in their NBD-based model of **purchase frequency** and **purchase quantity**. The mean of this distribution is given by
+
+$$
+E(T_w) = \frac{\alpha_T + \beta_T - 1}{\alpha_T - 1}
+$$
+
+### Modeling Repeat Purchases
+
+Let the random variable $R_{w \mid i}$ denote the number of (repeat) purchases made in week $w$ by a customer who made her trial purchase in week $i (w > i)$. Specifying an appropriate model for the distribution of $R_{w \mid i}$ is the single most important step in this modeling effort. To do so, we will start with the assertion that the purchasing by a new customer at an established store (or website) is analogous to a consumer's purchasing of a new product. We know that repeat buying rates for new products tend to be nonstationary - at least early in a new product's life - with the purchase rate declining (towards an equilibrium level) over time. One way to capture this pattern is to assume that, for a given cohort, the number of people making zero purchases in a given week grows (at a decreasing rate), which means that the observed average number of units purchased decreases over time.
+
+Our submodel for the distribution of $R_{w \mid i}$ is based on the following three assumptions:
+
+**Assumption 1**:
+
+- In week $w$, existing customers are either out of the market, i.e., definitely not going to make a repeat purchase that week, or a possible repeat buyer. (The notion that someone is a "possible repeat buyer" does not ensure that she will actually purchase any units that week; it merely conveys the fact that she will consider purchasing with some non-zero probability.) The probability of a week $i$ trialist being out of the market in week $w$, which we denote by $\pi_{w \mid i}$, is assumed to be governed by the following time-dependent distribution:
+
+$$
+\pi_{w|i} = 1 - \gamma (w - i)^\delta, \quad w > i
+$$
+
+- When $\alpha < 0, \pi_{w \mid i}$ grows at a decreasing rate as $w − i$ increases; consequently, the number of week $i$ triers making zero purchases in week $w$ increases over time. Likewise, $\delta$ can also be positive, allowing for the possibility that the number of repeat buyers actually increases over time. (Note that while this fraction $\pi_{w \mid i}$ of buyers is definitely not going to make a repeat purchase in week $w$, we are not assuming that they are permanently out of the
+market, i.e., they may consider buying again in future weeks.)
+
+**Assumption 2**:
+
+- For an individual who has been classified as a "possible repeat buyer" in week $w$, the number of units purchased, $R_{w}$, is distributed according to a geometric distribution with parameter $q_{R}$ and probability mass function
+
+$$
+P(R_w = x \mid q_R) = q_R (1 - q_R)^x, \quad x = 0, 1, \ldots; \quad 0 < q_R < 1
+$$
+
+**Assumption 3**:
+
+- $q_R$ is distributed across the population according to a beta distribution with parameters $\alpha_R$ and $\beta_R$, and pdf
+
+$$ 
+g(q_R) = \frac{1}{B(\alpha_R, \beta_R)} q_R^{\alpha_R - 1} (1 - q_R)^{\beta_R - 1}, \quad 0 < q_R < 1; \; \alpha_R, \beta_R > 0
+$$
+
+Qualitatively, the same type of "coin-flipping" story as discussed earlier for the trial submodel applies here as well. Note, however, that there are two differences. First, there is no longer a truncation at zero, i.e., the first coin-flip determines whether a "possible repeat buyer" actually chooses to purchase one unit (or more). Second, the stopping probability (P("heads")) is governed by a different beta distribution than that used for the trial purchasing process.
+
+It follows that the aggregate distribution of the number of units purchased in week $w$ by a week $i$ trialist $(w > i)$ is given by:
+$$
+\begin{align*}
+P(R_{w \mid i} = x) &= \delta_{x=0} \pi_{w \mid i} + (1 - \pi_{w \mid i}) \int_0^1 P(R_w = x \mid q_R) g(q_R) \, dq_R \\
+&= \delta_{x=0} \pi_{w \mid i} + (1 - \pi_{w \mid i}) \frac{B(\alpha_R + 1, \beta_R + x)}{B(\alpha_R, \beta_R)},
+\end{align*}
+$$
+
+where $\delta_{x=0}$, the Kronecker delta, equals $1$ if $x = 0$, and $0$ otherwise. We call this the "time-dependent, zero-inflated beta-geometric" distribution. The mean of this distribution is 
+
+$$
+E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
+$$
+
+*Week 1 Trial Model*
+
+As a refresher (or primer) on estimating the parameters of a basic probability model using SciPy, let us consider fitting the trial submodel to the week 1 data. The column of data in `TableOne` corresponding to week 1 presents *trial-week-only* purchases by a group of 1574 customers. Our goal is to fit the following shifted beta-geometric model to these data:
+
+$$
+\begin{aligned}
+P(T_{w} = x) &= \int^{1}_{0}P(T_{w} = x \mid q_{T})g(q_{T})dq_{T} \\
+    &=\begin{cases}
+    \frac{B(\alpha_{T} + 1,\beta_{T} + x - 1)}{B(\alpha_{T}+1,\beta_{T})} &\quad x=1,2,\ldots \\
+    0 &\quad x=0 \\
+    \end{cases}
+\end{aligned}
+$$
+
+The shifted beta-geometric probabilities can be computed by recursion using the expressions:
+
+$$
+\begin{aligned}
+P(T_{w} = x) &= \begin{cases}
+                    0 &\quad x=0 \\
+                    \frac{\alpha_{T}}{\alpha_{T} + \beta_{T}} &\quad x=1\\
+                    \frac{\beta_{T} + x - 2}{\alpha_{T} + \beta_{T} + x -1} P(T_{w}=x-1) &\quad x\ge 2 \\
+                \end{cases}
+\end{aligned}
+$$
+
+The probability of making 10+ purchases in a trial week is simply:
+
+$$
+1-\sum^{9}_{x=1}P(T_{1}=x)
+$$
+
+The shifted beta-geometric model has two parameters, $\alpha_{T}$ and $\beta_{T}$ . Maximum likelihood estimates of these two model parameters are found by maximizing the following log-likelihood function: 
+
+$$
+LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1x}\right)\ln\left[1-\sum^{9}_{x=1}P(T_{1}=x)\right]
+$$
+
+Where $n_{1}$ is the total number of triers in week 1 (1574) and $n_{1x}$ is the number of people making $x$ purchases in week 1.
+
+```{python}
+#| code-fold: false
+def trial_parameters(n1x, guess=[1,1]):
+    
+    def log_likelihood(x):
+        alpha_T, beta_T = x[0], x[1]
+        
+        # Shifted beta-geometric probabilities of making x purchases
+        p_t_1x = np.zeros(n1x.shape)
+        p_t_1x[0], p_t_1x[1] = 0, alpha_T / (alpha_T + beta_T)
+        x = np.arange(2, len(n1x)-1)
+        p_t_1x[2:len(n1x)-1] = (beta_T + x - 2) / (alpha_T + beta_T + x - 1)
+        p_t_1x[1:len(n1x)-1] = np.cumprod(p_t_1x[1:len(n1x)-1])
+        p_t_1x[-1] = 1 - np.sum(p_t_1x[:-1])     
+
+        return -np.sum(np.log(p_t_1x, where=p_t_1x != 0) * n1x) 
+    
+    return minimize(log_likelihood, guess, bounds=[(0, np.inf), (0, np.inf)])
+```
+
+```{python}
+#| code-fold: false
+n1x = TableOne['1'].to_numpy()
+
+result = trial_parameters(n1x)
+alpha_T, beta_T, ll = result.x[0], result.x[1], result.fun
+
+w1_alpha_T, w1_beta_T = alpha_T, beta_T
+
+display_markdown(f'''$\\alpha_{{T}}$ = {alpha_T:0.4f}
+
+$\\beta_{{T}}$ = {beta_T:0.4f}
+
+Log-Likelihood = {-ll:0.4f}''', raw=True)
+```
+
+*Chi-Squared Goodness of Fit Test*
+
+We first have to compute the expected number of people buying $1, 2, \ldots , 9, 10+$ units in their trial week. We have:
+
+$$
+E(n_{1x})=1574\times P(T_{1}=x)
+$$
+
+The chi-squared goodness of fit test statistic is computed as:
+
+$$
+\chi^{2}=\sum^{10+}_{x=1}\frac{\left[n_{1x}-E(n_{1x})\right]^{2}}{E(n_{1x})}
+$$
+
+```{python}
+p_t_1x = np.zeros(n1x.shape)
+p_t_1x[0], p_t_1x[1] = 0, alpha_T / (alpha_T + beta_T)
+x = np.arange(2, len(n1x)-1)
+p_t_1x[2:len(n1x)-1] = (beta_T + x - 2) / (alpha_T + beta_T + x - 1)
+p_t_1x[1:len(n1x)-1] = np.cumprod(p_t_1x[1:len(n1x)-1])
+p_t_1x[-1] = 1 - np.sum(p_t_1x[:-1])     
+
+n1 = weeklytriers.filter(pl.col('Week') == 1).select('Incremental Triers').collect().item(0,0) 
+E_n1x = p_t_1x * n1
+chi_square = np.sum(np.divide((n1x - E_n1x)**2, E_n1x, where=E_n1x != 0))
+
+df = 7
+critical_value = chi2.ppf(0.95, df=df)
+
+display_markdown(f'''$E_{{n_{{1x}}}}$ = {np.round(E_n1x[1:],1)}
+
+$\\chi^{{2}}$ = {chi_square:0.4f}
+
+Degrees of freedom = {df}
+
+Critical Value = {critical_value:0.4f}''', raw=True)
+```
+
+As the value of the sample test statistic is less than the critical value, we conclude that the shifted beta-geometric distribution adequately fits the data.
+
+```{python}
+w1_trial_df = pl.DataFrame({'Number of Units Purchased':np.arange(1,11), 'Observed': n1x[1:], 'Expected': E_n1x[1:]})
+w1_trial_df = w1_trial_df.unpivot(on=['Observed', 'Expected'], index='Number of Units Purchased', variable_name='Legend' , value_name='Frequency')
+
+ChartTemp(w1_trial_df).mark_bar().encode(
+    x=alt.X('Number of Units Purchased:O', axis=alt.Axis(labelAngle=0)),
+    y='Frequency:Q',
+    color='Legend:N',
+    xOffset='Legend:N'
+).line_prop('Fit of Week 1 Trial Model')
+```
+
+*Calibrating the Full Model*
+
+We now turn our attention to the task of estimating the parameters of the full model. Our goal is to construct the following log-likelihood function:
+
+$$
+\begin{align*}
+LL= & \sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1x}\right)\ln\left[1-\sum^{9}_{x=1}P(T_{1}=x)\right] + \\
+& \sum^{12}_{w=2} \Biggl\{\sum^{9}_{x=0}n_{wx} \ln[P(X_{w}=x)] + \left(n_{w} - \sum^{9}_{x=0}n_{wx}\right) \ln\left[1-\sum^{9}_{x=0}P(X_{w}=x)\right] \Biggr\}
+\end{align*}
+$$
+
+where $n_{wx}$ is the number of people making $x$ purchases in week $w$.
+
+At the heart of this log-likelihood function is $P(X_{w} = x)$, the probability that an eligible customer purchases $x$ units in week $w$, as given in the equation:
+
+$$
+P(X_{w} = x)=\frac{1}{\sum^{w}_{i=1}n_{i}} \Biggl[n_{w}P(T_{w}=x) + \sum^{w-1}_{i=1}n_{i}P(R_{w\mid i}=x)\Biggr]
+$$
+
+The aggregate distribution of the number of units purchased in week $w$ by a week $i$ trialist $(w \gt i)$ is given by:
+
+$$
+\begin{align*}
+P(R_{w \mid i} = x) &= \delta_{x=0} \pi_{w \mid i} + (1 - \pi_{w \mid i}) \int_0^1 P(R_w = x \mid q_R) g(q_R) \, dq_R \\
+&= \delta_{x=0} \pi_{w \mid i} + (1 - \pi_{w \mid i}) \frac{B(\alpha_R + 1, \beta_R + x)}{B(\alpha_R, \beta_R)},
+\end{align*}
+$$
+
+where $\delta_{x=0}$, the Kronecker delta, equals $1$ if $x = 0$, and $0$ otherwise. We call this the "time-dependent, zero-inflated beta-geometric" distribution.
+
+Probabilities associated with the "time dependent, zero-inflated beta-geometric" distribution can be computed using the following forward recursive relationship:
+
+$$
+P(R_{w \mid i} = x) =
+\begin{cases}
+1 - \gamma(w - i)^\delta \left( \frac{\beta_R}{\alpha_R + \beta_R} \right), & x = 0 \\[10pt]
+\gamma(w - i)^\delta \frac{\alpha_R \beta_R}{(\alpha_R + \beta_R)(\alpha_R + \beta_R + 1)}, & x = 1 \\[10pt]
+\frac{\beta_R + x - 1}{\alpha_R + \beta_R + x} P(R_{w \mid i} = x - 1), & x \geq 2
+\end{cases}
+$$
+
+However, rather than directly use the recursive relationship given in the equation above, we take the following apporach. We first compute the probability that a week 1 trier is a "possible repeat buyer" in weeks 2-12 using $\gamma(w-1)^{\delta}$.
+
+Next we need to create the expressions for the beta-geometric probabilities of making $x$ purchases $(x = 0, 1, \ldots , 9, 10+)$, given $\alpha_R$ and $\beta_R$, for someone who is a “possible repeat buyer”. The beta-geometric probabilities can be computed using the following recursive relationship:
+
+$$
+P(R = x \mid \text{possible repeat buyer}) =
+\begin{cases}
+\frac{\alpha_R}{\alpha_R + \beta_R}, & x = 0 \\[10pt]
+\frac{\beta_R + x - 1}{\alpha_R + \beta_R + x} P(R = x - 1), & x \ge 1 \\[10pt]
+\end{cases}
+$$
+
+The probability of a "possible repeat buyer" making 10+ purchases is simply $1 - \sum^{9}_{x=0} P(R=x)$.
+
+As the sample data are in the form of a table documenting the number of people purchasing $0, 1, \ldots , 9, 10+$ units (CDs) for each of the 12 weeks, we need to create a table that gives us $P(X_w = x), x = 0, 1, \ldots , 9, 10+$ and $w = 1, 2, \ldots 12$, given values of the six model parameters $(\alpha_T, \beta_T, \alpha_R, \beta_R, \gamma, \delta)$.
+
+We see that $P(X_w = x)$ is simply a weighted average of the week-of-trial-specific probabilities of purchasing $x$ units in week $w$. As an intermediate step, we build twelve tables that give us the probability of purchasing $x$ units in week $w$, one for each trial week. These will then be aggregated and the log-likelihood created.
+
+```{python}
+#| code-fold: false
+def bg_parameters(distMAT, weeks, units_range, incr_triers, guesses=[0.01,0.01,0.01,0.01,0.01,0]):
+    
+    def log_likelihood(x):
+        alpha_T, beta_T, alpha_R, beta_R, gamma, delta = x
+        
+        # Weekly P(possible repeat buyer)
+        weekly_p_repeat = gamma * (weeks[1:] - 1)**delta
+        
+        # Distribution of repeat purchase volume (given possible repeat buyer)
+        p_dist_repeat = np.zeros(units_range.shape)
+        p_dist_repeat[0] = alpha_R / (alpha_R + beta_R)
+        p_dist_repeat[1:-1] = (beta_R + units_range[1:-1] - 1) / (alpha_R + beta_R + units_range[1:-1])
+        p_dist_repeat = np.cumprod(p_dist_repeat)
+        p_dist_repeat[-1] = 1 - np.sum(p_dist_repeat[:-1])
+
+        # Week n Triers
+        w_n_triers = p_dist_repeat.reshape(-1,1) * np.append([0], weekly_p_repeat)
+        w_n_triers[0,1:] =  1 -  weekly_p_repeat + weekly_p_repeat * p_dist_repeat[0]
+        w_n_triers[1,0] = alpha_T / (alpha_T + beta_T)
+        w_n_triers[2:-1,0] = (beta_T + distMAT[2:-1,0] - 2) / (alpha_T + beta_T + distMAT[2:-1,0] - 1)
+        w_n_triers[1:,0] = np.cumprod(w_n_triers[1:,0])
+        w_n_triers[-1,0] = 1 - np.sum(w_n_triers[:-1,0])        
+        
+        cum_triers = np.cumsum(incr_triers)
+
+        # P(X_{w} = x) - Weighted Probabilities
+        weight_probs = np.zeros_like(w_n_triers)
+        for i in range(w_n_triers.shape[0]):
+            for j in range(w_n_triers.shape[1]):
+                weight_probs[i,j] = np.sum(incr_triers[:j+1] * w_n_triers[i,j::-1]) / cum_triers[j]        
+        
+        # Log-Likelihood Computation
+        ll_components = distMAT[:,1:] * np.log(weight_probs, where=weight_probs > 0)
+        ll = np.sum(ll_components)        
+        
+        return -ll
+    
+    bnds = [(1e-5, np.inf) for _ in range(len(guesses)-1)] + [(-np.inf, np.inf)]
+    return minimize(log_likelihood, guesses, bounds=bnds)   
+```
+
+```{python}
+#| code-fold: false
+distMAT = TableOne.to_numpy()
+trial_weeks = np.array(TableOne.columns[1:], dtype=np.int32)
+units_range = np.arange(distMAT.shape[0])
+incr_triers = weeklytriers.select('Incremental Triers').collect().to_numpy().flatten()
+
+cum_triers = np.cumsum(incr_triers)
+
+result = bg_parameters(distMAT, trial_weeks, units_range, incr_triers)
+
+alpha_T, beta_T, alpha_R, beta_R, gamma, delta = result.x
+ll = result.fun
+
+allW_alpha_T, allW_beta_T = alpha_T, beta_T
+
+display_markdown(f'''$\\alpha_{{T}}$ = {alpha_T:0.4f}
+
+$\\beta_{{T}}$ = {beta_T:0.4f}
+
+$\\alpha_{{R}}$ = {alpha_R:0.4f}
+
+$\\beta_{{R}}$ = {beta_R:0.4f}
+
+$\\gamma$ = {gamma:0.4f}
+
+$\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll:0.6f}''', raw=True)
+```
+
+*Chi-Squared Goodness of Fit Test*
+
+We first have to compute the expected number of people buying $1, 2, \ldots , 9, 10+$ units in each week ($w=1,2,\ldots,12$). We have:
+
+$$
+E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
+$$
+
+where $\sum^w_{i=1}n_{i}$ is the number of eligible cohort members in week $w$.
+
+The chi-squared goodness of fit test statistic is computed as:
+
+$$
+\chi^2 = \sum_{x=1}^{10+} \frac{\left[ n_{1x} - E(n_{1x}) \right]^2}{E(n_{1x})}
++ \sum_{w=2}^{12} \sum_{x=0}^{10+} \frac{\left[ n_{wx} - E(n_{wx}) \right]^2}{E(n_{wx})}.
+$$
+
+```{python}
+# Weekly P(possible repeat buyer)
+weekly_p_repeat = gamma * (trial_weeks[1:] - 1)**delta
+
+# Distribution of repeat purchase volume (given possible repeat buyer)
+p_dist_repeat = np.zeros(units_range.shape)
+p_dist_repeat[0] = alpha_R / (alpha_R + beta_R)
+p_dist_repeat[1:-1] = (beta_R + units_range[1:-1] - 1) / (alpha_R + beta_R + units_range[1:-1])
+p_dist_repeat = np.cumprod(p_dist_repeat)
+p_dist_repeat[-1] = 1 - np.sum(p_dist_repeat[:-1])
+
+# Week n Triers
+w_n_triers = p_dist_repeat.reshape(-1,1) * np.append([0], weekly_p_repeat)
+w_n_triers[0,1:] =  1 -  weekly_p_repeat + weekly_p_repeat * p_dist_repeat[0]
+w_n_triers[1,0] = alpha_T / (alpha_T + beta_T)
+w_n_triers[2:-1,0] = (beta_T + distMAT[2:-1,0] - 2) / (alpha_T + beta_T + distMAT[2:-1,0] - 1)
+w_n_triers[1:,0] = np.cumprod(w_n_triers[1:,0])
+w_n_triers[-1,0] = 1 - np.sum(w_n_triers[:-1,0])
+
+# P(X_{w} = x) - Weighted Probabilities
+weight_probs = np.zeros_like(w_n_triers)
+for i in range(w_n_triers.shape[0]):
+    for j in range(w_n_triers.shape[1]):
+        weight_probs[i,j] = np.sum(incr_triers[:j+1] * w_n_triers[i,j::-1]) / cum_triers[j]
+
+# Log-Likelihood Computation
+ll_components = distMAT[:,1:] * np.log(weight_probs, where=weight_probs != 0)
+ll = np.sum(ll_components)
+
+# Expected Distribution of Sales
+e_distMAT = weight_probs * cum_triers
+
+# chi-squared goodness of fit test statistic
+chi_square = np.sum(np.divide((distMAT[:,1:] - e_distMAT)**2, e_distMAT, where=distMAT[:,1:]!=0))
+df = 113
+critical_value = chi2.ppf(0.95, df=df)
+```
+
+```{python}
+e_distTable = (
+    pl.DataFrame({'Quant': np.arange(11, dtype=np.int32)})
+    .hstack(pl.from_numpy(e_distMAT.astype(np.int32), schema=TableOne.columns[1:]))
+)
+
+(
+    GT(e_distTable, rowname_col='Quant')
+    .tab_header(title="Estimated Distribution of the Number of CDNOW Units Purchased", subtitle='First 12 Weeks')
+    .tab_stubhead('Units Purchased')
+    .fmt_integer()
+    .tab_spanner(label='Week', columns=[str(i) for i in range(1, 13)])
+    .opt_stylize()
+)
+```
+
+```{python}
+display_markdown(f'''$\\chi^{{2}}$ = {chi_square:0.4f}
+
+Degrees of freedom = {df}
+
+Critical Value = {critical_value:0.4f}''', raw=True)
+```
+
+As the value of the sample test statistic is less than the critical value, we conclude that the model adequately fits the data.
+
+## Sales Forecast
+
+$$
+E(N_w) =
+\begin{cases}
+n_w E(T_w) + \sum_{i=1}^{w-1} n_i E(R_{w \mid i}) & w \leq 12 \\
+\sum_{i=1}^{12} n_i E(R_{w\mid i}) & w > 12
+\end{cases}
+$$
+
+$$
+E(T_w) = \frac{\alpha_T + \beta_T - 1}{\alpha_T - 1}
+$$
+
+$$
+E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
+$$
+
+```{python}
+full_weeks = np.arange(52) + 1
+
+# expected number of units purchased in weeks 1–52 by any given week 1 trier 
+week_1_triers = np.zeros(full_weeks.shape[0])
+week_1_triers[0] = (alpha_T + beta_T - 1)/(alpha_T - 1) # expected number of units purchased in the trial week    
+week_1_triers[1:] = gamma * (full_weeks[1:] - 1)**delta * beta_R / (alpha_R - 1) # expected repeat sales, number of units purchased w−i weeks after trial
+
+# mean weekly unit purchases for any week i trier
+# expected total number of units sold in any given week is
+mean_weekly_unit_purchases = toeplitz(week_1_triers, r=np.zeros(trial_weeks.shape[0]))
+
+# estimate of weekly unit sales - expected total number of units sold in weeks 1–52
+e_weekly_sales = np.sum(incr_triers * mean_weekly_unit_purchases, axis=1)
+```
+
+```{python}
+# Without SciPy's Toeplitz Constructor
+rows = full_weeks.shape[0]
+cols = trial_weeks.shape[0]
+
+mean_weekly_unit_purchases = np.zeros((rows, cols))
+
+row_indices = np.arange(rows)[:, None]
+col_indices = np.arange(cols)[None, :]
+lag_mask = row_indices >= col_indices
+
+mean_weekly_unit_purchases[lag_mask] = week_1_triers[(row_indices - col_indices)[lag_mask]]
+e_weekly_sales = np.sum(incr_triers * mean_weekly_unit_purchases, axis=1)
+```
+
+```{python}
+e_total_sales = e_weekly_sales[:12]
+e_trial_sales = mean_weekly_unit_purchases.diagonal() * incr_triers
+e_repeat_sales = e_total_sales - e_trial_sales
+
+e_weekly_sales_df = pl.DataFrame({
+    'Week': trial_weeks, 
+    'Total Sales': e_total_sales, 
+    'Trial Sales': e_trial_sales, 
+    'Repeat Sales': e_repeat_sales})
+
+e_weekly_sales_df = e_weekly_sales_df.unpivot(index='Week', on=['Total Sales', 'Trial Sales', 'Repeat Sales'], variable_name='Estimated Sales', value_name='Sales')
+
+forecasted_chart = (
+    ChartTemp(e_weekly_sales_df)
+    .line_encode(y_col='Sales', y_title='Units Purchased',  color='Estimated Sales:N', x_range=12, dash=[4,4])
+)
+
+actual_chart = (
+    ChartTemp(weeklysalessplit_lf.collect())
+    .line_encode(y_col='Sales', y_title='Units Purchased',  color='Actual Sales:N', x_range=12)
+)
+
+chart = forecasted_chart + actual_chart
+
+layered_line_prop(chart=chart, title="Model Fit: Trial/Repeat Decomposition")
+```
+
+```{python}
+e_total_sales = e_weekly_sales
+e_trial_sales = np.zeros((full_weeks.shape[0]))
+e_trial_sales[:trial_weeks.shape[0]] = mean_weekly_unit_purchases.diagonal() * incr_triers
+e_repeat_sales = e_total_sales - e_trial_sales
+
+e_repeat_sales_df = pl.DataFrame({
+    'Week': full_weeks, 
+    'Repeat Sales': e_repeat_sales})
+
+forecasted_chart = (
+    ChartTemp(e_repeat_sales_df)
+    .line_encode(y_col='Repeat Sales', y_title='Units Purchased', x_range=52, dash=[4,4])
+)
+
+actual_chart = (
+    ChartTemp(weekly_repeat_df.filter(pl.col('Week') <= 52).collect())
+    .line_encode(y_col='Repeat Sales', y_title='Units Purchased', x_range=52)
+)
+
+chart = forecasted_chart + actual_chart
+
+layered_line_prop(chart, 'Forecast Weekly Repeat Sales')
+```
+
+```{python}
+e_cum_repeat_sales_df = (
+    e_repeat_sales_df
+    .with_columns((pl.col('Repeat Sales').cum_sum()/1000).alias('Cumulative Repeat Sales'))
+)
+
+cum_weekly_repeat_df = (
+    weekly_repeat_df
+    .filter(pl.col('Week') <= 52)
+    .sort('Week')
+    .with_columns((pl.col('Repeat Sales').cum_sum()/1000).alias('Cumulative Repeat Sales'))
+)
+
+forecasted_chart = (
+    ChartTemp(e_cum_repeat_sales_df)
+    .line_encode(y_col='Cumulative Repeat Sales', y_title='Units Purchased (000)', x_range=52, dash=[4,4])
+)
+
+actual_chart = (
+    ChartTemp(cum_weekly_repeat_df.collect())
+    .line_encode(y_col='Cumulative Repeat Sales', y_title='Units Purchased (000)', x_range=52)
+)
+
+chart = forecasted_chart + actual_chart
+
+layered_line_prop(chart, 'Cumulative Repeat Sales Forecast')
+```
+
+```{python}
+full_weeks = np.arange(78) + 1
+week_1_triers = np.zeros(78)
+week_1_triers[0] = (alpha_T + beta_T - 1)/(alpha_T - 1) # expected number of units purchased in the trial week    
+week_1_triers[1:] = gamma * (full_weeks[1:] - 1)**delta * beta_R / (alpha_R - 1) # expected repeat sales, number of units purchased w−i weeks after trial
+
+rows = full_weeks.shape[0]
+cols = trial_weeks.shape[0]
+
+mean_weekly_unit_purchases = np.zeros((rows, cols))
+
+row_indices = np.arange(rows)[:, None]
+col_indices = np.arange(cols)[None, :]
+lag_mask = row_indices >= col_indices
+
+mean_weekly_unit_purchases[lag_mask] = week_1_triers[(row_indices - col_indices)[lag_mask]]
+e_weekly_sales = np.sum(incr_triers * mean_weekly_unit_purchases, axis=1)
+
+e_trial_sales = np.zeros((full_weeks.shape[0]))
+e_trial_sales[:trial_weeks.shape[0]] = mean_weekly_unit_purchases.diagonal() * incr_triers
+e_repeat_sales = e_weekly_sales - e_trial_sales
+
+e_repeat_sales_df = pl.DataFrame({
+    'Week': full_weeks,
+    'Repeat Sales': e_repeat_sales})
+
+forecasted_chart = (
+    ChartTemp(e_repeat_sales_df)
+    .line_encode(y_col='Repeat Sales', y_title='Units Purchased', x_range=78, dash=[4,4])
+)
+
+actual_chart = (
+    ChartTemp(weekly_repeat_df.collect())
+    .line_encode(y_col='Repeat Sales', y_title='Units Purchased', x_range=78)
+)
+
+chart = forecasted_chart + actual_chart
+
+layered_line_prop(chart, 'Forecast Weekly Repeat Sales')
+```
+
+```{python}
+qt = np.linspace(beta.ppf(0, w1_alpha_T, w1_beta_T), beta.ppf(1, w1_alpha_T, w1_beta_T), 300)
+y_w1 = beta.pdf(qt, w1_alpha_T, w1_beta_T)
+y_w12 = beta.pdf(qt, allW_alpha_T, allW_beta_T)
+
+mean_w1, var_w1 = beta.stats(w1_alpha_T, w1_beta_T, moments='mv')
+mean_w1_comp = (w1_alpha_T)/(w1_alpha_T + w1_beta_T)
+mean_w12, var_w12 = beta.stats(allW_alpha_T, allW_beta_T, moments='mv')
+mean_w12_comp = (allW_alpha_T)/(allW_alpha_T + allW_beta_T)
+
+display_markdown(f'''**Week 1:**
+
+$\\alpha_{{T}}$ = {w1_alpha_T:0.4f}
+
+$\\beta_{{T}}$ = {w1_beta_T:0.4f}
+
+Mean = {mean_w1:0.3f}, Variance = {var_w1:0.3f}
+
+**All 12 Weeks:**
+
+$\\alpha_{{T}}$ = {allW_alpha_T:0.4f}
+
+$\\beta_{{T}}$ = {allW_beta_T:0.4f}
+
+Mean = {mean_w12:0.3f}, Variance = {var_w12:0.3f}''', raw=True)
+```
+
+```{python}
+qt_dist = pl.DataFrame({'qT': qt, 'Week 1 PDF': y_w1, 'All 12 Week PDF': y_w12})
+qt_dist = qt_dist.unpivot(on=['Week 1 PDF', 'All 12 Week PDF'], index='qT', variable_name='Week 1 Only vs All 12 Weeks', value_name='PDF')
+
+(
+    alt.Chart(qt_dist).mark_line()
+    .encode(x=alt.X('qT', title='qₜ'), 
+            y=alt.Y('PDF', title='f(qₜ)'), 
+            strokeDash='Week 1 Only vs All 12 Weeks:N')
+    .properties(
+            width=550,
+            height=250,
+            title='Distribution of qₜ: Week 1 Only vs. All 12 Weeks'
+        ).configure_view(stroke=None).configure_axisY(grid=False).configure_axisX(grid=False)         
+)
+```
+

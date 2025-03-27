@@ -30,7 +30,7 @@ format:
             href: https://github.com/abdullahau/customer-analytics/
         -   text: Quarto Markdown
             icon: file-code
-            href: https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd
+            href: https://github.com/abdullahau/customer-analytics/blob/main/DoR-Model.qmd
         html-math-method:
             method: mathjax
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

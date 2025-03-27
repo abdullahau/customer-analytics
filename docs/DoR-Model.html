@@ -3312,7 +3312,7 @@ bottom: -1.25;
   </ul></li>
   <li><a href="#extending-the-basic-model" id="toc-extending-the-basic-model" class="nav-link" data-scroll-target="#extending-the-basic-model"><span class="header-section-number">5</span> Extending the Basic Model</a></li>
   </ul>
-<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd"><i class="bi bi-file-code"></i>Quarto Markdown</a></li></ul></div></nav>
+<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/DoR-Model.qmd"><i class="bi bi-file-code"></i>Quarto Markdown</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
@@ -3380,7 +3380,7 @@ R(t)=\sum_{j=1}^{\infty} R_{j}(t)
 <h2 data-number="2" class="anchored" data-anchor-id="imports"><span class="header-section-number">2</span> Imports</h2>
 <section id="import-packages" class="level3" data-number="2.1">
 <h3 data-number="2.1" class="anchored" data-anchor-id="import-packages"><span class="header-section-number">2.1</span> Import Packages</h3>
-<div id="1c94695c" class="cell" data-execution_count="1">
+<div id="acad9951" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
@@ -3392,7 +3392,7 @@ R(t)=\sum_{j=1}^{\infty} R_{j}(t)
 <span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> display_markdown</span>
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>alt.renderers.enable(<span class="st">&quot;html&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="386">
+<div class="cell-output cell-output-display" data-execution_count="1">
 <pre><code>RendererRegistry.enable(&#39;html&#39;)</code></pre>
 </div>
 </div>
@@ -3402,7 +3402,7 @@ R(t)=\sum_{j=1}^{\infty} R_{j}(t)
 <p>“Kiwi Bubbles” is a masked name for a shelf-stable juice drink, aimed primarily at children, which is sold as a multipack with several single-serve containers bundled together. Prior to national launch, it underwent a year-long test conducted in two of IRI’s BehaviorScan markets. The file <code>kiwibubbles_tran.txt</code> contains purchasing data for the new product, drawn from 1300 panelists in Market 1 and 1499 panelists in Market 2.</p>
 <p>Each record in this file comprises five fields: <em>Panelist ID</em>, <em>Market</em>, <em>Week</em>, <em>Day</em>, and <em>Units</em>. The value of the Market field is either 1 or 2. The Week field gives us the week number in which the purchase occurred (the product was launched at the beginning of week 1), the Day field tells us the day of the week (1-7) in which the purchase occurred, and the Units field tells us how many units of the new product were purchased on that particular purchase occasion.</p>
 <p>We load this dataset into python. We see that there are a total of 857 transactions across the two markets during the year-long test.</p>
-<div id="323ed105" class="cell" data-execution_count="2">
+<div id="860a8bf3" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf <span class="op">=</span> pl.scan_csv(</span>
@@ -3418,7 +3418,7 @@ R(t)=\sum_{j=1}^{\infty} R_{j}(t)
 <span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    })</span>
 <span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>kiwi_lf.head().collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="387">
+<div class="cell-output cell-output-display" data-execution_count="2">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -3486,7 +3486,7 @@ white-space: pre-wrap;
 </div>
 </div>
 <p>To illustrate the process of creating a sales by depth-of-repeat summary from this raw transaction data, we will focus just on <strong>Market 2</strong>.</p>
-<div id="0da24874" class="cell" data-execution_count="3">
+<div id="02397a78" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2 <span class="op">=</span> (kiwi_lf.<span class="bu">filter</span>(pl.col(<span class="st">&#39;Market&#39;</span>) <span class="op">==</span> <span class="dv">2</span>).drop(<span class="st">&#39;Market&#39;</span>))</span>
@@ -3500,12 +3500,12 @@ white-space: pre-wrap;
 <section id="preliminaries" class="level3" data-number="3.1">
 <h3 data-number="3.1" class="anchored" data-anchor-id="preliminaries"><span class="header-section-number">3.1</span> Preliminaries</h3>
 <p>Let us consider the transaction history of panelist 20014. We note that this panelist made his/her trial purchase and first repeat purchase in week 4. Similarly, this panelist’s third and fourth repeat purchases occurred in week 7 . We also note that this panelist typically purchased several units of the product on any given purchase occasion.</p>
-<div id="b7975d2e" class="cell" data-execution_count="4">
+<div id="67892a4f" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2.<span class="bu">filter</span>(pl.col(<span class="st">&#39;ID&#39;</span>) <span class="op">==</span> <span class="dv">20014</span>).collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="389">
+<div class="cell-output cell-output-display" data-execution_count="4">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -3596,7 +3596,7 @@ white-space: pre-wrap;
 <h3 data-number="3.2" class="anchored" data-anchor-id="sec-raw_trans_summary"><span class="header-section-number">3.2</span> Creating a “Raw” Transactions Summary</h3>
 <p>The first thing we need to do is add a field that indicates the depth-of-repeat level associated with each record; i.e., is this a trial purchase <span class="math inline">\((\mathrm{DoR}=0)\)</span>, a first repeat purchase <span class="math inline">\((\mathrm{DoR}=1\)</span> ), a second repeat purchase ( <span class="math inline">\(\operatorname{DoR}=2\)</span> ), etc.</p>
 <p>This is a straightforward exercise. If the panelist ID associated with this record does not equal that of the previous record, we are dealing with a new panelist and we set the depth-of-repeat indicator to 0 . If the panelist ID associated with this record does equal that of the previous record, we are dealing with a repeat purchase by that panelist and we increment the depth-of-repeat indicator by 1.</p>
-<div id="69f0b7ac" class="cell" data-execution_count="5">
+<div id="b07561a0" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2 <span class="op">=</span> (</span>
@@ -3607,12 +3607,12 @@ white-space: pre-wrap;
 </details>
 </div>
 <p>The corresponding records for panelist 20014 are shown below with DoR indicator:</p>
-<div id="3e92adce" class="cell" data-execution_count="6">
+<div id="38664a1f" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2.<span class="bu">filter</span>(pl.col(<span class="st">&#39;ID&#39;</span>) <span class="op">==</span> <span class="dv">20014</span>).collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="391">
+<div class="cell-output cell-output-display" data-execution_count="6">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -3709,7 +3709,7 @@ white-space: pre-wrap;
 </div>
 <p>The next step is to perform aggregations to the data and create two type of the same data-frame: a <strong>long-form</strong> and <strong>wide-form</strong>.</p>
 <p>We want there to be 52 rows, one for each week of the test. It turns out, however, that this panel of 1499 households only purchased the test product in 49 weeks; no purchases occurred in weeks 25,39, and 41. How can we create a table that will contain zeros in the rows corresponding to these three weeks? We accomplish this by creating a dummy dataframe that contains the full range of combination of <code>Week</code> and <code>DoR</code>. There are should be a range of 1 to 52 weeks and a range of 0 to 11 depth-of-repeats. Next, we will join the aggregated dataframes of the main dataset with the dummy dataframe such that it preserves the size of the dummy dataframe and fills the empty combinations with <code>null</code> values.</p>
-<div id="2de4b605" class="cell" data-execution_count="7">
+<div id="a66cf3b2" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Week Range: 1 to 52, DoR Range: 0 to 11 (max(DoR) = 11)</span></span>
@@ -3738,7 +3738,7 @@ white-space: pre-wrap;
 </details>
 </div>
 <p>The wide-form is more intuitive and easy to visualize, it tells us how many trial, first repeat, etc. purchases (columns) occurred in each week (rows).</p>
-<div id="b0a02271" class="cell" data-execution_count="8">
+<div id="2754de62" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>agg_trans_wideform <span class="op">=</span> (</span>
@@ -4043,7 +4043,7 @@ white-space: pre-wrap;
 </div>
 <p>We note that there are no entries in the rows corresponding to weeks 25, 39, and 41. Over the year-long test, 139 of the 1499 panelists made at least one purchase of the new product, with a total of 306 purchase occasions. We also note that by the end of the year, one person had made eleven repeat purchases of the new product.</p>
 <p>A cleaned-up summary that reports these weekly transactions in cumulative form (i.e., <span class="math inline">\(T(t), R_{1}(t), R_{2}(t)\)</span>, etc.) is created created below:</p>
-<div id="84ababbf" class="cell" data-execution_count="9">
+<div id="1a5c7045" class="cell" data-execution_count="9">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>cum_trans_longform <span class="op">=</span> agg_trans_longform.with_columns(pl.col(<span class="st">&#39;Count&#39;</span>).cum_sum().over(<span class="st">&#39;DoR&#39;</span>).alias(<span class="st">&#39;Cum DoR&#39;</span>))</span>
@@ -4268,7 +4268,7 @@ white-space: pre-wrap;
 <section id="sec-raw_vol_summary" class="level3" data-number="3.3">
 <h3 data-number="3.3" class="anchored" data-anchor-id="sec-raw_vol_summary"><span class="header-section-number">3.3</span> Creating a “Raw” Sales Volume Summary</h3>
 <p>Having created a weekly transaction by depth-of-repeat level summary, it is extremely easy to create an equivalent <strong>sales volume</strong> (e.g., units) summary. Here, instead of counting IDs or length of aggregated dataframe as the value item, we sum <code>Units</code>. We note that a total of 396 units of the product were purchased (across the 306 purchase occasions).</p>
-<div id="8485a223" class="cell" data-execution_count="10">
+<div id="d5181f04" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>agg_vol <span class="op">=</span> (</span>
@@ -4291,7 +4291,7 @@ white-space: pre-wrap;
 <span id="cb11-18"><a href="#cb11-18" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="6e0c6303" class="cell" data-execution_count="11">
+<div id="15b6772d" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>agg_vol_wideform <span class="op">=</span> (</span>
@@ -4595,7 +4595,7 @@ white-space: pre-wrap;
 </div>
 </div>
 <p>A cleaned-up summary that reports these weekly transactions in cumulative form is created below. We note that a total of 161 units were purchased on the 139 trial purchase occasions, an average 1.16 units per trial purchase.</p>
-<div id="5aa05274" class="cell" data-execution_count="12">
+<div id="1e221cac" class="cell" data-execution_count="12">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>cum_vol_longform <span class="op">=</span> agg_vol_longform.with_columns(pl.col(<span class="st">&#39;Units&#39;</span>).cum_sum().over(<span class="st">&#39;DoR&#39;</span>).alias(<span class="st">&#39;Cum DoR&#39;</span>))</span>
@@ -4821,12 +4821,12 @@ white-space: pre-wrap;
 <h3 data-number="3.4" class="anchored" data-anchor-id="sec-raw_shifted_trans_summary"><span class="header-section-number">3.4</span> Creating a “Shifted” Transactions Summary</h3>
 <p>We now turn our attention to the task of creating a weekly transaction by depth-of-repeat level summary under the assumption that a customer can have only one transaction per week. In other words, a second purchase within a single week is “shifted” to the next week (i.e., coded as occurring in the following week).</p>
 <p>Referring back to panellist <code>20014</code>, the field that indicates the depth-of-repeat level associated with each record (DoR) is correct. What we need to do is makes some changes to the week field: we want the week associated with the first repeat purchase to be 5, and the week associated with the fourth repeat purchase to be 8. One solution would be to create a new week variable that equals the original week variable +1 if the week associated with the current record is the same as that of the previous record. But what if we have three purchases occurring in the same week?</p>
-<div id="2607ce49" class="cell" data-execution_count="13">
+<div id="3e17e029" class="cell" data-execution_count="13">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2.<span class="bu">filter</span>(pl.col(<span class="st">&#39;ID&#39;</span>) <span class="op">==</span> <span class="dv">20014</span>).collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="398">
+<div class="cell-output cell-output-display" data-execution_count="13">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -4921,12 +4921,12 @@ white-space: pre-wrap;
 </div>
 </div>
 </div>
-<div id="9fcc1760" class="cell" data-execution_count="14">
+<div id="b0b797de" class="cell" data-execution_count="14">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>kiwi_lf_m2.<span class="bu">filter</span>(pl.col(<span class="st">&#39;ID&#39;</span>) <span class="op">==</span> <span class="dv">20069</span>).collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="399">
+<div class="cell-output cell-output-display" data-execution_count="14">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -4981,7 +4981,7 @@ white-space: pre-wrap;
 </div>
 <p>To complicate matters, consider the transaction history of panelist 20069. This person’s trial and first repeat purchases occurred in the same week. We therefore change the week associated with the first repeat purchase from 18 to 19. But this creates another problem as this person’s second repeat purchase occurred in week 19. Having shifted the first repeat purchase to week 19, we have to shift the second repeat purchase to week 20.</p>
 <p>Our solution is to group each record by <code>ID</code> and pass all of an ID’s <code>Week</code> as an array to a custom defined function which iterates over the array to evaluates whether the array has repeating numbers. If there were purchases made in the same week, such that index <span class="math inline">\(i\)</span> and index <span class="math inline">\(i+1\)</span> are in the same week, <span class="math inline">\(i+1\)</span> is incremented by 1. The loop inside the defined function also ensures that we shift purchases encroached on by the shifting of previous purchases (such as the second repeat purchase for panelist 20069).</p>
-<div id="fb14c50d" class="cell" data-execution_count="15">
+<div id="1f83ca78" class="cell" data-execution_count="15">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>example_array <span class="op">=</span> np.array([<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">2</span>,<span class="dv">3</span>,<span class="dv">6</span>,<span class="dv">7</span>,<span class="dv">7</span>,<span class="dv">8</span>])</span>
@@ -4995,11 +4995,11 @@ white-space: pre-wrap;
 <span id="cb16-9"><a href="#cb16-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb16-10"><a href="#cb16-10" aria-hidden="true" tabindex="-1"></a>shift(example_array)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="400">
+<div class="cell-output cell-output-display" data-execution_count="15">
 <pre><code>array([1, 2, 3, 4, 6, 7, 8, 9])</code></pre>
 </div>
 </div>
-<div id="c4c55cb4" class="cell" data-execution_count="16">
+<div id="74e43f8d" class="cell" data-execution_count="16">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Method 1</span></span>
@@ -5034,7 +5034,7 @@ white-space: pre-wrap;
 <span id="cb18-30"><a href="#cb18-30" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-31"><a href="#cb18-31" aria-hidden="true" tabindex="-1"></a>shifted_lf.<span class="bu">filter</span>(pl.col(<span class="st">&#39;shWeek&#39;</span>) <span class="op">!=</span> pl.col(<span class="st">&#39;Week&#39;</span>)).collect()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="401">
+<div class="cell-output cell-output-display" data-execution_count="16">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -5141,7 +5141,7 @@ white-space: pre-wrap;
 </div>
 </div>
 <p>The next step is to create a table that tells us how many trial, first repeat, etc. purchases occurred in each week. We create a pivot table in which we use <code>shWeek</code> as the row field, <code>DoR</code> as the column field, and <code>ID</code> as the data item.</p>
-<div id="248b426d" class="cell" data-execution_count="17">
+<div id="9eff3e6b" class="cell" data-execution_count="17">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>week_range, dor_range <span class="op">=</span> np.meshgrid(np.arange(<span class="dv">1</span>, <span class="dv">53</span>, dtype<span class="op">=</span><span class="st">&#39;int16&#39;</span>), np.arange(<span class="dv">0</span>, <span class="dv">12</span>, dtype<span class="op">=</span><span class="st">&#39;uint16&#39;</span>))</span>
@@ -5168,7 +5168,7 @@ white-space: pre-wrap;
 <span id="cb19-22"><a href="#cb19-22" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="29a2823a" class="cell" data-execution_count="18">
+<div id="1466b4f9" class="cell" data-execution_count="18">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>sh_agg_trans_wideform <span class="op">=</span> (</span>
@@ -5470,7 +5470,7 @@ white-space: pre-wrap;
 </div>
 </div>
 </div>
-<div id="f3c19967" class="cell" data-execution_count="19">
+<div id="a915df07" class="cell" data-execution_count="19">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>sh_cum_trans_longform <span class="op">=</span> sh_agg_trans_longform.with_columns(pl.col(<span class="st">&#39;Count&#39;</span>).cum_sum().over(<span class="st">&#39;DoR&#39;</span>).alias(<span class="st">&#39;Cum DoR&#39;</span>))</span>
@@ -5788,7 +5788,7 @@ p_{j}=p_{\infty}\left(1-e^{-\gamma j}\right) \tag{10}
 </table>
 <p>Given these parameter estimates, we can first generate a forecast of trial, then a forecast of first repeat (conditional on the trial forecast), then a forecast of second repeat (conditional on the first-repeat forecast), and so on. For a forecast horizon of <span class="math inline">\(t_{f}\)</span> periods, we should (in theory) allow for up to <span class="math inline">\(t_{f}-1\)</span> levels of repeat <span class="math inline">\({ }^{1}\)</span>.</p>
 <p><span class="math inline">\({ }^{1}\)</span> Under the assumption that a customer can have only one transaction per unit of time, the earliest point in time a first repeat purchase can occur is period 2. Following this logic, the summation limit in (7) should really be <span class="math inline">\(t-1\)</span>, not <span class="math inline">\(\infty\)</span>.</p>
-<div id="ab150a8a" class="cell" data-execution_count="20">
+<div id="01aa0817" class="cell" data-execution_count="20">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>modified_cum_trans <span class="op">=</span> (</span>
@@ -5803,7 +5803,7 @@ p_{j}=p_{\infty}\left(1-e^{-\gamma j}\right) \tag{10}
 <span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>modified_cum_trans</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="405">
+<div class="cell-output cell-output-display" data-execution_count="20">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -5912,7 +5912,7 @@ white-space: pre-wrap;
 </div>
 </div>
 </div>
-<div id="6c05c0c8" class="cell" data-execution_count="21">
+<div id="05125a72" class="cell" data-execution_count="21">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>actual_sales_curve <span class="op">=</span> (</span>
@@ -5923,25 +5923,25 @@ white-space: pre-wrap;
 <span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>actual_sales_curve.line_prop(<span class="st">&#39;Actual Cumulative Market Sales&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="406">
+<div class="cell-output cell-output-display" data-execution_count="21">
 
 <style>
-#altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46.vega-embed {
+#altair-viz-1d5fe825cc36431e9213c4b43d211a87.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46.vega-embed details,
-#altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46.vega-embed details summary {
+#altair-viz-1d5fe825cc36431e9213c4b43d211a87.vega-embed details,
+#altair-viz-1d5fe825cc36431e9213c4b43d211a87.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46"></div>
+<div id="altair-viz-1d5fe825cc36431e9213c4b43d211a87"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46") {
-      outputDiv = document.getElementById("altair-viz-d5c404c0f29e4173ab46fe70ed3c4c46");
+    if (outputDiv.id !== "altair-viz-1d5fe825cc36431e9213c4b43d211a87") {
+      outputDiv = document.getElementById("altair-viz-1d5fe825cc36431e9213c4b43d211a87");
     }
 
     const paths = {
@@ -5993,7 +5993,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="ec927e4f" class="cell" data-execution_count="22">
+<div id="2b654a0b" class="cell" data-execution_count="22">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6006,22 +6006,22 @@ position: relative;
 <div class="cell-output cell-output-display">
 
 <style>
-#altair-viz-a9dd4cc120af458cae237b2b8acba3d3.vega-embed {
+#altair-viz-e36be1df0c864202b22be1fe9d1323ed.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-a9dd4cc120af458cae237b2b8acba3d3.vega-embed details,
-#altair-viz-a9dd4cc120af458cae237b2b8acba3d3.vega-embed details summary {
+#altair-viz-e36be1df0c864202b22be1fe9d1323ed.vega-embed details,
+#altair-viz-e36be1df0c864202b22be1fe9d1323ed.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-a9dd4cc120af458cae237b2b8acba3d3"></div>
+<div id="altair-viz-e36be1df0c864202b22be1fe9d1323ed"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-a9dd4cc120af458cae237b2b8acba3d3") {
-      outputDiv = document.getElementById("altair-viz-a9dd4cc120af458cae237b2b8acba3d3");
+    if (outputDiv.id !== "altair-viz-e36be1df0c864202b22be1fe9d1323ed") {
+      outputDiv = document.getElementById("altair-viz-e36be1df0c864202b22be1fe9d1323ed");
     }
 
     const paths = {
@@ -6078,7 +6078,7 @@ position: relative;
 <h3 data-number="4.2" class="anchored" data-anchor-id="forecasting-trial"><span class="header-section-number">4.2</span> Forecasting Trial</h3>
 <p><strong>Modelling Objective</strong>:</p>
 <p>Using the purchasing data for the 101 households who had tried Kiwi Bubbles by the end of week 24, we wish to forecast the purchasing behavior of the whole panel (i.e., 1499 households) to the end of the year (week 52).</p>
-<div id="2b9d802c" class="cell" data-execution_count="23">
+<div id="0fe0042f" class="cell" data-execution_count="23">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6087,25 +6087,25 @@ position: relative;
 <span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Actual Test-Market Cumulative Trials&#39;</span>)</span>
 <span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="408">
+<div class="cell-output cell-output-display" data-execution_count="23">
 
 <style>
-#altair-viz-fc4ce8af29574748bd58112612fdfbbd.vega-embed {
+#altair-viz-b4861dc0c73b463486ddbed0f0c7a226.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-fc4ce8af29574748bd58112612fdfbbd.vega-embed details,
-#altair-viz-fc4ce8af29574748bd58112612fdfbbd.vega-embed details summary {
+#altair-viz-b4861dc0c73b463486ddbed0f0c7a226.vega-embed details,
+#altair-viz-b4861dc0c73b463486ddbed0f0c7a226.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-fc4ce8af29574748bd58112612fdfbbd"></div>
+<div id="altair-viz-b4861dc0c73b463486ddbed0f0c7a226"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-fc4ce8af29574748bd58112612fdfbbd") {
-      outputDiv = document.getElementById("altair-viz-fc4ce8af29574748bd58112612fdfbbd");
+    if (outputDiv.id !== "altair-viz-b4861dc0c73b463486ddbed0f0c7a226") {
+      outputDiv = document.getElementById("altair-viz-b4861dc0c73b463486ddbed0f0c7a226");
     }
 
     const paths = {
@@ -6215,7 +6215,7 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
 <p>-&gt; the “exponential w/ never triers” model</p>
 <section id="trial-model-parameter-estimate" class="level4" data-number="4.2.1">
 <h4 data-number="4.2.1" class="anchored" data-anchor-id="trial-model-parameter-estimate"><span class="header-section-number">4.2.1</span> Trial Model Parameter Estimate</h4>
-<div id="eb234756" class="cell" data-execution_count="24">
+<div id="84740162" class="cell" data-execution_count="24">
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> trial_model(trails: np.ndarray, weeks: np.ndarray, n: <span class="bu">int</span>, guess<span class="op">=</span>[<span class="fl">0.05</span>, <span class="fl">0.05</span>]):</span>
 <span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> least_square(x):</span>
@@ -6225,7 +6225,7 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
 <span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(least_square, guess, bounds<span class="op">=</span>[(<span class="dv">0</span>, np.inf), (<span class="dv">0</span>, np.inf)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="02738127" class="cell" data-execution_count="25">
+<div id="44aad52e" class="cell" data-execution_count="25">
 <div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>train_trial <span class="op">=</span> (</span>
 <span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    modified_cum_trans</span>
 <span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(pl.col(<span class="st">&#39;Week (t)&#39;</span>)<span class="op">&lt;=</span><span class="dv">24</span>)</span>
@@ -6253,7 +6253,7 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
 </section>
 <section id="forecasting-trial-transactions" class="level4" data-number="4.2.2">
 <h4 data-number="4.2.2" class="anchored" data-anchor-id="forecasting-trial-transactions"><span class="header-section-number">4.2.2</span> Forecasting Trial Transactions</h4>
-<div id="1d7f60ed" class="cell" data-execution_count="26">
+<div id="ecec0f9e" class="cell" data-execution_count="26">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>endwk <span class="op">=</span> <span class="dv">52</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -6261,7 +6261,7 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
 </div>
 <p>Our goal is to generate a (cumulative) sales forecast for the new product up to the end of the year (week 52). We start by generating a forecast of <span class="math inline">\(T(t)\)</span>, the cumulative number of trial transactions by <span class="math inline">\(t\)</span>, for <span class="math inline">\(t=1, \ldots, 52\)</span>.</p>
 <p>Given <span class="math inline">\(\hat{p}_{0}\)</span> and <span class="math inline">\(\hat{\theta}_{T}\)</span>, we evaluate expressions (1) and (2) by specifying the vector of time points <span class="math inline">\(t\)</span> (up to 52 weeks).</p>
-<div id="397c43d1" class="cell" data-execution_count="27">
+<div id="dfcc4383" class="cell" data-execution_count="27">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>t <span class="op">=</span> np.arange(<span class="dv">1</span>, endwk<span class="op">+</span><span class="dv">1</span>, <span class="dv">1</span>)</span>
@@ -6282,7 +6282,7 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
  124.34516386 124.64833557]</code></pre>
 </div>
 </div>
-<div id="d6bd3053" class="cell" data-execution_count="28">
+<div id="c3353ca7" class="cell" data-execution_count="28">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>forecast_df <span class="op">=</span> pl.DataFrame({</span>
@@ -6304,25 +6304,25 @@ P(\text{trail by } t) &amp;= P\left(T ≤ t\mid\text{ever trier}\right) × P\lef
 <span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>layered_line_prop(trial_chart, <span class="st">&#39;Cumulative Trial Forecast&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="413">
+<div class="cell-output cell-output-display" data-execution_count="28">
 
 <style>
-#altair-viz-52c769d7e78b4021bbb87fac76024bd6.vega-embed {
+#altair-viz-26bf7b6a357d494a89595bfdeeb389c4.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-52c769d7e78b4021bbb87fac76024bd6.vega-embed details,
-#altair-viz-52c769d7e78b4021bbb87fac76024bd6.vega-embed details summary {
+#altair-viz-26bf7b6a357d494a89595bfdeeb389c4.vega-embed details,
+#altair-viz-26bf7b6a357d494a89595bfdeeb389c4.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-52c769d7e78b4021bbb87fac76024bd6"></div>
+<div id="altair-viz-26bf7b6a357d494a89595bfdeeb389c4"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-52c769d7e78b4021bbb87fac76024bd6") {
-      outputDiv = document.getElementById("altair-viz-52c769d7e78b4021bbb87fac76024bd6");
+    if (outputDiv.id !== "altair-viz-26bf7b6a357d494a89595bfdeeb389c4") {
+      outputDiv = document.getElementById("altair-viz-26bf7b6a357d494a89595bfdeeb389c4");
     }
 
     const paths = {
@@ -6374,7 +6374,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="7e119bbe" class="cell" data-execution_count="29">
+<div id="f221f11b" class="cell" data-execution_count="29">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>trial_forecast_index <span class="op">=</span> forecast_df.select(<span class="st">&#39;T(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">/</span> modified_cum_trans.select(<span class="st">&#39;T(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">*</span> <span class="dv">100</span></span>
@@ -6389,7 +6389,7 @@ position: relative;
 </section>
 <section id="forecasting-first-repeat" class="level3" data-number="4.3">
 <h3 data-number="4.3" class="anchored" data-anchor-id="forecasting-first-repeat"><span class="header-section-number">4.3</span> Forecasting First-Repeat</h3>
-<div id="5d955d2c" class="cell" data-execution_count="30">
+<div id="4a255e29" class="cell" data-execution_count="30">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6398,25 +6398,25 @@ position: relative;
 <span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Actual Test-Market Cumulative First Repeat Sales&#39;</span>)</span>
 <span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="415">
+<div class="cell-output cell-output-display" data-execution_count="30">
 
 <style>
-#altair-viz-f6a72e73127b4f00bd9558b146055edf.vega-embed {
+#altair-viz-3674b59259aa4a2787f49b965d5d9f30.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-f6a72e73127b4f00bd9558b146055edf.vega-embed details,
-#altair-viz-f6a72e73127b4f00bd9558b146055edf.vega-embed details summary {
+#altair-viz-3674b59259aa4a2787f49b965d5d9f30.vega-embed details,
+#altair-viz-3674b59259aa4a2787f49b965d5d9f30.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-f6a72e73127b4f00bd9558b146055edf"></div>
+<div id="altair-viz-3674b59259aa4a2787f49b965d5d9f30"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-f6a72e73127b4f00bd9558b146055edf") {
-      outputDiv = document.getElementById("altair-viz-f6a72e73127b4f00bd9558b146055edf");
+    if (outputDiv.id !== "altair-viz-3674b59259aa4a2787f49b965d5d9f30") {
+      outputDiv = document.getElementById("altair-viz-3674b59259aa4a2787f49b965d5d9f30");
     }
 
     const paths = {
@@ -6475,7 +6475,7 @@ position: relative;
 F R(t)=\sum_{t_{0}=1}^{t-1} P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right)\times\left[T\left(t_{0}\right)-T\left(t_{0}-1\right)\right]
 \]</span></p>
 <p>where <span class="math inline">\(T\left(t_{0}\right)-T\left(t_{0}-1\right)\)</span> is the number of incremental tirers in week <span class="math inline">\(t_{0}\)</span>.</p>
-<div id="cb7fbf12" class="cell" data-execution_count="31">
+<div id="364adcfd" class="cell" data-execution_count="31">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>kiwi_trial_fr <span class="op">=</span> (</span>
@@ -6528,7 +6528,7 @@ F R(t)=\sum_{t_{0}=1}^{t-1} P\left(\text { first repeat by } t \mid \text { tria
 <span id="cb34-48"><a href="#cb34-48" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="df019a8d" class="cell" data-execution_count="32">
+<div id="8fe58f1f" class="cell" data-execution_count="32">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6537,25 +6537,25 @@ F R(t)=\sum_{t_{0}=1}^{t-1} P\left(\text { first repeat by } t \mid \text { tria
 <span id="cb35-4"><a href="#cb35-4" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Empirical Time-to-FR Curves by Time of Trial&#39;</span>)</span>
 <span id="cb35-5"><a href="#cb35-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="417">
+<div class="cell-output cell-output-display" data-execution_count="32">
 
 <style>
-#altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3.vega-embed {
+#altair-viz-041edde21d2947ae930a9f3143c3030e.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3.vega-embed details,
-#altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3.vega-embed details summary {
+#altair-viz-041edde21d2947ae930a9f3143c3030e.vega-embed details,
+#altair-viz-041edde21d2947ae930a9f3143c3030e.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3"></div>
+<div id="altair-viz-041edde21d2947ae930a9f3143c3030e"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3") {
-      outputDiv = document.getElementById("altair-viz-7a1f42a8b77948bca759b0e0f68b8ea3");
+    if (outputDiv.id !== "altair-viz-041edde21d2947ae930a9f3143c3030e") {
+      outputDiv = document.getElementById("altair-viz-041edde21d2947ae930a9f3143c3030e");
     }
 
     const paths = {
@@ -6619,7 +6619,7 @@ P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\
 \]</span></p>
 <section id="first-repeat-model-parameter-estimate" class="level4" data-number="4.3.1">
 <h4 data-number="4.3.1" class="anchored" data-anchor-id="first-repeat-model-parameter-estimate"><span class="header-section-number">4.3.1</span> First Repeat Model Parameter Estimate</h4>
-<div id="e36d274b" class="cell" data-execution_count="33">
+<div id="d8ff37eb" class="cell" data-execution_count="33">
 <div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> fr_model(fr: np.ndarray, eligible: np.ndarray, weeks: np.ndarray, guess<span class="op">=</span>[<span class="fl">0.05</span>, <span class="fl">0.05</span>]):</span>
 <span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> least_square(x):</span>
@@ -6636,7 +6636,7 @@ P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\
 <span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>        </span>
 <span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(least_square, guess, bounds<span class="op">=</span>[(<span class="dv">0</span>, np.inf), (<span class="dv">0</span>, np.inf)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="1a830486" class="cell" data-execution_count="34">
+<div id="7fa77840" class="cell" data-execution_count="34">
 <div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a>fr_array <span class="op">=</span> (</span>
 <span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>    modified_cum_trans</span>
 <span id="cb37-3"><a href="#cb37-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(pl.col(<span class="st">&#39;Week (t)&#39;</span>)<span class="op">&lt;=</span><span class="dv">24</span>)</span>
@@ -6665,14 +6665,14 @@ P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\
 <section id="forecasting-first-repeat-transactions" class="level4" data-number="4.3.2">
 <h4 data-number="4.3.2" class="anchored" data-anchor-id="forecasting-first-repeat-transactions"><span class="header-section-number">4.3.2</span> Forecasting First Repeat Transactions</h4>
 <p>The next step is to generate a forecast of first-repeat purchasing, <em>conditional on our forecast of trial transactions</em>. We have generated a forecast of <span class="math inline">\(T(t)\)</span>, the cumulative number of trial transactions by <span class="math inline">\(t\)</span>, whereas our expression for <span class="math inline">\(FR(t),(5)\)</span>, requires the incremental number of triers in each period. We compute this quantity, storing it in the array <code>eligible</code>. At time <span class="math inline">\(t\)</span>, we use (6) to compute the probability of making a first repeat purchase <span class="math inline">\(t\)</span> periods after a trial purchase <span class="math inline">\((t=1, \ldots, 52)\)</span>. Given these two quantities, we use (5) to compute <span class="math inline">\(FR(t)\)</span>.</p>
-<div id="738a6770" class="cell" data-execution_count="35">
+<div id="3ef1e657" class="cell" data-execution_count="35">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>repeat <span class="op">=</span> np.zeros((endwk, endwk<span class="op">-</span><span class="dv">1</span>))</span>
 <span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>probmat <span class="op">=</span> np.zeros((endwk, endwk))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="4b5fda87" class="cell" data-execution_count="36">
+<div id="821d6020" class="cell" data-execution_count="36">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>t_0 <span class="op">=</span> t.reshape(<span class="op">-</span><span class="dv">1</span>, <span class="dv">1</span>)</span>
@@ -6698,7 +6698,7 @@ P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\
  44.5443989  44.69509552 44.83640945 44.96892487]</code></pre>
 </div>
 </div>
-<div id="9de8b2a5" class="cell" data-execution_count="37">
+<div id="6570e5f4" class="cell" data-execution_count="37">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>forecast_df <span class="op">=</span> pl.DataFrame({</span>
@@ -6720,25 +6720,25 @@ P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\
 <span id="cb41-17"><a href="#cb41-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb41-18"><a href="#cb41-18" aria-hidden="true" tabindex="-1"></a>layered_line_prop(fr_chart, <span class="st">&#39;Cumulative First Repeat Forecast&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="422">
+<div class="cell-output cell-output-display" data-execution_count="37">
 
 <style>
-#altair-viz-069d90d20723452195e6001f234b5a43.vega-embed {
+#altair-viz-f315de3b943c4f2e869024f281af03de.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-069d90d20723452195e6001f234b5a43.vega-embed details,
-#altair-viz-069d90d20723452195e6001f234b5a43.vega-embed details summary {
+#altair-viz-f315de3b943c4f2e869024f281af03de.vega-embed details,
+#altair-viz-f315de3b943c4f2e869024f281af03de.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-069d90d20723452195e6001f234b5a43"></div>
+<div id="altair-viz-f315de3b943c4f2e869024f281af03de"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-069d90d20723452195e6001f234b5a43") {
-      outputDiv = document.getElementById("altair-viz-069d90d20723452195e6001f234b5a43");
+    if (outputDiv.id !== "altair-viz-f315de3b943c4f2e869024f281af03de") {
+      outputDiv = document.getElementById("altair-viz-f315de3b943c4f2e869024f281af03de");
     }
 
     const paths = {
@@ -6790,7 +6790,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="87bacc7b" class="cell" data-execution_count="38">
+<div id="87a6ad45" class="cell" data-execution_count="38">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>fr_forecast_index <span class="op">=</span> forecast_df.select(<span class="st">&#39;FR(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">/</span> modified_cum_trans.select(<span class="st">&#39;FR(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">*</span> <span class="dv">100</span></span>
@@ -6805,7 +6805,7 @@ position: relative;
 </section>
 <section id="forecasting-additional-repeat" class="level3" data-number="4.4">
 <h3 data-number="4.4" class="anchored" data-anchor-id="forecasting-additional-repeat"><span class="header-section-number">4.4</span> Forecasting Additional Repeat</h3>
-<div id="ab3faf89" class="cell" data-execution_count="39">
+<div id="83714945" class="cell" data-execution_count="39">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6814,25 +6814,25 @@ position: relative;
 <span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Actual Test-Market Cumulative Additional Repeat Sales&#39;</span>)</span>
 <span id="cb43-5"><a href="#cb43-5" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="424">
+<div class="cell-output cell-output-display" data-execution_count="39">
 
 <style>
-#altair-viz-2eca657f0cd84aaf88cca368d7454cf5.vega-embed {
+#altair-viz-fd73d529b72146f3be3a12e5d690b13f.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-2eca657f0cd84aaf88cca368d7454cf5.vega-embed details,
-#altair-viz-2eca657f0cd84aaf88cca368d7454cf5.vega-embed details summary {
+#altair-viz-fd73d529b72146f3be3a12e5d690b13f.vega-embed details,
+#altair-viz-fd73d529b72146f3be3a12e5d690b13f.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-2eca657f0cd84aaf88cca368d7454cf5"></div>
+<div id="altair-viz-fd73d529b72146f3be3a12e5d690b13f"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-2eca657f0cd84aaf88cca368d7454cf5") {
-      outputDiv = document.getElementById("altair-viz-2eca657f0cd84aaf88cca368d7454cf5");
+    if (outputDiv.id !== "altair-viz-fd73d529b72146f3be3a12e5d690b13f") {
+      outputDiv = document.getElementById("altair-viz-fd73d529b72146f3be3a12e5d690b13f");
     }
 
     const paths = {
@@ -6889,7 +6889,7 @@ position: relative;
 A R(t)= \sum_{j\ge2} R_{j}(t)
 \]</span></p>
 <p>where <span class="math inline">\(R_{j}(t)\)</span> is the cumulative number of individuals who have made at least <span class="math inline">\(j\)</span> repeat purchases by time <span class="math inline">\(t\)</span>. How do we characterize <span class="math inline">\(R_{j}(t)\)</span>, <span class="math inline">\(j = 2, 3, \ldots\)</span>?</p>
-<div id="e0402755" class="cell" data-execution_count="40">
+<div id="e124369e" class="cell" data-execution_count="40">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -6899,25 +6899,25 @@ A R(t)= \sum_{j\ge2} R_{j}(t)
 <span id="cb44-5"><a href="#cb44-5" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Cumulative Sales by Depth of Repeat Level&#39;</span>)</span>
 <span id="cb44-6"><a href="#cb44-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="425">
+<div class="cell-output cell-output-display" data-execution_count="40">
 
 <style>
-#altair-viz-15260ecfc87b4830b5b422d7fa6178ec.vega-embed {
+#altair-viz-b2023a46c68f46aca8232e5a0ae43661.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-15260ecfc87b4830b5b422d7fa6178ec.vega-embed details,
-#altair-viz-15260ecfc87b4830b5b422d7fa6178ec.vega-embed details summary {
+#altair-viz-b2023a46c68f46aca8232e5a0ae43661.vega-embed details,
+#altair-viz-b2023a46c68f46aca8232e5a0ae43661.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-15260ecfc87b4830b5b422d7fa6178ec"></div>
+<div id="altair-viz-b2023a46c68f46aca8232e5a0ae43661"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-15260ecfc87b4830b5b422d7fa6178ec") {
-      outputDiv = document.getElementById("altair-viz-15260ecfc87b4830b5b422d7fa6178ec");
+    if (outputDiv.id !== "altair-viz-b2023a46c68f46aca8232e5a0ae43661") {
+      outputDiv = document.getElementById("altair-viz-b2023a46c68f46aca8232e5a0ae43661");
     }
 
     const paths = {
@@ -6995,7 +6995,7 @@ p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
 \]</span></p>
 <section id="additional-repeat-model-parameter-estimate" class="level4" data-number="4.4.1">
 <h4 data-number="4.4.1" class="anchored" data-anchor-id="additional-repeat-model-parameter-estimate"><span class="header-section-number">4.4.1</span> Additional Repeat Model Parameter Estimate</h4>
-<div id="7cb7817c" class="cell" data-execution_count="41">
+<div id="a3608919" class="cell" data-execution_count="41">
 <div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> ar_model(ar, eligibles, weeks, j, guess<span class="op">=</span>[<span class="fl">0.5</span>, <span class="fl">0.5</span>, <span class="fl">0.5</span>]):</span>
 <span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> least_square(x):</span>
@@ -7017,7 +7017,7 @@ p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
 <span id="cb45-19"><a href="#cb45-19" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb45-20"><a href="#cb45-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(least_square, guess, bounds<span class="op">=</span>[(<span class="dv">0</span>,np.inf),(<span class="dv">0</span>,np.inf),(<span class="dv">0</span>,np.inf)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="875acef9" class="cell" data-execution_count="42">
+<div id="854e8dcc" class="cell" data-execution_count="42">
 <div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>mod_cum_ar_trans <span class="op">=</span> (</span>
 <span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>    sh_cum_trans_wideform</span>
 <span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>    .<span class="bu">filter</span>(pl.col(<span class="st">&#39;shWeek&#39;</span>) <span class="op">&lt;=</span> <span class="dv">24</span>)</span>
@@ -7053,7 +7053,7 @@ p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
 <section id="forecasting-additional-repeat-transactions" class="level4" data-number="4.4.2">
 <h4 data-number="4.4.2" class="anchored" data-anchor-id="forecasting-additional-repeat-transactions"><span class="header-section-number">4.4.2</span> Forecasting Additional Repeat Transactions</h4>
 <p>To forecast additional repeat, we first compute second repeat (conditional on our forecast of first repeat), then compute third repeat (conditional on our forecast of second repeat), and so on. The code we use to accomplish this is basically the same as that for first repeat, embedded within a loop over depth-of-repeat levels. Given the assumption that a customer can have only one transaction per period, we could theoretically have up to 51 depth-of-repeat levels for a 52-week forecast horizon. Another consequence of this assumption is that the first week in which a <span class="math inline">\(j\)</span> th repeat purchase could occur is week <span class="math inline">\(j+1\)</span>; this means <span class="math inline">\(R_{j}(t)=0\)</span> for <span class="math inline">\(t \leq j\)</span>.</p>
-<div id="6061c697" class="cell" data-execution_count="43">
+<div id="e51d99d3" class="cell" data-execution_count="43">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>j <span class="op">=</span> np.arange(<span class="dv">2</span>, endwk, <span class="dv">1</span>)</span>
@@ -7067,7 +7067,7 @@ p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
 <span id="cb47-9"><a href="#cb47-9" aria-hidden="true" tabindex="-1"></a>    repeat[:,DoR<span class="op">-</span><span class="dv">1</span>] <span class="op">=</span> p_ar.T <span class="op">@</span> eligibles</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="b10b8c34" class="cell" data-execution_count="44">
+<div id="adba0a4b" class="cell" data-execution_count="44">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb48"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb48-1"><a href="#cb48-1" aria-hidden="true" tabindex="-1"></a>est_cum_trans <span class="op">=</span> pl.DataFrame({</span>
@@ -7095,25 +7095,25 @@ p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
 <span id="cb48-23"><a href="#cb48-23" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb48-24"><a href="#cb48-24" aria-hidden="true" tabindex="-1"></a>layered_line_prop(combined_curve, <span class="st">&#39;Actual Vs. Predicted Cumulative Sales by Depth of Repeat Level&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="429">
+<div class="cell-output cell-output-display" data-execution_count="44">
 
 <style>
-#altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb.vega-embed {
+#altair-viz-dffc1f9d9b74498f9e31e6351564103e.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb.vega-embed details,
-#altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb.vega-embed details summary {
+#altair-viz-dffc1f9d9b74498f9e31e6351564103e.vega-embed details,
+#altair-viz-dffc1f9d9b74498f9e31e6351564103e.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb"></div>
+<div id="altair-viz-dffc1f9d9b74498f9e31e6351564103e"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb") {
-      outputDiv = document.getElementById("altair-viz-ab0c768f3ea947f39cc84cfd5705b0fb");
+    if (outputDiv.id !== "altair-viz-dffc1f9d9b74498f9e31e6351564103e") {
+      outputDiv = document.getElementById("altair-viz-dffc1f9d9b74498f9e31e6351564103e");
     }
 
     const paths = {
@@ -7165,7 +7165,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="0802c66d" class="cell" data-execution_count="45">
+<div id="d15bd8d3" class="cell" data-execution_count="45">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb49"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb49-1"><a href="#cb49-1" aria-hidden="true" tabindex="-1"></a>forecast_df <span class="op">=</span> pl.DataFrame({</span>
@@ -7187,25 +7187,25 @@ position: relative;
 <span id="cb49-17"><a href="#cb49-17" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb49-18"><a href="#cb49-18" aria-hidden="true" tabindex="-1"></a>layered_line_prop(ar_chart, <span class="st">&#39;Cumulative Additional Repeat Forecast&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="430">
+<div class="cell-output cell-output-display" data-execution_count="45">
 
 <style>
-#altair-viz-51301aca07374f54a9dacd076d6a2ea5.vega-embed {
+#altair-viz-63902d7b51324164ba02e9c3ec406f14.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-51301aca07374f54a9dacd076d6a2ea5.vega-embed details,
-#altair-viz-51301aca07374f54a9dacd076d6a2ea5.vega-embed details summary {
+#altair-viz-63902d7b51324164ba02e9c3ec406f14.vega-embed details,
+#altair-viz-63902d7b51324164ba02e9c3ec406f14.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-51301aca07374f54a9dacd076d6a2ea5"></div>
+<div id="altair-viz-63902d7b51324164ba02e9c3ec406f14"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-51301aca07374f54a9dacd076d6a2ea5") {
-      outputDiv = document.getElementById("altair-viz-51301aca07374f54a9dacd076d6a2ea5");
+    if (outputDiv.id !== "altair-viz-63902d7b51324164ba02e9c3ec406f14") {
+      outputDiv = document.getElementById("altair-viz-63902d7b51324164ba02e9c3ec406f14");
     }
 
     const paths = {
@@ -7257,7 +7257,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="02cb37ab" class="cell" data-execution_count="46">
+<div id="cb70d015" class="cell" data-execution_count="46">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb50"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb50-1"><a href="#cb50-1" aria-hidden="true" tabindex="-1"></a>ar_forecast_index <span class="op">=</span> forecast_df.select(<span class="st">&#39;AR(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">/</span> modified_cum_trans.select(<span class="st">&#39;AR(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">*</span> <span class="dv">100</span></span>
@@ -7272,7 +7272,7 @@ position: relative;
 </section>
 <section id="bringing-it-all-together" class="level3" data-number="4.5">
 <h3 data-number="4.5" class="anchored" data-anchor-id="bringing-it-all-together"><span class="header-section-number">4.5</span> Bringing It All Together</h3>
-<div id="778c6621" class="cell" data-execution_count="47">
+<div id="1492fda1" class="cell" data-execution_count="47">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb51"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb51-1"><a href="#cb51-1" aria-hidden="true" tabindex="-1"></a>display_markdown(<span class="ss">f&#39;&#39;&#39;Our forecast horizon is </span><span class="sc">{</span>endwk<span class="sc">}</span><span class="ss"> weeks and we allow for up to </span><span class="sc">{</span>endwk<span class="op">-</span><span class="dv">1</span><span class="sc">}</span><span class="ss"> level of repeats.</span></span>
@@ -7298,7 +7298,7 @@ position: relative;
 </div>
 </div>
 <p>We can now compute <span class="math inline">\(A R(t)=R_{2}(t)+\cdots+R_{52}(t)\)</span>, and print out our forecasts of <span class="math inline">\(T(t), F R(t), A R(t)\)</span>, and <span class="math inline">\(S(t)(=T(t)+F R(t)+A R(t))\)</span>.</p>
-<div id="d4403fee" class="cell" data-execution_count="48">
+<div id="d3d37be5" class="cell" data-execution_count="48">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb52"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb52-1"><a href="#cb52-1" aria-hidden="true" tabindex="-1"></a>ar <span class="op">=</span> np.<span class="bu">sum</span>(repeat[:,<span class="dv">1</span>:], axis<span class="op">=</span><span class="dv">1</span>)</span>
@@ -7314,7 +7314,7 @@ position: relative;
 <span id="cb52-11"><a href="#cb52-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb52-12"><a href="#cb52-12" aria-hidden="true" tabindex="-1"></a>forecast_df</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="433">
+<div class="cell-output cell-output-display" data-execution_count="48">
 <div><style>
 .dataframe > thead > tr,
 .dataframe > tbody > tr {
@@ -7423,7 +7423,7 @@ white-space: pre-wrap;
 </div>
 </div>
 </div>
-<div id="3a706153" class="cell" data-execution_count="49">
+<div id="e313e5e4" class="cell" data-execution_count="49">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb53"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb53-1"><a href="#cb53-1" aria-hidden="true" tabindex="-1"></a>forecasted_curve <span class="op">=</span> (</span>
@@ -7434,25 +7434,25 @@ white-space: pre-wrap;
 <span id="cb53-6"><a href="#cb53-6" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb53-7"><a href="#cb53-7" aria-hidden="true" tabindex="-1"></a>forecasted_curve.line_prop(<span class="st">&#39;Overall Sales Forecast for the Extended Model&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="434">
+<div class="cell-output cell-output-display" data-execution_count="49">
 
 <style>
-#altair-viz-3e01be9cf03d4eed921869dc928fdca8.vega-embed {
+#altair-viz-e29a7a379a164cf79a442365daf26be8.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-3e01be9cf03d4eed921869dc928fdca8.vega-embed details,
-#altair-viz-3e01be9cf03d4eed921869dc928fdca8.vega-embed details summary {
+#altair-viz-e29a7a379a164cf79a442365daf26be8.vega-embed details,
+#altair-viz-e29a7a379a164cf79a442365daf26be8.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-3e01be9cf03d4eed921869dc928fdca8"></div>
+<div id="altair-viz-e29a7a379a164cf79a442365daf26be8"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-3e01be9cf03d4eed921869dc928fdca8") {
-      outputDiv = document.getElementById("altair-viz-3e01be9cf03d4eed921869dc928fdca8");
+    if (outputDiv.id !== "altair-viz-e29a7a379a164cf79a442365daf26be8") {
+      outputDiv = document.getElementById("altair-viz-e29a7a379a164cf79a442365daf26be8");
     }
 
     const paths = {
@@ -7504,32 +7504,32 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="2e36127d" class="cell" data-execution_count="50">
+<div id="39ae0d36" class="cell" data-execution_count="50">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb54"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb54-1"><a href="#cb54-1" aria-hidden="true" tabindex="-1"></a>chart <span class="op">=</span> forecasted_curve <span class="op">+</span> actual_sales_curve</span>
 <span id="cb54-2"><a href="#cb54-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb54-3"><a href="#cb54-3" aria-hidden="true" tabindex="-1"></a>layered_line_prop(chart, <span class="st">&#39;Overall Sales Forecast for the Extended Model&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="435">
+<div class="cell-output cell-output-display" data-execution_count="50">
 
 <style>
-#altair-viz-a215dbfc0561449b928290381f2d75e2.vega-embed {
+#altair-viz-04a6240f480b448eb46c7324510833d7.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-a215dbfc0561449b928290381f2d75e2.vega-embed details,
-#altair-viz-a215dbfc0561449b928290381f2d75e2.vega-embed details summary {
+#altair-viz-04a6240f480b448eb46c7324510833d7.vega-embed details,
+#altair-viz-04a6240f480b448eb46c7324510833d7.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-a215dbfc0561449b928290381f2d75e2"></div>
+<div id="altair-viz-04a6240f480b448eb46c7324510833d7"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-a215dbfc0561449b928290381f2d75e2") {
-      outputDiv = document.getElementById("altair-viz-a215dbfc0561449b928290381f2d75e2");
+    if (outputDiv.id !== "altair-viz-04a6240f480b448eb46c7324510833d7") {
+      outputDiv = document.getElementById("altair-viz-04a6240f480b448eb46c7324510833d7");
     }
 
     const paths = {
@@ -7581,7 +7581,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="ad5f0c6e" class="cell" data-execution_count="51">
+<div id="b1980117" class="cell" data-execution_count="51">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb55"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb55-1"><a href="#cb55-1" aria-hidden="true" tabindex="-1"></a>trial_forecast_index <span class="op">=</span> forecast_df.select(<span class="st">&#39;T(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">/</span> modified_cum_trans.select(<span class="st">&#39;T(t)&#39;</span>).item(<span class="op">-</span><span class="dv">1</span>,<span class="dv">0</span>) <span class="op">*</span> <span class="dv">100</span></span>
@@ -7609,7 +7609,7 @@ position: relative;
 <section id="actual-vs-estimated-depth-of-repeat-curves" class="level5" data-number="4.5.0.1">
 <h5 data-number="4.5.0.1" class="anchored" data-anchor-id="actual-vs-estimated-depth-of-repeat-curves"><span class="header-section-number">4.5.0.1</span> Actual vs Estimated Depth-of-Repeat Curves</h5>
 <p><a id="depth_of_repeat_curve" href></a></p>
-<div id="019c3ea4" class="cell" data-execution_count="52">
+<div id="acd1f4e3" class="cell" data-execution_count="52">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb56"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb56-1"><a href="#cb56-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Step 1: Time Since Last Purchase (TSLP)</span></span>
@@ -7697,7 +7697,7 @@ position: relative;
 <span id="cb56-83"><a href="#cb56-83" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="e2bff8b0" class="cell" data-execution_count="53">
+<div id="b3a83d95" class="cell" data-execution_count="53">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb57"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb57-1"><a href="#cb57-1" aria-hidden="true" tabindex="-1"></a>actual_curve <span class="op">=</span> (</span>
@@ -7706,25 +7706,25 @@ position: relative;
 <span id="cb57-4"><a href="#cb57-4" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb57-5"><a href="#cb57-5" aria-hidden="true" tabindex="-1"></a>actual_curve.line_prop({<span class="st">&#39;text&#39;</span>: <span class="st">&#39;Depth-of-Repeat Curves&#39;</span>, <span class="st">&#39;subtitle&#39;</span>: <span class="st">&#39;Cumulative Proportion Repurchasing J Times (Out of Those Purchasing J - 1 Times)&#39;</span>})</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="438">
+<div class="cell-output cell-output-display" data-execution_count="53">
 
 <style>
-#altair-viz-c94d3aad91c24d63a69ff706907d7fba.vega-embed {
+#altair-viz-5256e49503714f40a0d5fbd6c67310bd.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-c94d3aad91c24d63a69ff706907d7fba.vega-embed details,
-#altair-viz-c94d3aad91c24d63a69ff706907d7fba.vega-embed details summary {
+#altair-viz-5256e49503714f40a0d5fbd6c67310bd.vega-embed details,
+#altair-viz-5256e49503714f40a0d5fbd6c67310bd.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-c94d3aad91c24d63a69ff706907d7fba"></div>
+<div id="altair-viz-5256e49503714f40a0d5fbd6c67310bd"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-c94d3aad91c24d63a69ff706907d7fba") {
-      outputDiv = document.getElementById("altair-viz-c94d3aad91c24d63a69ff706907d7fba");
+    if (outputDiv.id !== "altair-viz-5256e49503714f40a0d5fbd6c67310bd") {
+      outputDiv = document.getElementById("altair-viz-5256e49503714f40a0d5fbd6c67310bd");
     }
 
     const paths = {
@@ -7772,11 +7772,11 @@ position: relative;
         .catch(showError)
         .then(() => displayChart(vegaEmbed));
     }
-  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "data": {"name": "data-64bf53e1329036a5b87c1d88c6aec465"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}, "height": 250, "title": {"text": "Depth-of-Repeat Curves", "subtitle": "Cumulative Proportion Repurchasing J Times (Out of Those Purchasing J - 1 Times)"}, "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-64bf53e1329036a5b87c1d88c6aec465": [{"DoR": 1, "TSLP": 1, "Eligible": 101, "Weights": 10.0, "Prob Purch": 0.09900990099009901}, {"DoR": 3, "TSLP": 1, "Eligible": 22, "Weights": 4.0, "Prob Purch": 0.18181818181818182}, {"DoR": 2, "TSLP": 1, "Eligible": 35, "Weights": 6.0, "Prob Purch": 0.17142857142857143}, {"DoR": 4, "TSLP": 1, "Eligible": 12, "Weights": 2.0, "Prob Purch": 0.16666666666666666}, {"DoR": 1, "TSLP": 2, "Eligible": 101, "Weights": 16.0, "Prob Purch": 0.15841584158415842}, {"DoR": 2, "TSLP": 2, "Eligible": 35, "Weights": 9.0, "Prob Purch": 0.2571428571428571}, {"DoR": 3, "TSLP": 2, "Eligible": 22, "Weights": 5.0, "Prob Purch": 0.22727272727272727}, {"DoR": 4, "TSLP": 2, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 2, "TSLP": 3, "Eligible": 35, "Weights": 11.0, "Prob Purch": 0.3142857142857143}, {"DoR": 4, "TSLP": 3, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 1, "TSLP": 3, "Eligible": 101, "Weights": 18.0, "Prob Purch": 0.1782178217821782}, {"DoR": 3, "TSLP": 3, "Eligible": 22, "Weights": 7.0, "Prob Purch": 0.3181818181818182}, {"DoR": 1, "TSLP": 4, "Eligible": 101, "Weights": 21.0, "Prob Purch": 0.2079207920792079}, {"DoR": 4, "TSLP": 4, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 3, "TSLP": 4, "Eligible": 22, "Weights": 10.0, "Prob Purch": 0.45454545454545453}, {"DoR": 2, "TSLP": 4, "Eligible": 35, "Weights": 14.0, "Prob Purch": 0.4}, {"DoR": 3, "TSLP": 5, "Eligible": 22, "Weights": 11.0, "Prob Purch": 0.5}, {"DoR": 4, "TSLP": 5, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 2, "TSLP": 5, "Eligible": 35, "Weights": 16.0, "Prob Purch": 0.45714285714285713}, {"DoR": 1, "TSLP": 5, "Eligible": 101, "Weights": 25.0, "Prob Purch": 0.24752475247524752}, {"DoR": 1, "TSLP": 6, "Eligible": 101, "Weights": 27.0, "Prob Purch": 0.26732673267326734}, {"DoR": 4, "TSLP": 6, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 3, "TSLP": 6, "Eligible": 22, "Weights": 12.0, "Prob Purch": 0.5454545454545454}, {"DoR": 2, "TSLP": 6, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 2, "TSLP": 7, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 7, "Eligible": 12, "Weights": 6.0, "Prob Purch": 0.5}, {"DoR": 3, "TSLP": 7, "Eligible": 22, "Weights": 13.0, "Prob Purch": 0.5909090909090909}, {"DoR": 1, "TSLP": 7, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 2, "TSLP": 8, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 8, "Eligible": 12, "Weights": 7.0, "Prob Purch": 0.5833333333333334}, {"DoR": 3, "TSLP": 8, "Eligible": 22, "Weights": 14.0, "Prob Purch": 0.6363636363636364}, {"DoR": 1, "TSLP": 8, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 1, "TSLP": 9, "Eligible": 101, "Weights": 29.0, "Prob Purch": 0.2871287128712871}, {"DoR": 2, "TSLP": 9, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 9, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 9, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 3, "TSLP": 10, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 10, "Eligible": 35, "Weights": 21.0, "Prob Purch": 0.6}, {"DoR": 1, "TSLP": 10, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 10, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 4, "TSLP": 11, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 11, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 11, "Eligible": 35, "Weights": 22.0, "Prob Purch": 0.6285714285714286}, {"DoR": 1, "TSLP": 11, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 3, "TSLP": 12, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 12, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 12, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 12, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 4, "TSLP": 13, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 13, "Eligible": 101, "Weights": 32.0, "Prob Purch": 0.31683168316831684}, {"DoR": 2, "TSLP": 13, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 13, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 4, "TSLP": 14, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 14, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 1, "TSLP": 14, "Eligible": 101, "Weights": 34.0, "Prob Purch": 0.33663366336633666}, {"DoR": 3, "TSLP": 14, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 1, "TSLP": 15, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 3, "TSLP": 15, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 15, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 15, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 3, "TSLP": 16, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 2, "TSLP": 16, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 4, "TSLP": 16, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 16, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 2, "TSLP": 17, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 4, "TSLP": 17, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 17, "Eligible": 101, "Weights": 36.0, "Prob Purch": 0.3564356435643564}, {"DoR": 3, "TSLP": 17, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 1, "TSLP": 18, "Eligible": 101, "Weights": 38.0, "Prob Purch": 0.37623762376237624}, {"DoR": 3, "TSLP": 18, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 4, "TSLP": 18, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 18, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 2, "TSLP": 19, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 19, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 19, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 19, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 3, "TSLP": 20, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 20, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 20, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 4, "TSLP": 20, "Eligible": 12, "Weights": 10.0, "Prob Purch": 0.8333333333333334}, {"DoR": 1, "TSLP": 21, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 21, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 21, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 21, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 3, "TSLP": 22, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 22, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 22, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 22, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 4, "TSLP": 23, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 23, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 23, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 23, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 24, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 24, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 24, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 3, "TSLP": 24, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 25, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 25, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 25, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 2, "TSLP": 25, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 2, "TSLP": 26, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 3, "TSLP": 26, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 26, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 26, "Eligible": 101, "Weights": 42.0, "Prob Purch": 0.4158415841584158}]}}, {"mode": "vega-lite"});
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "data": {"name": "data-73e1394edc8dd0a327928f608c337ff0"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}, "height": 250, "title": {"text": "Depth-of-Repeat Curves", "subtitle": "Cumulative Proportion Repurchasing J Times (Out of Those Purchasing J - 1 Times)"}, "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-73e1394edc8dd0a327928f608c337ff0": [{"DoR": 2, "TSLP": 1, "Eligible": 35, "Weights": 6.0, "Prob Purch": 0.17142857142857143}, {"DoR": 1, "TSLP": 1, "Eligible": 101, "Weights": 10.0, "Prob Purch": 0.09900990099009901}, {"DoR": 3, "TSLP": 1, "Eligible": 22, "Weights": 4.0, "Prob Purch": 0.18181818181818182}, {"DoR": 4, "TSLP": 1, "Eligible": 12, "Weights": 2.0, "Prob Purch": 0.16666666666666666}, {"DoR": 3, "TSLP": 2, "Eligible": 22, "Weights": 5.0, "Prob Purch": 0.22727272727272727}, {"DoR": 4, "TSLP": 2, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 1, "TSLP": 2, "Eligible": 101, "Weights": 16.0, "Prob Purch": 0.15841584158415842}, {"DoR": 2, "TSLP": 2, "Eligible": 35, "Weights": 9.0, "Prob Purch": 0.2571428571428571}, {"DoR": 3, "TSLP": 3, "Eligible": 22, "Weights": 7.0, "Prob Purch": 0.3181818181818182}, {"DoR": 1, "TSLP": 3, "Eligible": 101, "Weights": 18.0, "Prob Purch": 0.1782178217821782}, {"DoR": 2, "TSLP": 3, "Eligible": 35, "Weights": 11.0, "Prob Purch": 0.3142857142857143}, {"DoR": 4, "TSLP": 3, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 2, "TSLP": 4, "Eligible": 35, "Weights": 14.0, "Prob Purch": 0.4}, {"DoR": 1, "TSLP": 4, "Eligible": 101, "Weights": 21.0, "Prob Purch": 0.2079207920792079}, {"DoR": 4, "TSLP": 4, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 3, "TSLP": 4, "Eligible": 22, "Weights": 10.0, "Prob Purch": 0.45454545454545453}, {"DoR": 3, "TSLP": 5, "Eligible": 22, "Weights": 11.0, "Prob Purch": 0.5}, {"DoR": 2, "TSLP": 5, "Eligible": 35, "Weights": 16.0, "Prob Purch": 0.45714285714285713}, {"DoR": 1, "TSLP": 5, "Eligible": 101, "Weights": 25.0, "Prob Purch": 0.24752475247524752}, {"DoR": 4, "TSLP": 5, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 4, "TSLP": 6, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 2, "TSLP": 6, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 3, "TSLP": 6, "Eligible": 22, "Weights": 12.0, "Prob Purch": 0.5454545454545454}, {"DoR": 1, "TSLP": 6, "Eligible": 101, "Weights": 27.0, "Prob Purch": 0.26732673267326734}, {"DoR": 2, "TSLP": 7, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 7, "Eligible": 12, "Weights": 6.0, "Prob Purch": 0.5}, {"DoR": 3, "TSLP": 7, "Eligible": 22, "Weights": 13.0, "Prob Purch": 0.5909090909090909}, {"DoR": 1, "TSLP": 7, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 4, "TSLP": 8, "Eligible": 12, "Weights": 7.0, "Prob Purch": 0.5833333333333334}, {"DoR": 2, "TSLP": 8, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 3, "TSLP": 8, "Eligible": 22, "Weights": 14.0, "Prob Purch": 0.6363636363636364}, {"DoR": 1, "TSLP": 8, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 3, "TSLP": 9, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 4, "TSLP": 9, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 9, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 1, "TSLP": 9, "Eligible": 101, "Weights": 29.0, "Prob Purch": 0.2871287128712871}, {"DoR": 4, "TSLP": 10, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 10, "Eligible": 35, "Weights": 21.0, "Prob Purch": 0.6}, {"DoR": 3, "TSLP": 10, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 10, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 2, "TSLP": 11, "Eligible": 35, "Weights": 22.0, "Prob Purch": 0.6285714285714286}, {"DoR": 4, "TSLP": 11, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 11, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 11, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 3, "TSLP": 12, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 12, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 1, "TSLP": 12, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 12, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 4, "TSLP": 13, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 13, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 13, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 13, "Eligible": 101, "Weights": 32.0, "Prob Purch": 0.31683168316831684}, {"DoR": 4, "TSLP": 14, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 14, "Eligible": 101, "Weights": 34.0, "Prob Purch": 0.33663366336633666}, {"DoR": 2, "TSLP": 14, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 14, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 15, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 15, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 2, "TSLP": 15, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 15, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 2, "TSLP": 16, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 16, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 3, "TSLP": 16, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 16, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 17, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 17, "Eligible": 101, "Weights": 36.0, "Prob Purch": 0.3564356435643564}, {"DoR": 4, "TSLP": 17, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 17, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 3, "TSLP": 18, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 18, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 18, "Eligible": 101, "Weights": 38.0, "Prob Purch": 0.37623762376237624}, {"DoR": 4, "TSLP": 18, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 19, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 19, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 19, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 19, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 20, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 20, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 20, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 20, "Eligible": 12, "Weights": 10.0, "Prob Purch": 0.8333333333333334}, {"DoR": 3, "TSLP": 21, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 21, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 21, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 21, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 22, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 22, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 22, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 3, "TSLP": 22, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 23, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 23, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 2, "TSLP": 23, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 23, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 4, "TSLP": 24, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 24, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 2, "TSLP": 24, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 24, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 2, "TSLP": 25, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 3, "TSLP": 25, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 25, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 4, "TSLP": 25, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 26, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 26, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 26, "Eligible": 101, "Weights": 42.0, "Prob Purch": 0.4158415841584158}, {"DoR": 3, "TSLP": 26, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}]}}, {"mode": "vega-lite"});
 </script>
 </div>
 </div>
-<div id="9385a5a1" class="cell" data-execution_count="54">
+<div id="96a40def" class="cell" data-execution_count="54">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb58"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb58-1"><a href="#cb58-1" aria-hidden="true" tabindex="-1"></a>p_j1 <span class="op">=</span> p_1 <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> np.exp(<span class="op">-</span>theta_FR <span class="op">*</span> (t[:<span class="dv">27</span>] <span class="op">-</span> <span class="dv">1</span>)))</span>
@@ -7795,25 +7795,25 @@ position: relative;
 <span id="cb58-14"><a href="#cb58-14" aria-hidden="true" tabindex="-1"></a>)</span>
 <span id="cb58-15"><a href="#cb58-15" aria-hidden="true" tabindex="-1"></a>estimated_curve.line_prop(<span class="st">&#39;Estimated Depth-of-Repeat Curves&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="439">
+<div class="cell-output cell-output-display" data-execution_count="54">
 
 <style>
-#altair-viz-101fb6528aca4cc4b925ef60e6a53094.vega-embed {
+#altair-viz-2c910e616dbf468ab6f08efad42f9ca2.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-101fb6528aca4cc4b925ef60e6a53094.vega-embed details,
-#altair-viz-101fb6528aca4cc4b925ef60e6a53094.vega-embed details summary {
+#altair-viz-2c910e616dbf468ab6f08efad42f9ca2.vega-embed details,
+#altair-viz-2c910e616dbf468ab6f08efad42f9ca2.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-101fb6528aca4cc4b925ef60e6a53094"></div>
+<div id="altair-viz-2c910e616dbf468ab6f08efad42f9ca2"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-101fb6528aca4cc4b925ef60e6a53094") {
-      outputDiv = document.getElementById("altair-viz-101fb6528aca4cc4b925ef60e6a53094");
+    if (outputDiv.id !== "altair-viz-2c910e616dbf468ab6f08efad42f9ca2") {
+      outputDiv = document.getElementById("altair-viz-2c910e616dbf468ab6f08efad42f9ca2");
     }
 
     const paths = {
@@ -7865,32 +7865,32 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="878f41ed" class="cell" data-execution_count="55">
+<div id="02c69e06" class="cell" data-execution_count="55">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb59"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb59-1"><a href="#cb59-1" aria-hidden="true" tabindex="-1"></a>combined_curve <span class="op">=</span> actual_curve <span class="op">+</span> estimated_curve</span>
 <span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>layered_line_prop(combined_curve, <span class="st">&#39;Actual Vs Estimated Depth-of-Repeat Curves&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="440">
+<div class="cell-output cell-output-display" data-execution_count="55">
 
 <style>
-#altair-viz-dc99453cf6e24e0fa02ae42941efc058.vega-embed {
+#altair-viz-3fa836432bb243628e384f0d206653c7.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-dc99453cf6e24e0fa02ae42941efc058.vega-embed details,
-#altair-viz-dc99453cf6e24e0fa02ae42941efc058.vega-embed details summary {
+#altair-viz-3fa836432bb243628e384f0d206653c7.vega-embed details,
+#altair-viz-3fa836432bb243628e384f0d206653c7.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-dc99453cf6e24e0fa02ae42941efc058"></div>
+<div id="altair-viz-3fa836432bb243628e384f0d206653c7"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-dc99453cf6e24e0fa02ae42941efc058") {
-      outputDiv = document.getElementById("altair-viz-dc99453cf6e24e0fa02ae42941efc058");
+    if (outputDiv.id !== "altair-viz-3fa836432bb243628e384f0d206653c7") {
+      outputDiv = document.getElementById("altair-viz-3fa836432bb243628e384f0d206653c7");
     }
 
     const paths = {
@@ -7938,7 +7938,7 @@ position: relative;
         .catch(showError)
         .then(() => displayChart(vegaEmbed));
     }
-  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-64bf53e1329036a5b87c1d88c6aec465"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}}, {"data": {"name": "data-b00a9445e3d0a8750a501e5fc1bf7ddb"}, "mark": {"type": "line", "strokeDash": [5, 3], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}}], "height": 250, "title": "Actual Vs Estimated Depth-of-Repeat Curves", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-64bf53e1329036a5b87c1d88c6aec465": [{"DoR": 1, "TSLP": 1, "Eligible": 101, "Weights": 10.0, "Prob Purch": 0.09900990099009901}, {"DoR": 3, "TSLP": 1, "Eligible": 22, "Weights": 4.0, "Prob Purch": 0.18181818181818182}, {"DoR": 2, "TSLP": 1, "Eligible": 35, "Weights": 6.0, "Prob Purch": 0.17142857142857143}, {"DoR": 4, "TSLP": 1, "Eligible": 12, "Weights": 2.0, "Prob Purch": 0.16666666666666666}, {"DoR": 1, "TSLP": 2, "Eligible": 101, "Weights": 16.0, "Prob Purch": 0.15841584158415842}, {"DoR": 2, "TSLP": 2, "Eligible": 35, "Weights": 9.0, "Prob Purch": 0.2571428571428571}, {"DoR": 3, "TSLP": 2, "Eligible": 22, "Weights": 5.0, "Prob Purch": 0.22727272727272727}, {"DoR": 4, "TSLP": 2, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 2, "TSLP": 3, "Eligible": 35, "Weights": 11.0, "Prob Purch": 0.3142857142857143}, {"DoR": 4, "TSLP": 3, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 1, "TSLP": 3, "Eligible": 101, "Weights": 18.0, "Prob Purch": 0.1782178217821782}, {"DoR": 3, "TSLP": 3, "Eligible": 22, "Weights": 7.0, "Prob Purch": 0.3181818181818182}, {"DoR": 1, "TSLP": 4, "Eligible": 101, "Weights": 21.0, "Prob Purch": 0.2079207920792079}, {"DoR": 4, "TSLP": 4, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 3, "TSLP": 4, "Eligible": 22, "Weights": 10.0, "Prob Purch": 0.45454545454545453}, {"DoR": 2, "TSLP": 4, "Eligible": 35, "Weights": 14.0, "Prob Purch": 0.4}, {"DoR": 3, "TSLP": 5, "Eligible": 22, "Weights": 11.0, "Prob Purch": 0.5}, {"DoR": 4, "TSLP": 5, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 2, "TSLP": 5, "Eligible": 35, "Weights": 16.0, "Prob Purch": 0.45714285714285713}, {"DoR": 1, "TSLP": 5, "Eligible": 101, "Weights": 25.0, "Prob Purch": 0.24752475247524752}, {"DoR": 1, "TSLP": 6, "Eligible": 101, "Weights": 27.0, "Prob Purch": 0.26732673267326734}, {"DoR": 4, "TSLP": 6, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 3, "TSLP": 6, "Eligible": 22, "Weights": 12.0, "Prob Purch": 0.5454545454545454}, {"DoR": 2, "TSLP": 6, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 2, "TSLP": 7, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 7, "Eligible": 12, "Weights": 6.0, "Prob Purch": 0.5}, {"DoR": 3, "TSLP": 7, "Eligible": 22, "Weights": 13.0, "Prob Purch": 0.5909090909090909}, {"DoR": 1, "TSLP": 7, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 2, "TSLP": 8, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 8, "Eligible": 12, "Weights": 7.0, "Prob Purch": 0.5833333333333334}, {"DoR": 3, "TSLP": 8, "Eligible": 22, "Weights": 14.0, "Prob Purch": 0.6363636363636364}, {"DoR": 1, "TSLP": 8, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 1, "TSLP": 9, "Eligible": 101, "Weights": 29.0, "Prob Purch": 0.2871287128712871}, {"DoR": 2, "TSLP": 9, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 9, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 9, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 3, "TSLP": 10, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 10, "Eligible": 35, "Weights": 21.0, "Prob Purch": 0.6}, {"DoR": 1, "TSLP": 10, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 10, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 4, "TSLP": 11, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 11, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 11, "Eligible": 35, "Weights": 22.0, "Prob Purch": 0.6285714285714286}, {"DoR": 1, "TSLP": 11, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 3, "TSLP": 12, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 12, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 12, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 12, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 4, "TSLP": 13, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 13, "Eligible": 101, "Weights": 32.0, "Prob Purch": 0.31683168316831684}, {"DoR": 2, "TSLP": 13, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 13, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 4, "TSLP": 14, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 14, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 1, "TSLP": 14, "Eligible": 101, "Weights": 34.0, "Prob Purch": 0.33663366336633666}, {"DoR": 3, "TSLP": 14, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 1, "TSLP": 15, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 3, "TSLP": 15, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 15, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 15, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 3, "TSLP": 16, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 2, "TSLP": 16, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 4, "TSLP": 16, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 16, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 2, "TSLP": 17, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 4, "TSLP": 17, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 17, "Eligible": 101, "Weights": 36.0, "Prob Purch": 0.3564356435643564}, {"DoR": 3, "TSLP": 17, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 1, "TSLP": 18, "Eligible": 101, "Weights": 38.0, "Prob Purch": 0.37623762376237624}, {"DoR": 3, "TSLP": 18, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 4, "TSLP": 18, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 18, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 2, "TSLP": 19, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 19, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 19, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 19, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 3, "TSLP": 20, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 20, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 20, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 4, "TSLP": 20, "Eligible": 12, "Weights": 10.0, "Prob Purch": 0.8333333333333334}, {"DoR": 1, "TSLP": 21, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 21, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 21, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 21, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 3, "TSLP": 22, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 22, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 22, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 22, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 4, "TSLP": 23, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 23, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 23, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 23, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 24, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 24, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 24, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 3, "TSLP": 24, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 25, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 25, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 25, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 2, "TSLP": 25, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 2, "TSLP": 26, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 3, "TSLP": 26, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 26, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 26, "Eligible": 101, "Weights": 42.0, "Prob Purch": 0.4158415841584158}], "data-b00a9445e3d0a8750a501e5fc1bf7ddb": [{"DoR": 1, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 1, "TSLP": 1, "Prob Purch": 0.13433496515603896}, {"DoR": 1, "TSLP": 2, "Prob Purch": 0.21902017390214767}, {"DoR": 1, "TSLP": 3, "Prob Purch": 0.27240601110426205}, {"DoR": 1, "TSLP": 4, "Prob Purch": 0.3060606204034524}, {"DoR": 1, "TSLP": 5, "Prob Purch": 0.32727659801925885}, {"DoR": 1, "TSLP": 6, "Prob Purch": 0.3406512208589669}, {"DoR": 1, "TSLP": 7, "Prob Purch": 0.349082627572517}, {"DoR": 1, "TSLP": 8, "Prob Purch": 0.3543978144021779}, {"DoR": 1, "TSLP": 9, "Prob Purch": 0.35774852585449085}, {"DoR": 1, "TSLP": 10, "Prob Purch": 0.3598608254963413}, {"DoR": 1, "TSLP": 11, "Prob Purch": 0.3611924262147147}, {"DoR": 1, "TSLP": 12, "Prob Purch": 0.36203187173562523}, {"DoR": 1, "TSLP": 13, "Prob Purch": 0.36256106098346347}, {"DoR": 1, "TSLP": 14, "Prob Purch": 0.3628946636450439}, {"DoR": 1, "TSLP": 15, "Prob Purch": 0.36310496787225227}, {"DoR": 1, "TSLP": 16, "Prob Purch": 0.36323754435642114}, {"DoR": 1, "TSLP": 17, "Prob Purch": 0.36332112101290526}, {"DoR": 1, "TSLP": 18, "Prob Purch": 0.36337380801507513}, {"DoR": 1, "TSLP": 19, "Prob Purch": 0.36340702207644615}, {"DoR": 1, "TSLP": 20, "Prob Purch": 0.363427960331183}, {"DoR": 1, "TSLP": 21, "Prob Purch": 0.3634411598765963}, {"DoR": 1, "TSLP": 22, "Prob Purch": 0.3634494809139181}, {"DoR": 1, "TSLP": 23, "Prob Purch": 0.3634547265235161}, {"DoR": 1, "TSLP": 24, "Prob Purch": 0.3634580333732503}, {"DoR": 1, "TSLP": 25, "Prob Purch": 0.36346011802231915}, {"DoR": 1, "TSLP": 26, "Prob Purch": 0.3634614321920243}, {"DoR": 2, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 2, "TSLP": 1, "Prob Purch": 0.13941978121689486}, {"DoR": 2, "TSLP": 2, "Prob Purch": 0.25008956562110607}, {"DoR": 2, "TSLP": 3, "Prob Purch": 0.3379379403149434}, {"DoR": 2, "TSLP": 4, "Prob Purch": 0.40767094809023613}, {"DoR": 2, "TSLP": 5, "Prob Purch": 0.46302419042779946}, {"DoR": 2, "TSLP": 6, "Prob Purch": 0.5069629438966641}, {"DoR": 2, "TSLP": 7, "Prob Purch": 0.5418410102007861}, {"DoR": 2, "TSLP": 8, "Prob Purch": 0.5695268094799291}, {"DoR": 2, "TSLP": 9, "Prob Purch": 0.5915034716905402}, {"DoR": 2, "TSLP": 10, "Prob Purch": 0.6089482879680012}, {"DoR": 2, "TSLP": 11, "Prob Purch": 0.6227957781845739}, {"DoR": 2, "TSLP": 12, "Prob Purch": 0.6337877532359724}, {"DoR": 2, "TSLP": 13, "Prob Purch": 0.6425130538963015}, {"DoR": 2, "TSLP": 14, "Prob Purch": 0.6494390950542513}, {"DoR": 2, "TSLP": 15, "Prob Purch": 0.6549369051571988}, {"DoR": 2, "TSLP": 16, "Prob Purch": 0.6593010022277713}, {"DoR": 2, "TSLP": 17, "Prob Purch": 0.6627651712122854}, {"DoR": 2, "TSLP": 18, "Prob Purch": 0.6655149878545846}, {"DoR": 2, "TSLP": 19, "Prob Purch": 0.6676977599999585}, {"DoR": 2, "TSLP": 20, "Prob Purch": 0.6694304188854021}, {"DoR": 2, "TSLP": 21, "Prob Purch": 0.6708057831531151}, {"DoR": 2, "TSLP": 22, "Prob Purch": 0.6718975311508275}, {"DoR": 2, "TSLP": 23, "Prob Purch": 0.6727641478853825}, {"DoR": 2, "TSLP": 24, "Prob Purch": 0.6734520580681211}, {"DoR": 2, "TSLP": 25, "Prob Purch": 0.6739981130895009}, {"DoR": 2, "TSLP": 26, "Prob Purch": 0.6744315651503309}, {"DoR": 3, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 3, "TSLP": 1, "Prob Purch": 0.15318060386531743}, {"DoR": 3, "TSLP": 2, "Prob Purch": 0.2747735676235138}, {"DoR": 3, "TSLP": 3, "Prob Purch": 0.37129263376129656}, {"DoR": 3, "TSLP": 4, "Prob Purch": 0.4479083345401313}, {"DoR": 3, "TSLP": 5, "Prob Purch": 0.5087249777249343}, {"DoR": 3, "TSLP": 6, "Prob Purch": 0.557000514601436}, {"DoR": 3, "TSLP": 7, "Prob Purch": 0.5953210686253192}, {"DoR": 3, "TSLP": 8, "Prob Purch": 0.6257394742135153}, {"DoR": 3, "TSLP": 9, "Prob Purch": 0.6498852472091595}, {"DoR": 3, "TSLP": 10, "Prob Purch": 0.6690518781447212}, {"DoR": 3, "TSLP": 11, "Prob Purch": 0.6842661246087419}, {"DoR": 3, "TSLP": 12, "Prob Purch": 0.6963430147124949}, {"DoR": 3, "TSLP": 13, "Prob Purch": 0.7059295081956286}, {"DoR": 3, "TSLP": 14, "Prob Purch": 0.7135391540988902}, {"DoR": 3, "TSLP": 15, "Prob Purch": 0.7195796016175692}, {"DoR": 3, "TSLP": 16, "Prob Purch": 0.7243744378937585}, {"DoR": 3, "TSLP": 17, "Prob Purch": 0.7281805225992988}, {"DoR": 3, "TSLP": 18, "Prob Purch": 0.7312017479240681}, {"DoR": 3, "TSLP": 19, "Prob Purch": 0.7335999610930345}, {"DoR": 3, "TSLP": 20, "Prob Purch": 0.7355036345319703}, {"DoR": 3, "TSLP": 21, "Prob Purch": 0.7370147481431394}, {"DoR": 3, "TSLP": 22, "Prob Purch": 0.7382142523748824}, {"DoR": 3, "TSLP": 23, "Prob Purch": 0.7391664047420734}, {"DoR": 3, "TSLP": 24, "Prob Purch": 0.7399222121051123}, {"DoR": 3, "TSLP": 25, "Prob Purch": 0.7405221631105475}, {"DoR": 3, "TSLP": 26, "Prob Purch": 0.7409983971703421}, {"DoR": 4, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 4, "TSLP": 1, "Prob Purch": 0.1582359083497569}, {"DoR": 4, "TSLP": 2, "Prob Purch": 0.28384171341718034}, {"DoR": 4, "TSLP": 3, "Prob Purch": 0.38354612584272973}, {"DoR": 4, "TSLP": 4, "Prob Purch": 0.4626903170828389}, {"DoR": 4, "TSLP": 5, "Prob Purch": 0.5255140462906936}, {"DoR": 4, "TSLP": 6, "Prob Purch": 0.575382784472728}, {"DoR": 4, "TSLP": 7, "Prob Purch": 0.6149680029757606}, {"DoR": 4, "TSLP": 8, "Prob Purch": 0.6463902843700262}, {"DoR": 4, "TSLP": 9, "Prob Purch": 0.6713329221868358}, {"DoR": 4, "TSLP": 10, "Prob Purch": 0.6911320950557439}, {"DoR": 4, "TSLP": 11, "Prob Purch": 0.7068484458752519}, {"DoR": 4, "TSLP": 12, "Prob Purch": 0.7193239005175888}, {"DoR": 4, "TSLP": 13, "Prob Purch": 0.7292267698490507}, {"DoR": 4, "TSLP": 14, "Prob Purch": 0.7370875511838817}, {"DoR": 4, "TSLP": 15, "Prob Purch": 0.7433273470577613}, {"DoR": 4, "TSLP": 16, "Prob Purch": 0.7482804237163327}, {"DoR": 4, "TSLP": 17, "Prob Purch": 0.7522121177783747}, {"DoR": 4, "TSLP": 18, "Prob Purch": 0.7553330503346565}, {"DoR": 4, "TSLP": 19, "Prob Purch": 0.7578104099326209}, {"DoR": 4, "TSLP": 20, "Prob Purch": 0.7597769088770707}, {"DoR": 4, "TSLP": 21, "Prob Purch": 0.7613378926364326}, {"DoR": 4, "TSLP": 22, "Prob Purch": 0.7625769832059286}, {"DoR": 4, "TSLP": 23, "Prob Purch": 0.7635605587429616}, {"DoR": 4, "TSLP": 24, "Prob Purch": 0.7643413094490564}, {"DoR": 4, "TSLP": 25, "Prob Purch": 0.7649610601871711}, {"DoR": 4, "TSLP": 26, "Prob Purch": 0.7654530110421565}]}}, {"mode": "vega-lite"});
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-73e1394edc8dd0a327928f608c337ff0"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}}, {"data": {"name": "data-b00a9445e3d0a8750a501e5fc1bf7ddb"}, "mark": {"type": "line", "strokeDash": [5, 3], "strokeWidth": 2}, "encoding": {"color": {"field": "DoR", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Time Since Last Purchase", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0]}, "field": "TSLP", "scale": {"domain": [0, 26]}, "type": "quantitative"}, "y": {"field": "Prob Purch", "scale": {}, "title": "P(Purchase)", "type": "quantitative"}}}], "height": 250, "title": "Actual Vs Estimated Depth-of-Repeat Curves", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json", "datasets": {"data-73e1394edc8dd0a327928f608c337ff0": [{"DoR": 2, "TSLP": 1, "Eligible": 35, "Weights": 6.0, "Prob Purch": 0.17142857142857143}, {"DoR": 1, "TSLP": 1, "Eligible": 101, "Weights": 10.0, "Prob Purch": 0.09900990099009901}, {"DoR": 3, "TSLP": 1, "Eligible": 22, "Weights": 4.0, "Prob Purch": 0.18181818181818182}, {"DoR": 4, "TSLP": 1, "Eligible": 12, "Weights": 2.0, "Prob Purch": 0.16666666666666666}, {"DoR": 3, "TSLP": 2, "Eligible": 22, "Weights": 5.0, "Prob Purch": 0.22727272727272727}, {"DoR": 4, "TSLP": 2, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 1, "TSLP": 2, "Eligible": 101, "Weights": 16.0, "Prob Purch": 0.15841584158415842}, {"DoR": 2, "TSLP": 2, "Eligible": 35, "Weights": 9.0, "Prob Purch": 0.2571428571428571}, {"DoR": 3, "TSLP": 3, "Eligible": 22, "Weights": 7.0, "Prob Purch": 0.3181818181818182}, {"DoR": 1, "TSLP": 3, "Eligible": 101, "Weights": 18.0, "Prob Purch": 0.1782178217821782}, {"DoR": 2, "TSLP": 3, "Eligible": 35, "Weights": 11.0, "Prob Purch": 0.3142857142857143}, {"DoR": 4, "TSLP": 3, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 2, "TSLP": 4, "Eligible": 35, "Weights": 14.0, "Prob Purch": 0.4}, {"DoR": 1, "TSLP": 4, "Eligible": 101, "Weights": 21.0, "Prob Purch": 0.2079207920792079}, {"DoR": 4, "TSLP": 4, "Eligible": 12, "Weights": 3.0, "Prob Purch": 0.25}, {"DoR": 3, "TSLP": 4, "Eligible": 22, "Weights": 10.0, "Prob Purch": 0.45454545454545453}, {"DoR": 3, "TSLP": 5, "Eligible": 22, "Weights": 11.0, "Prob Purch": 0.5}, {"DoR": 2, "TSLP": 5, "Eligible": 35, "Weights": 16.0, "Prob Purch": 0.45714285714285713}, {"DoR": 1, "TSLP": 5, "Eligible": 101, "Weights": 25.0, "Prob Purch": 0.24752475247524752}, {"DoR": 4, "TSLP": 5, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 4, "TSLP": 6, "Eligible": 12, "Weights": 5.0, "Prob Purch": 0.4166666666666667}, {"DoR": 2, "TSLP": 6, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 3, "TSLP": 6, "Eligible": 22, "Weights": 12.0, "Prob Purch": 0.5454545454545454}, {"DoR": 1, "TSLP": 6, "Eligible": 101, "Weights": 27.0, "Prob Purch": 0.26732673267326734}, {"DoR": 2, "TSLP": 7, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 4, "TSLP": 7, "Eligible": 12, "Weights": 6.0, "Prob Purch": 0.5}, {"DoR": 3, "TSLP": 7, "Eligible": 22, "Weights": 13.0, "Prob Purch": 0.5909090909090909}, {"DoR": 1, "TSLP": 7, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 4, "TSLP": 8, "Eligible": 12, "Weights": 7.0, "Prob Purch": 0.5833333333333334}, {"DoR": 2, "TSLP": 8, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 3, "TSLP": 8, "Eligible": 22, "Weights": 14.0, "Prob Purch": 0.6363636363636364}, {"DoR": 1, "TSLP": 8, "Eligible": 101, "Weights": 28.0, "Prob Purch": 0.27722772277227725}, {"DoR": 3, "TSLP": 9, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 4, "TSLP": 9, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 9, "Eligible": 35, "Weights": 19.0, "Prob Purch": 0.5428571428571428}, {"DoR": 1, "TSLP": 9, "Eligible": 101, "Weights": 29.0, "Prob Purch": 0.2871287128712871}, {"DoR": 4, "TSLP": 10, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 10, "Eligible": 35, "Weights": 21.0, "Prob Purch": 0.6}, {"DoR": 3, "TSLP": 10, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 10, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 2, "TSLP": 11, "Eligible": 35, "Weights": 22.0, "Prob Purch": 0.6285714285714286}, {"DoR": 4, "TSLP": 11, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 11, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 11, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 3, "TSLP": 12, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 2, "TSLP": 12, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 1, "TSLP": 12, "Eligible": 101, "Weights": 30.0, "Prob Purch": 0.297029702970297}, {"DoR": 4, "TSLP": 12, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 4, "TSLP": 13, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 13, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 13, "Eligible": 22, "Weights": 15.0, "Prob Purch": 0.6818181818181818}, {"DoR": 1, "TSLP": 13, "Eligible": 101, "Weights": 32.0, "Prob Purch": 0.31683168316831684}, {"DoR": 4, "TSLP": 14, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 14, "Eligible": 101, "Weights": 34.0, "Prob Purch": 0.33663366336633666}, {"DoR": 2, "TSLP": 14, "Eligible": 35, "Weights": 23.0, "Prob Purch": 0.6571428571428571}, {"DoR": 3, "TSLP": 14, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 15, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 15, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 2, "TSLP": 15, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 15, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 2, "TSLP": 16, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 16, "Eligible": 101, "Weights": 35.0, "Prob Purch": 0.3465346534653465}, {"DoR": 3, "TSLP": 16, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 4, "TSLP": 16, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 2, "TSLP": 17, "Eligible": 35, "Weights": 24.0, "Prob Purch": 0.6857142857142857}, {"DoR": 1, "TSLP": 17, "Eligible": 101, "Weights": 36.0, "Prob Purch": 0.3564356435643564}, {"DoR": 4, "TSLP": 17, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 3, "TSLP": 17, "Eligible": 22, "Weights": 16.0, "Prob Purch": 0.7272727272727273}, {"DoR": 3, "TSLP": 18, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 18, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 18, "Eligible": 101, "Weights": 38.0, "Prob Purch": 0.37623762376237624}, {"DoR": 4, "TSLP": 18, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 19, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 19, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 19, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 19, "Eligible": 12, "Weights": 9.0, "Prob Purch": 0.75}, {"DoR": 1, "TSLP": 20, "Eligible": 101, "Weights": 39.0, "Prob Purch": 0.38613861386138615}, {"DoR": 3, "TSLP": 20, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 20, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 20, "Eligible": 12, "Weights": 10.0, "Prob Purch": 0.8333333333333334}, {"DoR": 3, "TSLP": 21, "Eligible": 22, "Weights": 17.0, "Prob Purch": 0.7727272727272727}, {"DoR": 2, "TSLP": 21, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 21, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 21, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 2, "TSLP": 22, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 22, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 22, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 3, "TSLP": 22, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 4, "TSLP": 23, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 23, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 2, "TSLP": 23, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 23, "Eligible": 101, "Weights": 40.0, "Prob Purch": 0.39603960396039606}, {"DoR": 4, "TSLP": 24, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 3, "TSLP": 24, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 2, "TSLP": 24, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 1, "TSLP": 24, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 2, "TSLP": 25, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 3, "TSLP": 25, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}, {"DoR": 1, "TSLP": 25, "Eligible": 101, "Weights": 41.0, "Prob Purch": 0.40594059405940597}, {"DoR": 4, "TSLP": 25, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 2, "TSLP": 26, "Eligible": 35, "Weights": 25.0, "Prob Purch": 0.7142857142857143}, {"DoR": 4, "TSLP": 26, "Eligible": 12, "Weights": 11.0, "Prob Purch": 0.9166666666666666}, {"DoR": 1, "TSLP": 26, "Eligible": 101, "Weights": 42.0, "Prob Purch": 0.4158415841584158}, {"DoR": 3, "TSLP": 26, "Eligible": 22, "Weights": 18.0, "Prob Purch": 0.8181818181818182}], "data-b00a9445e3d0a8750a501e5fc1bf7ddb": [{"DoR": 1, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 1, "TSLP": 1, "Prob Purch": 0.13433496515603896}, {"DoR": 1, "TSLP": 2, "Prob Purch": 0.21902017390214767}, {"DoR": 1, "TSLP": 3, "Prob Purch": 0.27240601110426205}, {"DoR": 1, "TSLP": 4, "Prob Purch": 0.3060606204034524}, {"DoR": 1, "TSLP": 5, "Prob Purch": 0.32727659801925885}, {"DoR": 1, "TSLP": 6, "Prob Purch": 0.3406512208589669}, {"DoR": 1, "TSLP": 7, "Prob Purch": 0.349082627572517}, {"DoR": 1, "TSLP": 8, "Prob Purch": 0.3543978144021779}, {"DoR": 1, "TSLP": 9, "Prob Purch": 0.35774852585449085}, {"DoR": 1, "TSLP": 10, "Prob Purch": 0.3598608254963413}, {"DoR": 1, "TSLP": 11, "Prob Purch": 0.3611924262147147}, {"DoR": 1, "TSLP": 12, "Prob Purch": 0.36203187173562523}, {"DoR": 1, "TSLP": 13, "Prob Purch": 0.36256106098346347}, {"DoR": 1, "TSLP": 14, "Prob Purch": 0.3628946636450439}, {"DoR": 1, "TSLP": 15, "Prob Purch": 0.36310496787225227}, {"DoR": 1, "TSLP": 16, "Prob Purch": 0.36323754435642114}, {"DoR": 1, "TSLP": 17, "Prob Purch": 0.36332112101290526}, {"DoR": 1, "TSLP": 18, "Prob Purch": 0.36337380801507513}, {"DoR": 1, "TSLP": 19, "Prob Purch": 0.36340702207644615}, {"DoR": 1, "TSLP": 20, "Prob Purch": 0.363427960331183}, {"DoR": 1, "TSLP": 21, "Prob Purch": 0.3634411598765963}, {"DoR": 1, "TSLP": 22, "Prob Purch": 0.3634494809139181}, {"DoR": 1, "TSLP": 23, "Prob Purch": 0.3634547265235161}, {"DoR": 1, "TSLP": 24, "Prob Purch": 0.3634580333732503}, {"DoR": 1, "TSLP": 25, "Prob Purch": 0.36346011802231915}, {"DoR": 1, "TSLP": 26, "Prob Purch": 0.3634614321920243}, {"DoR": 2, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 2, "TSLP": 1, "Prob Purch": 0.13941978121689486}, {"DoR": 2, "TSLP": 2, "Prob Purch": 0.25008956562110607}, {"DoR": 2, "TSLP": 3, "Prob Purch": 0.3379379403149434}, {"DoR": 2, "TSLP": 4, "Prob Purch": 0.40767094809023613}, {"DoR": 2, "TSLP": 5, "Prob Purch": 0.46302419042779946}, {"DoR": 2, "TSLP": 6, "Prob Purch": 0.5069629438966641}, {"DoR": 2, "TSLP": 7, "Prob Purch": 0.5418410102007861}, {"DoR": 2, "TSLP": 8, "Prob Purch": 0.5695268094799291}, {"DoR": 2, "TSLP": 9, "Prob Purch": 0.5915034716905402}, {"DoR": 2, "TSLP": 10, "Prob Purch": 0.6089482879680012}, {"DoR": 2, "TSLP": 11, "Prob Purch": 0.6227957781845739}, {"DoR": 2, "TSLP": 12, "Prob Purch": 0.6337877532359724}, {"DoR": 2, "TSLP": 13, "Prob Purch": 0.6425130538963015}, {"DoR": 2, "TSLP": 14, "Prob Purch": 0.6494390950542513}, {"DoR": 2, "TSLP": 15, "Prob Purch": 0.6549369051571988}, {"DoR": 2, "TSLP": 16, "Prob Purch": 0.6593010022277713}, {"DoR": 2, "TSLP": 17, "Prob Purch": 0.6627651712122854}, {"DoR": 2, "TSLP": 18, "Prob Purch": 0.6655149878545846}, {"DoR": 2, "TSLP": 19, "Prob Purch": 0.6676977599999585}, {"DoR": 2, "TSLP": 20, "Prob Purch": 0.6694304188854021}, {"DoR": 2, "TSLP": 21, "Prob Purch": 0.6708057831531151}, {"DoR": 2, "TSLP": 22, "Prob Purch": 0.6718975311508275}, {"DoR": 2, "TSLP": 23, "Prob Purch": 0.6727641478853825}, {"DoR": 2, "TSLP": 24, "Prob Purch": 0.6734520580681211}, {"DoR": 2, "TSLP": 25, "Prob Purch": 0.6739981130895009}, {"DoR": 2, "TSLP": 26, "Prob Purch": 0.6744315651503309}, {"DoR": 3, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 3, "TSLP": 1, "Prob Purch": 0.15318060386531743}, {"DoR": 3, "TSLP": 2, "Prob Purch": 0.2747735676235138}, {"DoR": 3, "TSLP": 3, "Prob Purch": 0.37129263376129656}, {"DoR": 3, "TSLP": 4, "Prob Purch": 0.4479083345401313}, {"DoR": 3, "TSLP": 5, "Prob Purch": 0.5087249777249343}, {"DoR": 3, "TSLP": 6, "Prob Purch": 0.557000514601436}, {"DoR": 3, "TSLP": 7, "Prob Purch": 0.5953210686253192}, {"DoR": 3, "TSLP": 8, "Prob Purch": 0.6257394742135153}, {"DoR": 3, "TSLP": 9, "Prob Purch": 0.6498852472091595}, {"DoR": 3, "TSLP": 10, "Prob Purch": 0.6690518781447212}, {"DoR": 3, "TSLP": 11, "Prob Purch": 0.6842661246087419}, {"DoR": 3, "TSLP": 12, "Prob Purch": 0.6963430147124949}, {"DoR": 3, "TSLP": 13, "Prob Purch": 0.7059295081956286}, {"DoR": 3, "TSLP": 14, "Prob Purch": 0.7135391540988902}, {"DoR": 3, "TSLP": 15, "Prob Purch": 0.7195796016175692}, {"DoR": 3, "TSLP": 16, "Prob Purch": 0.7243744378937585}, {"DoR": 3, "TSLP": 17, "Prob Purch": 0.7281805225992988}, {"DoR": 3, "TSLP": 18, "Prob Purch": 0.7312017479240681}, {"DoR": 3, "TSLP": 19, "Prob Purch": 0.7335999610930345}, {"DoR": 3, "TSLP": 20, "Prob Purch": 0.7355036345319703}, {"DoR": 3, "TSLP": 21, "Prob Purch": 0.7370147481431394}, {"DoR": 3, "TSLP": 22, "Prob Purch": 0.7382142523748824}, {"DoR": 3, "TSLP": 23, "Prob Purch": 0.7391664047420734}, {"DoR": 3, "TSLP": 24, "Prob Purch": 0.7399222121051123}, {"DoR": 3, "TSLP": 25, "Prob Purch": 0.7405221631105475}, {"DoR": 3, "TSLP": 26, "Prob Purch": 0.7409983971703421}, {"DoR": 4, "TSLP": 0, "Prob Purch": 0.0}, {"DoR": 4, "TSLP": 1, "Prob Purch": 0.1582359083497569}, {"DoR": 4, "TSLP": 2, "Prob Purch": 0.28384171341718034}, {"DoR": 4, "TSLP": 3, "Prob Purch": 0.38354612584272973}, {"DoR": 4, "TSLP": 4, "Prob Purch": 0.4626903170828389}, {"DoR": 4, "TSLP": 5, "Prob Purch": 0.5255140462906936}, {"DoR": 4, "TSLP": 6, "Prob Purch": 0.575382784472728}, {"DoR": 4, "TSLP": 7, "Prob Purch": 0.6149680029757606}, {"DoR": 4, "TSLP": 8, "Prob Purch": 0.6463902843700262}, {"DoR": 4, "TSLP": 9, "Prob Purch": 0.6713329221868358}, {"DoR": 4, "TSLP": 10, "Prob Purch": 0.6911320950557439}, {"DoR": 4, "TSLP": 11, "Prob Purch": 0.7068484458752519}, {"DoR": 4, "TSLP": 12, "Prob Purch": 0.7193239005175888}, {"DoR": 4, "TSLP": 13, "Prob Purch": 0.7292267698490507}, {"DoR": 4, "TSLP": 14, "Prob Purch": 0.7370875511838817}, {"DoR": 4, "TSLP": 15, "Prob Purch": 0.7433273470577613}, {"DoR": 4, "TSLP": 16, "Prob Purch": 0.7482804237163327}, {"DoR": 4, "TSLP": 17, "Prob Purch": 0.7522121177783747}, {"DoR": 4, "TSLP": 18, "Prob Purch": 0.7553330503346565}, {"DoR": 4, "TSLP": 19, "Prob Purch": 0.7578104099326209}, {"DoR": 4, "TSLP": 20, "Prob Purch": 0.7597769088770707}, {"DoR": 4, "TSLP": 21, "Prob Purch": 0.7613378926364326}, {"DoR": 4, "TSLP": 22, "Prob Purch": 0.7625769832059286}, {"DoR": 4, "TSLP": 23, "Prob Purch": 0.7635605587429616}, {"DoR": 4, "TSLP": 24, "Prob Purch": 0.7643413094490564}, {"DoR": 4, "TSLP": 25, "Prob Purch": 0.7649610601871711}, {"DoR": 4, "TSLP": 26, "Prob Purch": 0.7654530110421565}]}}, {"mode": "vega-lite"});
 </script>
 </div>
 </div>

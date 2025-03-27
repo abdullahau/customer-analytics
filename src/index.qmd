@@ -46,6 +46,7 @@ jupyter:
 - [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
 - [Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/DoR-Model)
+- [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric)
 
 ## Source Files
 

@@ -1,0 +1,1210 @@
+---
+title: Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/buyer-behavior-summary-transaction-log.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+
+## Introduction
+
+**Source**:
+
+-   [Creating a Depth-of-Repeat Sales Summary Using Excel](https://www.brucehardie.com/notes/006/) by Bruce G. S. Hardie & Peter S. Fader
+-   [Generating a Sales Forecast With a Simple Depth-of-Repeat Model](https://www.brucehardie.com/notes/007/) by Bruce G. S. Hardie & Peter S. Fader
+
+Central to diagnosing the performance of a new product is the decomposition of its total sales into trial, first repeat, second repeat, and so on, components. More formally, we are interested in creating a summary of purchasing that tells us for each unit of time (e.g., week), the cumulative number of people who have made a trial (i.e., first-ever) purchase, a first repeat (i.e., secondever) purchase, a second repeat purchase, and so on. We let $T(t)$ denote the cumulative number of people who have made a trial purchase by time $t$, and $R_{j}(t)$ denote the number of people who have made at least $j$ repeat purchases of the new product by time $t(j=1,2,3, \ldots)$.
+
+With such a data summary in place, standard new product performance metrics such as “percent triers repeating” and “repeats per repeater” are easily computed from these data. At any point in time $t$, percent triers repeating is computed as $R_{1}(t)/T (t)$, while repeats per repeater is computed as $R(t)/R_{1}(t)$, where $R(t)$ is the total number of repeat purchases up to time $t$:
+
+$$
+R(t)=\sum_{j=1}^{\infty} R_{j}(t)
+$$
+
+Furthermore, a simple new product sales forecasting model can easily be built around such a data summary.
+
+we describe how to create such a sales summary from raw customer-level transaction data (typically collected via a consumer panel) using python.
+
+A consumer panel is formed by selecting a representative sample of individuals or households (from the population of interest) and recording their complete behaviour (e.g., purchasing of FMCG products) over a fixed period of time.
+
+For a given product category, we can construct a dataset that reports the timing of each purchase, along with details of the product purchased. A stylized representation of this is given in the figure (Purchase Histories: Total Category) below for a total of $n$ households, in which we consider an observation period starting with the launch of a new product and ending at time $t_{\text {end }}$. We let $\diamond$ denote a purchase of the new product and $\times$ denote the purchase of any other product in the category.
+
+![](references/Depth-of-Repeat/Purchase Histories-Total Category.png){fig-align="center" width="550"}
+
+We see that HH 1 made three category purchases over the observation period but never purchased the new product. HH 2 made seven category purchases; the third category purchase represents a trial purchase of the new product, and no repeat purchasing activity was observed over the remainder of the observation period. HH 3 made a trial purchase of the new product and two repeat purchases. And so on.
+
+In many analysis situations, where we are focusing on a particular product, purchase records not associated with the focal product are removed to yield a simpler (and smaller) dataset. A stylized representation of this is given in the figure (Purchase Histories: New Product Only) below. As HH 1 never bought the new product, there is no explicit record of this household in the resulting dataset.
+
+![](references/Depth-of-Repeat/Purchase Histories-New Product Only.png){fig-align="center" width="550"}
+
+## Imports
+
+### Import Packages
+
+```{python}
+import polars as pl
+import numpy as np
+import altair as alt
+from utils import ChartTemp, layered_line_prop
+from scipy.optimize import minimize
+
+from IPython.display import display_markdown
+alt.renderers.enable("html")
+```
+
+### Import Panel Data
+
+"Kiwi Bubbles" is a masked name for a shelf-stable juice drink, aimed primarily at children, which is sold as a multipack with several single-serve containers bundled together. Prior to national launch, it underwent a year-long test conducted in two of IRI's BehaviorScan markets. The file `kiwibubbles_tran.txt` contains purchasing data for the new product, drawn from 1300 panelists in Market 1 and 1499 panelists in Market 2.
+
+Each record in this file comprises five fields: *Panelist ID*, *Market*, *Week*, *Day*, and *Units*. The value of the Market field is either 1 or 2. The Week field gives us the week number in which the purchase occurred (the product was launched at the beginning of week 1), the Day field tells us the day of the week (1-7) in which the purchase occurred, and the Units field tells us how many units of the new product were purchased on that particular purchase occasion.
+
+We load this dataset into python. We see that there are a total of 857 transactions across the two markets during the year-long test.
+
+```{python}
+kiwi_lf = pl.scan_csv(
+    source="data/kiwibubbles/kiwibubbles_tran.csv",
+    has_header=False,
+    separator=",",
+    schema={
+        'ID': pl.UInt16,
+        'Market': pl.UInt8,
+        'Week': pl.Int16,
+        'Day': pl.Int16,
+        'Units': pl.Int16
+    })
+kiwi_lf.head().collect()
+```
+
+To illustrate the process of creating a sales by depth-of-repeat summary from this raw transaction data, we will focus just on **Market 2**.
+
+```{python}
+kiwi_lf_m2 = (kiwi_lf.filter(pl.col('Market') == 2).drop('Market'))
+num_panellists_m2 = 1499
+```
+
+## Creating a Depth-of-Repeat Sales Summary
+
+### Preliminaries
+
+Let us consider the transaction history of panelist 20014. We note that this panelist made his/her trial purchase and first repeat purchase in week 4. Similarly, this panelist's third and fourth repeat purchases occurred in week 7 . We also note that this panelist typically purchased several units of the product on any given purchase occasion.
+
+```{python}
+kiwi_lf_m2.filter(pl.col('ID') == 20014).collect()
+```
+
+This suggests several possible versions of the desired sales by depth-of-repeat summary:
+- Our summary counts the number of trial, first repeat, second repeat, etc. transactions that occurred each week. The process of creating such a summary is described in section @sec-raw_trans_summary below.
+- Our summary reports the *sales volume* (e.g., units) associated with trial, first repeat, second repeat, etc. transactions that occurred each week. The process of creating such a summary is described in section @sec-raw_vol_summary below.
+- We have noted that this panelist's trial and first repeat purchases occurred in the same week, albeit on different days. Similarly, his/her fourth and fifth repeat purchases occurred in the same week. The structure of many simple models of new product sales forecasting is such that a customer can have only one transaction per unit of time. If the unit of time is one week (as it typically the case), we clearly have a problem. One solution would be change the unit of time from week to day. However, as such purchasing behaviour tends to be rare, Eskin suggests that, "[f]or estimation purposes, second purchases within a single week are coded in the following week." The process of creating such a "shifted" summary is described in @sec-raw_shifted_trans_summary below.
+
+But what happens if we observe multiple transactions on the same day? This is very rare and typically reflects bad pre-processing of the panel data. For example, as an individual's purchases are scanned at the supermarket checkout, one six-pack of Coke could be the first item scanned with another six-pack of Coke being the last item scanned. As the raw data are "cleaned-up" these two purchases should be combined into one transaction with a quantity of two. But this doesn't always happen. If the (very) raw panel data file contains a transaction time field, we easily determine whether the two records come from the same or different shopping trips. Even if they did come from separate shopping trips on the same day, our natural reaction would be to combine them into a single transaction with multiple units, rather than shift to an even smaller time unit (e.g., hour). we should reflect on how to determine whether we observe multiple transactions for an individual panelist on the same day once the raw panel data has been loaded into python. (Note that there are no such occurrences in the Kiwi Bubbles dataset.)
+
+### Creating a "Raw" Transactions Summary {#sec-raw_trans_summary}
+
+The first thing we need to do is add a field that indicates the depth-of-repeat level associated with each record; i.e., is this a trial purchase $(\mathrm{DoR}=0)$, a first repeat purchase $(\mathrm{DoR}=1$ ), a second repeat purchase ( $\operatorname{DoR}=2$ ), etc.
+
+This is a straightforward exercise. If the panelist ID associated with this record does not equal that of the previous record, we are dealing with a new panelist and we set the depth-of-repeat indicator to 0 . If the panelist ID associated with this record does equal that of the previous record, we are dealing with a repeat purchase by that panelist and we increment the depth-of-repeat indicator by 1.
+
+```{python}
+kiwi_lf_m2 = (
+    kiwi_lf_m2
+    .sort(by='ID')
+    .with_columns((pl.col("ID").cum_count().over("ID") - 1).cast(pl.UInt16).alias("DoR"))    
+)
+```
+
+The corresponding records for panelist 20014 are shown below with DoR indicator:
+
+```{python}
+kiwi_lf_m2.filter(pl.col('ID') == 20014).collect()
+```
+
+The next step is to perform aggregations to the data and create two type of the same data-frame: a **long-form** and **wide-form**.
+
+We want there to be 52 rows, one for each week of the test. It turns out, however, that this panel of 1499 households only purchased the test product in 49 weeks; no purchases occurred in weeks 25,39, and 41. How can we create a table that will contain zeros in the rows corresponding to these three weeks? We accomplish this by creating a dummy dataframe that contains the full range of combination of `Week` and `DoR`. There are should be a range of 1 to 52 weeks and a range of 0 to 11 depth-of-repeats. Next, we will join the aggregated dataframes of the main dataset with the dummy dataframe such that it preserves the size of the dummy dataframe and fills the empty combinations with `null` values.
+
+```{python}
+# Week Range: 1 to 52, DoR Range: 0 to 11 (max(DoR) = 11)
+week_range, dor_range = np.meshgrid(np.arange(1, 53, dtype='int16'), np.arange(0, 12, dtype='uint16'))
+# Create a dummy LazyFrame that contains the full range of combinations for Week & DoR
+dummy_lf = pl.LazyFrame({'Week': week_range.reshape(-1), 'DoR': dor_range.reshape(-1)})
+
+agg_trans = (
+    kiwi_lf_m2
+    .group_by('Week', 'DoR')
+    .agg(pl.len().alias('Count'))
+)
+
+week_total_trans = (
+    agg_trans
+    .group_by('Week')
+    .agg(pl.col('Count').sum().alias('Total')) 
+)
+
+agg_trans_longform = (
+    dummy_lf
+    .join(week_total_trans, on='Week', how='left')
+    .join(agg_trans, on=['Week', 'DoR'], how='left')
+    .fill_null(0)
+)
+```
+
+The wide-form is more intuitive and easy to visualize, it tells us how many trial, first repeat, etc. purchases (columns) occurred in each week (rows).
+
+```{python}
+agg_trans_wideform = (
+    agg_trans_longform
+    .collect()
+    .pivot(on='DoR', index='Week', values='Count')
+    .join(week_total_trans.collect(), on='Week', how='left')
+)
+
+col_total = agg_trans_wideform.select(pl.col('*').exclude('Week').sum())
+
+display(agg_trans_wideform)
+display(col_total)
+```
+
+We note that there are no entries in the rows corresponding to weeks 25, 39, and 41. Over the year-long test, 139 of the 1499 panelists made at least one purchase of the new product, with a total of 306 purchase occasions. We also note that by the end of the year, one person had made eleven repeat purchases of the new product.
+
+A cleaned-up summary that reports these weekly transactions in cumulative form (i.e., $T(t), R_{1}(t), R_{2}(t)$, etc.) is created created below:
+
+```{python}
+cum_trans_longform = agg_trans_longform.with_columns(pl.col('Count').cum_sum().over('DoR').alias('Cum DoR'))
+cum_trans_wideform = cum_trans_longform.collect().pivot(on='DoR', index='Week', values='Cum DoR')
+
+display(cum_trans_wideform)
+```
+
+### Creating a "Raw" Sales Volume Summary {#sec-raw_vol_summary}
+
+Having created a weekly transaction by depth-of-repeat level summary, it is extremely easy to create an equivalent **sales volume** (e.g., units) summary. Here, instead of counting IDs or length of aggregated dataframe as the value item, we sum `Units`. We note that a total of 396 units of the product were purchased (across the 306 purchase occasions).
+
+```{python}
+agg_vol = (
+    kiwi_lf_m2
+    .group_by('Week', 'DoR')
+    .agg(pl.col('Units').sum().alias('Units'))
+)
+
+week_total_vol = (
+    agg_vol
+    .group_by('Week')
+    .agg(pl.col('Units').sum().alias('Total')) 
+)
+
+agg_vol_longform = (
+    dummy_lf
+    .join(agg_vol, on=['Week', 'DoR'], how='left')
+    .join(week_total_vol, on='Week', how='left')
+    .fill_null(0)
+)
+```
+
+```{python}
+agg_vol_wideform = (
+    agg_vol_longform
+    .collect()
+    .pivot(on='DoR', index='Week', values='Units')
+    .join(week_total_vol.collect(), on='Week', how='left')
+)
+
+col_total = agg_vol_wideform.select(pl.col('*').exclude('Week').sum())
+
+display(agg_vol_wideform)
+display(col_total)
+```
+
+A cleaned-up summary that reports these weekly transactions in cumulative form is created below. We note that a total of 161 units were purchased on the 139 trial purchase occasions, an average 1.16 units per trial purchase.
+
+```{python}
+cum_vol_longform = agg_vol_longform.with_columns(pl.col('Units').cum_sum().over('DoR').alias('Cum DoR'))
+cum_vol_wideform = cum_vol_longform.collect().pivot(on='DoR', index='Week', values='Cum DoR')
+
+display(cum_vol_wideform)
+```
+
+### Creating a "Shifted" Transactions Summary {#sec-raw_shifted_trans_summary}
+
+We now turn our attention to the task of creating a weekly transaction by depth-of-repeat level summary under the assumption that a customer can have only one transaction per week. In other words, a second purchase within a single week is "shifted" to the next week (i.e., coded as occurring in the following week).
+
+Referring back to panellist `20014`, the field that indicates the depth-of-repeat level associated with each record (DoR) is correct. What we need to do is makes some changes to the week field: we want the week associated with the first repeat purchase to be 5, and the week associated with the fourth repeat purchase to be 8. One solution would be to create a new week variable that equals the original week variable +1 if the week associated with the current record is the same as that of the previous record. But what if we have three purchases occurring in the same week?
+
+```{python}
+kiwi_lf_m2.filter(pl.col('ID') == 20014).collect()
+```
+
+```{python}
+kiwi_lf_m2.filter(pl.col('ID') == 20069).collect()
+```
+
+To complicate matters, consider the transaction history of panelist 20069. This person's trial and first repeat purchases occurred in the same week. We therefore change the week associated with the first repeat purchase from 18 to 19. But this creates another problem as this person's second repeat purchase occurred in week 19. Having shifted the first repeat purchase to week 19, we have to shift the second repeat purchase to week 20.
+
+Our solution is to group each record by `ID` and pass all of an ID's `Week` as an array to a custom defined function which iterates over the array to evaluates whether the array has repeating numbers. If there were purchases made in the same week, such that index $i$ and index $i+1$ are in the same week, $i+1$ is incremented by 1. The loop inside the defined function also ensures that we shift purchases encroached on by the shifting of previous purchases (such as the second repeat purchase for panelist 20069).
+
+```{python}
+example_array = np.array([1,1,2,3,6,7,7,8])
+
+def shift(arr):    
+    arr = np.sort(arr) # Sort array to handle duplicates systematically
+    for i in range(1, len(arr)):
+        if arr[i] <= arr[i - 1]: # If duplicate or less, increment by 1
+            arr[i] = arr[i - 1] + 1
+    return arr
+
+shift(example_array)
+```
+
+```{python}
+# Method 1
+def shift_week(group_df):    
+    week_arr = group_df["Week"].sort().to_numpy().copy()  # Sort array to handle duplicates systematically
+    for i in range(1, len(week_arr)):
+        if week_arr[i] <= week_arr[i - 1]: # If duplicate or less, increment by 1
+            week_arr[i] = week_arr[i - 1] + 1
+    return group_df.with_columns(pl.Series("shWeek", week_arr))
+
+# Method 2
+# def shift_week(group_df):
+#     seen = set()
+#     adjusted_weeks = []
+#     for week in group_df["Week"].to_list(): 
+#         while week in seen: 
+#             week += 1
+#         seen.add(week)
+#         adjusted_weeks.append(week)
+#     return group_df.with_columns(pl.Series("shWeek", adjusted_weeks))
+
+shifted_lf = (
+    kiwi_lf_m2
+    .group_by('ID')
+    .map_groups(shift_week, schema={'Week': pl.Int16, 
+                                    'shWeek':pl.Int16,
+                                    'DoR':pl.UInt16,
+                                    'Units':pl.Int16,
+                                    'Day':pl.Int16,
+                                    'ID':pl.UInt16})
+)
+
+shifted_lf.filter(pl.col('shWeek') != pl.col('Week')).collect()
+```
+
+The next step is to create a table that tells us how many trial, first repeat, etc. purchases occurred in each week. We create a pivot table in which we use `shWeek` as the row field, `DoR` as the column field, and `ID` as the data item.
+
+```{python}
+week_range, dor_range = np.meshgrid(np.arange(1, 53, dtype='int16'), np.arange(0, 12, dtype='uint16'))
+dummy_lf = pl.DataFrame({'shWeek': week_range.reshape(-1), 'DoR': dor_range.reshape(-1)})
+
+sh_agg_trans = (
+    shifted_lf
+    .collect()
+    .group_by('shWeek', 'DoR')
+    .agg(pl.len().alias('Count'))
+)
+
+shweek_total_trans = (
+    sh_agg_trans
+    .group_by('shWeek')
+    .agg(pl.col('Count').sum().alias('Total')) 
+)
+
+sh_agg_trans_longform = (
+    dummy_lf
+    .join(sh_agg_trans, on=['shWeek', 'DoR'], how='left')
+    .join(shweek_total_trans, on='shWeek', how='left')
+    .fill_null(0)
+)
+```
+
+```{python}
+sh_agg_trans_wideform = (
+    sh_agg_trans_longform
+    .pivot(on='DoR', index='shWeek', values='Count')
+    .join(shweek_total_trans, on='shWeek', how='left')
+)
+
+col_total = sh_agg_trans_wideform.select(pl.col('*').exclude('shWeek').sum())
+
+display(sh_agg_trans_wideform)
+display(col_total)
+```
+
+```{python}
+sh_cum_trans_longform = sh_agg_trans_longform.with_columns(pl.col('Count').cum_sum().over('DoR').alias('Cum DoR'))
+sh_cum_trans_wideform = sh_cum_trans_longform.pivot(on='DoR', index='shWeek', values='Cum DoR')
+
+display(sh_cum_trans_wideform)
+```
+
+The differences between the "raw" and "shifted" cumulative transaction counts by depth-of-repeat level are small; there are only nine depth-of-repeat/week occasions on which the two sets of numbers differ, and the maximum deviation is one transaction. Perhaps the most obvious difference is with respect to first repeat. Looking at the "raw" numbers, we observe a first repeat purchase in the first week the product was on the market. Under the assumption that a trial and first repeat purchase cannot occur in the same week, this first repeat purchase is shifted to week 2 in the "shifted" numbers.
+
+## Generating a Sales Forecast With a Depth-of-Repeat Model
+
+### Introduction
+
+Central to diagnosing the performance of a new product is the decomposition of its total sales into trial, first repeat, second repeat, and so on, components:
+
+$$
+S(t)=T(t)+R_{1}(t)+R_{2}(t)+R_{3}(t)+\cdots
+$$
+
+where $S(t)$ is the cumulative sales volume up to time $t$ (assuming that only one unit is purchased on each purchase occasion), $T(t)$ equals the cumulative number of people who have made a trial purchase by time $t$, and $R_{j}(t)$ denotes the number of people who have made at least $j$ repeat purchases of the new product by time $t(j=1,2,3, \ldots)$.
+
+- We can decompose $T(t)$ in the following manner:
+
+    $$
+    \begin{equation*}
+    T(t)=N F_{0}(t) \tag{1}
+    \end{equation*}
+    $$
+
+    where $N$ is number of customers whose purchases are being monitored and $F_{0}(t)$ is the proportion of customers who have made their trial purchase by $t$.
+
+- We can decompose the $R_{j}(t)$ by conditioning on the time at which the $(j-1)$ th purchase occurred:
+
+    $$
+    \begin{equation*}
+    R_{j}(t)=\sum_{t_{j-1}=j}^{t-1} F_{j}\left(t \mid t_{j-1}\right)\left[R_{j-1}\left(t_{j-1}\right)-R_{j-1}\left(t_{j-1}-1\right)\right] \tag{2}
+    \end{equation*}
+    $$
+
+    where $F_{j}\left(t \mid t_{j-1}\right)$ is the proportion of customers who have made a $j$ th repeat purchase by $t$, given that their $(j-1)$ th repeat purchase was made in period $t_{j-1}$, and $R_{j-1}\left(t_{j-1}\right)-R_{j-1}\left(t_{j-1}-1\right)$ is the number of individuals who made their $(j-1)$ th repeat purchase in time period $t_{j-1}$. (Note that $R_{0}(t)=T(t)$ and $R_{j}(t)=0$ for $\left.t \leq j.\right)$
+
+Equations (1) and (2) are simply definitional. If we specify mathematical expressions for $F_{0}(t)$ and the $F_{j}\left(t \mid t_{j-1}\right)$, we arrive at a model of new product sales. Our python implementation incorporates the following model, with separate submodels for trial, first repeat (denoted by $F R(t)$ instead of $R_{1}(t)$ ) and additional repeat $\left(A R(t)=R_{2}(t)+R_{3}(t)+\cdots\right)$:
+
+For trial, we have
+
+$$
+\begin{align*}
+& T(t)=N P(\text { trial by } t)  \tag{3}\\
+& P(\text {trial by } t)=p_{0}\left(1-e^{-\theta_{T} t}\right) \tag{4}
+\end{align*}
+$$
+
+For first repeat, we have
+
+$$
+\begin{align*}
+& F R(t)=\sum_{t_{0}=1}^{t-1} P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right)\left[T\left(t_{0}\right)-T\left(t_{0}-1\right)\right]  \tag{5}\\
+& P\left(\text {first repeat by } t \mid \text { trial at } t_{0}\right)=p_{1}\left(1-e^{-\theta_{F R}\left(t-t_{0}\right)}\right) \tag{6}
+\end{align*}
+$$
+
+For additional repeat $(j \geq 2)$, we have
+
+$$
+\begin{align*}
+A R(t)= & \sum_{j=2}^{\infty} R_{j}(t)  \tag{7}\\
+R_{j}(t)=\sum_{t_{j-1}=j}^{t-1}\{ & P\left(j \text {th repeat by } t \mid(j-1) \text { th repeat at } t_{j-1}\right) \\
+& \left.\quad \times\left[R_{j-1}\left(t_{j-1}\right)-R_{j-1}\left(t_{j-1}-1\right)\right]\right\} \tag{8}
+\end{align*}
+$$
+
+$$
+\begin{equation*}
+P\left(j\text{th repeat by } t \mid (j-1)\text{th repeat at } t_{j-1}\right)=p_{j}\left(1-e^{-\theta_{A R}\left(t-t_{j-1}\right)}\right) \tag{9}
+\end{equation*}
+$$
+
+$$
+\begin{equation*}
+p_{j}=p_{\infty}\left(1-e^{-\gamma j}\right) \tag{10}
+\end{equation*}
+$$
+
+For the Kiwi Bubbles dataset (from a panel of $N=1499$ households) with a 24 -week calibration period, we have
+
+| $p_{0}$ | $\theta_{T}$ | $p_{1}$ | $\theta_{F R}$ | $p_{\infty}$ | $\gamma$ | $\theta_{A R}$ |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 0.08620 | 0.06428 | 0.36346 | 0.46140 | 0.78158 | 1.00140 | 0.23094 |
+
+Given these parameter estimates, we can first generate a forecast of trial, then a forecast of first repeat (conditional on the trial forecast), then a forecast of second repeat (conditional on the first-repeat forecast), and so on. For a forecast horizon of $t_{f}$ periods, we should (in theory) allow for up to $t_{f}-1$ levels of repeat ${ }^{1}$.
+
+${ }^{1}$ Under the assumption that a customer can have only one transaction per unit of time, the earliest point in time a first repeat purchase can occur is period 2. Following this logic, the summation limit in (7) should really be $t-1$, not $\infty$.
+
+```{python}
+modified_cum_trans = (
+    sh_cum_trans_wideform
+    .with_columns(
+        pl.sum_horizontal(pl.col(f'{i}' for i in range(2, 12)).alias('AR(t)')),
+        pl.sum_horizontal(pl.exclude('shWeek').alias('S(t)'))
+    )
+    .rename({'shWeek': 'Week (t)', '0': 'T(t)', '1': 'FR(t)'})
+    .select('Week (t)', 'T(t)', 'FR(t)', 'AR(t)', 'S(t)')
+)
+
+modified_cum_trans
+```
+
+```{python}
+actual_sales_curve = (
+    ChartTemp(modified_cum_trans)
+    .transform_fold(['T(t)', 'FR(t)', 'AR(t)', 'S(t)'], as_=['Type', 'Cum DoR'])
+    .line_encode(x_col='Week (t)',y_col='Cum DoR:Q', color='Type:N')
+)
+
+actual_sales_curve.line_prop('Actual Cumulative Market Sales')
+```
+
+```{python}
+(
+    ChartTemp(modified_cum_trans.filter(pl.col('Week (t)')<=24))
+    .transform_fold(['T(t)', 'FR(t)', 'AR(t)', 'S(t)'], as_=['Type', 'Cum DoR'])
+    .line_encode(x_col='Week (t)',y_col='Cum DoR:Q', color='Type:N', y_scale=alt.Scale(domain=[0, 350]))
+    .line_prop('Initial Test-Market Cumulative Sales')
+).show()
+```
+
+### Forecasting Trial
+
+**Modelling Objective**:
+
+Using the purchasing data for the 101 households who had tried Kiwi Bubbles by the end of week 24, we wish to forecast the purchasing behavior of the whole panel (i.e., 1499 households) to the end of the year (week 52).
+
+```{python}
+(
+    ChartTemp(modified_cum_trans.filter(pl.col('Week (t)')<=24))
+    .line_encode(x_col='Week (t)',y_col='T(t):Q', y_scale=alt.Scale(domain=[0, 150]), y_title='Cumulative Trial Sales (# of Transactions)')
+    .line_prop('Actual Test-Market Cumulative Trials')
+)
+```
+
+**Modelling Trial Sales**
+- We model the cumulative number of triers by time $t$, $T(t)$, by developing an expression for the probability that a randomly-chosen individual has made a trial purchase by time $t$. 
+- For a market comprising $N$ individuals (i.e., the size of the panel), we have:
+
+$$
+T(t)=N \cdot P(\text {trial by } t)
+$$
+
+**Characterizing $P(\text {trial by } t)$**:
+
+Cumulative penetration curves (from controlled test-markets) tend to:
+- increase at a decreasing rate
+- towards a penetration limit < 100%
+
+A mathematical expression that captures this is:
+
+$$
+P(\text {trial by } t)=p_{0}\left(1-e^{-\theta_{T} t}\right)
+$$
+
+**Formal Derivation: Individual-Level Model**:
+
+- Let $T$ denote the random variable of interest, and $t$ denote a particular realization.
+- Assume time-to-trial is distributed exponentially.
+- The probability that an individual has tried by time $t$ is given by:
+
+$$
+F(t) = P(T ≤ t) = 1 − e^{−λ_{T} t}
+$$
+
+- $λ_{T}$ represents the individual’s trial rate.
+
+**Formal Derivation: Market-Level Model**:
+
+Assume two segments of consumers:
+
+|Segment | Description | Size | $λ_{T}$ |
+|:-----: |:----------: |:----:| :-----: |
+| 1 | ever triers | $p_{0}$ | $\theta_{T}$ |
+| 2 | never triers | $1 - p_{0}$ | 0 |
+
+$$
+\begin{aligned}
+P(\text{trail by } t) &= P\left(T ≤ t\mid\text{ever trier}\right) × P\left(\text{ever trier}\right) + P\left(T ≤ t \mid \text{never trier}\right) × P\left(\text{never trier}\right) \\
+        &= p_{0}F\left(t \mid λ_{T} = θ_{T} \right) + \left(1 − p_{0}\right)F\left(t \mid λ_{T} = 0\right) \\
+        &= p_{0}\left(1-e^{-\theta_{T} t}\right)
+\end{aligned}
+$$
+
+-> the “exponential w/ never triers” model
+
+#### Trial Model Parameter Estimate
+
+```{python}
+#| code-fold: false
+def trial_model(trails: np.ndarray, weeks: np.ndarray, n: int, guess=[0.05, 0.05]):
+    
+    def least_square(x):
+        p_0, theta_T = x[0], x[1]
+        pred_cum_triers = p_0 * (1 - np.exp(-theta_T * weeks)) * n
+        return np.sum((pred_cum_triers - trails)**2)
+    
+    return minimize(least_square, guess, bounds=[(0, np.inf), (0, np.inf)])
+```
+
+```{python}
+#| code-fold: false
+train_trial = (
+    modified_cum_trans
+    .filter(pl.col('Week (t)')<=24)
+    .select('T(t)', 'Week (t)')
+    .to_numpy().transpose()
+)
+
+trails, weeks = train_trial[0], train_trial[1]
+
+result = trial_model(trails, weeks, n=num_panellists_m2)
+p_0, theta_T, sse = result.x[0], result.x[1], result.fun
+
+# Trial Purchase Model Parameters
+display_markdown(f'''$P_{0}$ = {p_0:0.4f}
+
+$\\theta_{{T}}$ = {theta_T:0.4f}
+
+Sum of Square Errors = {sse:0.4f}''', raw=True)
+```
+
+#### Forecasting Trial Transactions
+
+```{python}
+endwk = 52
+```
+
+Our goal is to generate a (cumulative) sales forecast for the new product up to the end of the year (week 52). We start by generating a forecast of $T(t)$, the cumulative number of trial transactions by $t$, for $t=1, \ldots, 52$.
+
+Given $\hat{p}_{0}$ and $\hat{\theta}_{T}$, we evaluate expressions (1) and (2) by specifying the vector of time points $t$ (up to 52 weeks). 
+
+```{python}
+t = np.arange(1, endwk+1, 1)
+cum_trial = num_panellists_m2 * p_0 * (1 - np.exp(-theta_T * t))
+print(cum_trial)
+```
+
+```{python}
+forecast_df = pl.DataFrame({
+    'Week (t)': t,
+    'T(t)': cum_trial
+})
+
+actual_trial_curve = (
+    ChartTemp(modified_cum_trans)
+    .line_encode(x_col='Week (t)',y_col='T(t):Q', y_title='Cumulative Trial Sales (# of Transactions)')
+)
+
+froecast_trial_curve = (
+    ChartTemp(forecast_df)
+    .line_encode(x_col='Week (t)',y_col='T(t):Q', y_title='Cumulative Trial Sales (# of Transactions)', dash=[5,3])
+)
+
+trial_chart = actual_trial_curve + froecast_trial_curve
+
+layered_line_prop(trial_chart, 'Cumulative Trial Forecast')
+```
+
+```{python}
+trial_forecast_index = forecast_df.select('T(t)').item(-1,0) / modified_cum_trans.select('T(t)').item(-1,0) * 100
+
+display_markdown(f'''Trial Forecast Index = **{trial_forecast_index:0.0f}**''', raw=True)
+```
+
+### Forecasting First-Repeat
+
+```{python}
+(
+    ChartTemp(modified_cum_trans.filter(pl.col('Week (t)')<=24))
+    .line_encode(x_col='Week (t)',y_col='FR(t):Q', y_scale=alt.Scale(domain=[0, 100]), y_title='Cumulative FR Sales (# of Transactions)')
+    .line_prop('Actual Test-Market Cumulative First Repeat Sales')
+)
+```
+
+**Modelling First Repeat**:
+
+How can an individual have made a first repeat purchase of the new product by the end of week 4? 
+- she could have made a trial purchase in week 1 and made a second purchase (i.e., her first repeat purchase) somewhere in the intervening three weeks,
+- she could have made a trial purchase in week 2 and a second purchase sometime in the following two weeks, or
+- she could have made a trial purchase in week 3 and her first repeat purchase sometime in the following week.
+
+**Modelling First Repeat Sales**:
+
+$$
+F R(t)=\sum_{t_{0}=1}^{t-1} P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right)\times\left[T\left(t_{0}\right)-T\left(t_{0}-1\right)\right]
+$$
+
+where $T\left(t_{0}\right)-T\left(t_{0}-1\right)$ is the number of incremental tirers in week $t_{0}$.
+
+```{python}
+kiwi_trial_fr = (
+    shifted_lf
+    .filter(pl.col('DoR') < 2)
+    .sort('ID')
+    .with_columns(
+        pl.when(pl.col('DoR') == 0).then(pl.col('shWeek')).otherwise(None).alias('Trial Week'),
+        pl.col('DoR').shift(-1).alias('Next_DoR'),
+        pl.col('shWeek').shift(-1).alias('Next_Week')
+    ).with_columns(
+        pl.when(pl.col('Next_DoR') == 1)
+        .then(pl.col('Next_Week') - pl.col('Trial Week'))
+        .otherwise(None)
+        .alias('FR Delta')
+    ).select('ID', 'Trial Week', 'FR Delta')
+    .group_by(['Trial Week', 'FR Delta'])
+    .agg(pl.len().alias('Count'))
+    .filter(~pl.all_horizontal(pl.col('*').exclude('Count').is_null()))       
+)
+
+trial_week_total = (
+    kiwi_trial_fr
+    .group_by('Trial Week')
+    .agg(pl.col('Count').sum().alias('Total Triers'))
+    .sort('Trial Week')
+    .fill_null(0)    
+)
+
+trial_week_range, fr_delta_range = np.meshgrid(np.arange(1, 25, dtype='int16'), np.arange(0, 25, dtype='int16'))
+trial_fr_range = pl.LazyFrame({'Trial Week': trial_week_range.reshape(-1), 'FR Delta': fr_delta_range.reshape(-1)})
+
+# (Shifted) Cum. First Repeat (as % of Trial) by Week of Trial
+cum_fr_by_trial = (
+    trial_fr_range
+    .join(trial_week_total, on='Trial Week', how='left')
+    .join(kiwi_trial_fr, on=['Trial Week', 'FR Delta'], how='left')
+    .fill_null(0)
+    .with_columns(pl.col('Count').cum_sum().over('Trial Week').alias('Cum FR by Week')) 
+    .with_columns(
+        pl.when(pl.col('Trial Week') > (24 - pl.col('FR Delta')))
+        .then(None) 
+        .otherwise(
+            pl.when(pl.col('Total Triers') > 0)
+            .then(pl.col('Cum FR by Week') / pl.col('Total Triers')) 
+            .otherwise(0)
+        ).alias('Cum FR by Trial') 
+    )
+    .with_columns((pl.col('Cum FR by Trial') * pl.col('Total Triers')).alias('Weights'))
+)
+```
+
+```{python}
+(
+    ChartTemp(cum_fr_by_trial.filter(pl.col('Trial Week') <= 10).collect())
+    .line_encode(x_col='FR Delta',x_title='Weeks Since Trial',y_col='Cum FR by Trial', y_title='Cum. % Making FR Purchase', color='Trial Week:N', x_range=24)
+    .line_prop('Empirical Time-to-FR Curves by Time of Trial')
+)
+```
+
+**Modelling First Repeat**:
+- Let us assume that these empirical time-to-FR curves are realizations of the same underlying curve
+
+$$
+P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = P\left(\text { first repeat } t - t_{0} \text { periods after trial}\right)
+$$
+
+- Specify a mathematical expression for this curve
+
+$$
+P\left(\text { first repeat by } t \mid \text { trial at } t_{0}\right) = p_{1}\left(1-e^{-\theta_{F R}\left(t-t_{0}\right)}\right)
+$$ 
+
+#### First Repeat Model Parameter Estimate
+
+```{python}
+#| code-fold: false
+def fr_model(fr: np.ndarray, eligible: np.ndarray, weeks: np.ndarray, guess=[0.05, 0.05]):
+    
+    def least_square(x):
+        p_1, theta_FR = x[0], x[1]
+        t = weeks
+        t_0 = weeks.reshape(-1,1)
+
+        p_fr_trial = p_1 * (1 - np.exp(-theta_FR * (t - t_0)))
+        p_fr_trial = np.triu(p_fr_trial)     
+        
+        pred_cum_fr = p_fr_trial.T @ eligible    
+        
+        return np.sum((pred_cum_fr - fr)**2)
+        
+    return minimize(least_square, guess, bounds=[(0, np.inf), (0, np.inf)])
+```
+
+```{python}
+#| code-fold: false
+fr_array = (
+    modified_cum_trans
+    .filter(pl.col('Week (t)')<=24)
+    .select('T(t)', 'FR(t)', 'Week (t)')
+    .to_numpy().transpose()         
+)
+
+eligible, fr, weeks = np.diff(fr_array[0], prepend=0), fr_array[1], fr_array[2]
+
+result = fr_model(fr, eligible, weeks)
+p_1, theta_FR, sse = result.x[0], result.x[1], result.fun
+
+# First Repeat Model Parameters
+display_markdown(f'''$P_{1}$ = {p_1:0.4f}
+
+$\\theta_{{FR}}$ = {theta_FR:0.4f}
+
+Sum of Square Errors = {sse:0.4f}''', raw=True)
+```
+
+#### Forecasting First Repeat Transactions
+
+The next step is to generate a forecast of first-repeat purchasing, *conditional on our forecast of trial transactions*. We have generated a forecast of $T(t)$, the cumulative number of trial transactions by $t$, whereas our expression for $FR(t),(5)$, requires the incremental number of triers in each period. We compute this quantity, storing it in the array `eligible`. At time $t$, we use (6) to compute the probability of making a first repeat purchase $t$ periods after a trial purchase $(t=1, \ldots, 52)$. Given these two quantities, we use (5) to compute $FR(t)$.
+
+```{python}
+repeat = np.zeros((endwk, endwk-1))
+probmat = np.zeros((endwk, endwk))
+```
+
+```{python}
+t_0 = t.reshape(-1, 1)
+eligible = np.diff(cum_trial, prepend=0)
+
+p_fr_trial = p_1 * (1 - np.exp(-theta_FR * (t - t_0)))
+p_fr_trial = np.triu(p_fr_trial)
+
+pred_cum_fr = p_fr_trial.T @ eligible 
+print(pred_cum_fr)
+
+repeat[:,0] = pred_cum_fr
+```
+
+```{python}
+forecast_df = pl.DataFrame({
+    'Week (t)': t,
+    'FR(t)': repeat[:,0]
+})
+
+actual_fr_curve = (
+    ChartTemp(modified_cum_trans)
+    .line_encode(x_col='Week (t)',y_col='FR(t):Q', y_title='Cumulative FR Sales (# of Transactions)')
+)
+
+froecast_fr_curve = (
+    ChartTemp(forecast_df)
+    .line_encode(x_col='Week (t)',y_col='FR(t):Q', y_title='Cumulative FR Sales (# of Transactions)', dash=[5,3])
+)
+
+fr_chart = actual_fr_curve + froecast_fr_curve
+
+layered_line_prop(fr_chart, 'Cumulative First Repeat Forecast')
+```
+
+```{python}
+fr_forecast_index = forecast_df.select('FR(t)').item(-1,0) / modified_cum_trans.select('FR(t)').item(-1,0) * 100
+
+display_markdown(f'''First Repeat Forecast Index = **{fr_forecast_index:0.0f}**''', raw=True)
+```
+
+### Forecasting Additional Repeat
+
+```{python}
+(
+    ChartTemp(modified_cum_trans.filter(pl.col('Week (t)')<=24))
+    .line_encode(x_col='Week (t)',y_col='AR(t):Q', y_scale=alt.Scale(domain=[0, 100]), y_title='Cumulative AR Sales (# of Transactions)')
+    .line_prop('Actual Test-Market Cumulative Additional Repeat Sales')
+)
+```
+
+**Modelling Additional Repeat**:
+
+$$
+A R(t)= \sum_{j\ge2} R_{j}(t)
+$$
+
+where $R_{j}(t)$ is the cumulative number of individuals who have made at least $j$ repeat purchases by time $t$. How do we characterize $R_{j}(t)$, $j = 2, 3, \ldots$?
+
+```{python}
+(
+    ChartTemp(sh_cum_trans_wideform.filter(pl.col('shWeek')<=24))
+    .transform_fold(['2', '3', '4', '5', '6'], as_=['Repeat Level', 'Cum DoR'])
+    .line_encode(y_col='Cum DoR:Q', y_title='Cumulative Sales (# transactions)', color='Repeat Level:N', x_col='shWeek', y_scale=alt.Scale(domain=[0, 40]))
+    .line_prop('Cumulative Sales by Depth of Repeat Level')
+)
+```
+
+**Modelling Second Repeat**:
+
+How can an individual have made a second repeat purchase by the end of week 5?
+- she could have made her 1st repeat purchase in week 2 (which implies her trial purchase occurred in week 1) and made a 3rd purchase of the new product (i.e., her 2nd repeat purchase) somewhere in the intervening three weeks,
+- she could have made her 1st repeat purchase in week 3 and a 2nd repeat purchase sometime in the following two weeks, or
+- she could have made her 1st repeat purchase in week 4 and
+her 2nd repeat purchase sometime in the following week.
+
+$$
+R_{2}(t)=\sum_{t_{1}=2}^{t-1} P\left( \text {second repeat by } t \mid \text {first repeat at } t_{1}\right) \times\left[FR\left(t_{1}\right)-FR\left(t_{1}-1\right)\right]
+$$
+
+where $FR(t_{1}) − FR(t_{1} − 1)$ is the number of individuals who made their first repeat purchase in week $t_{1}$.
+
+**Modelling Additional Repeat - General**:
+
+$$
+R_{j}(t)=\sum_{t_{j-1}=j}^{t-1} P\left(j \text {th repeat by } t \mid(j-1) \text { th repeat at } t_{j-1}\right) \times\left[R_{j-1}\left(t_{j-1}\right)-R_{j-1}\left(t_{j-1}-1\right)\right]
+$$
+
+where $R_{j-1}\left(t_{j-1}\right)-R_{j-1}\left(t_{j-1}-1\right)$ is the number of individuals who made their $(j-1)th$ repeat purchase in week $t_{j-1}$
+
+**Challenges**:
+- Sparse data for higher orders of repeat $(j = 3, 4, 5)$
+- No data for repeat levels we are likely to observe in the forecast period
+
+Are there common patterns across depth-of-repeat levels that we can exploit? See: [Actual Vs. Estimated Depth-of-Repeat Curve](#depth_of_repeat_curve)
+
+**Probability of jth Repeat**:
+
+Following the same logic as for trial and first repeat,
+$$P\left(j \text {th repeat by } t \mid(j-1) \text { th repeat at } t_{j-1}\right)=p_{j}\left(1-e^{-\theta_{AR}(t-t_{j-1})}\right),\quad t=t_{j+1}+1,\ldots$$
+
+**Evolution of $p_{j}$**:
+
+- The asymptote of the depth-of-repeat curves (i.e., ultimate conversion proportion) increases, at a decreasing rate, as j increases.
+- The proportion of consumers who have made their $jth$ repeat purchase within 52 weeks of their $(j − 1)th$ repeat purchase increases with $j$.
+- We model the evolution of the ultimate conversion proportions as:
+
+$$
+p_{j} = p_{\infty}\left(1-e^{-\gamma j}\right), \quad j \ge 2
+$$
+
+#### Additional Repeat Model Parameter Estimate
+
+```{python}
+#| code-fold: false
+def ar_model(ar, eligibles, weeks, j, guess=[0.5, 0.5, 0.5]):
+
+    def least_square(x):
+        p_inf, gamma, theta_AR = x[0], x[1], x[2]
+        t, t_0 = weeks, weeks.reshape(-1, 1)
+        
+        sse = np.zeros(len(j))
+
+        for i, DoR in enumerate(j):
+            p_j = p_inf * (1 - np.exp(-gamma * DoR))
+            p_ar = p_j * (1 - np.exp(-theta_AR * (t - t_0)))
+            p_ar = np.triu(p_ar)
+            p_ar[:DoR-1] = 0
+
+            pred_cum_ar = p_ar.T @ eligibles[i]
+            sse[i] = np.sum((pred_cum_ar - ar[i])**2)
+
+        return np.sum(sse)
+
+    return minimize(least_square, guess, bounds=[(0,np.inf),(0,np.inf),(0,np.inf)])
+```
+
+```{python}
+#| code-fold: false
+mod_cum_ar_trans = (
+    sh_cum_trans_wideform
+    .filter(pl.col('shWeek') <= 24)
+    .rename({'shWeek': 'Week'})
+    .select('1', '2', '3', '4', '5', 'Week')
+    .to_numpy().transpose()
+)
+
+eligibles = np.diff(mod_cum_ar_trans[:-2], prepend=0, axis=1)
+ar = mod_cum_ar_trans[1:-1]
+weeks = mod_cum_ar_trans[-1]
+j = np.arange(2, 6, 1)
+
+result = ar_model(ar, eligibles, weeks, j)
+p_inf, gamma, theta_AR, sse = result.x[0], result.x[1], result.x[2], result.fun
+
+# Additional Repeat Model Parameters
+display_markdown(f'''$p_{{\\infty}}$ = {p_inf:0.4f}
+
+$\\gamma$ = {gamma:0.4f}
+
+$\\theta_{{AR}}$ = {theta_AR:0.4f}
+
+Sum of Square Errors = {sse:0.4f}''', raw=True)
+```
+
+#### Forecasting Additional Repeat Transactions
+
+To forecast additional repeat, we first compute second repeat (conditional on our forecast of first repeat), then compute third repeat (conditional on our forecast of second repeat), and so on. The code we use to accomplish this is basically the same as that for first repeat, embedded within a loop
+over depth-of-repeat levels. Given the assumption that a customer can have only one transaction per period, we could theoretically have up to 51 depth-of-repeat levels for a 52-week forecast horizon. Another consequence of this assumption is that the first week in which a $j$ th repeat purchase could occur is week $j+1$; this means $R_{j}(t)=0$ for $t \leq j$.
+
+```{python}
+j = np.arange(2, endwk, 1)
+p_j = p_inf * (1 - np.exp(-gamma * j))
+
+for DoR in j:
+    eligibles = np.diff(repeat[:,DoR-2], prepend=0)
+    p_ar = p_j[DoR-2] * (1 - np.exp(-theta_AR * (t - t_0)))
+    p_ar = np.triu(p_ar)
+    p_ar[:DoR-2] = 0
+    repeat[:,DoR-1] = p_ar.T @ eligibles
+```
+
+```{python}
+est_cum_trans = pl.DataFrame({
+    'shWeek': [i for i in range(1, 53, 1)],
+    '2': repeat[:,1],
+    '3': repeat[:,2],
+    '4': repeat[:,3],
+    '5': repeat[:,4],
+    '6': repeat[:,5],
+})
+
+actual_curve = (
+    ChartTemp(sh_cum_trans_wideform)
+    .transform_fold(['2', '3', '4', '5', '6'], as_=['Repeat Level', 'Cum DoR'])
+    .line_encode(y_col='Cum DoR:Q', y_title='Cumulative Sales (# transactions)', color='Repeat Level:N', x_col='shWeek', y_scale=alt.Scale(domain=[0, 40]))
+)
+
+estimated_curve = (
+    ChartTemp(est_cum_trans)
+    .transform_fold(['2', '3', '4', '5', '6'], as_=['Repeat Level', 'Cum DoR'])
+    .line_encode(y_col='Cum DoR:Q', y_title='Cumulative Sales (# transactions)', color='Repeat Level:N', x_col='shWeek', y_scale=alt.Scale(domain=[0, 40]), dash=[5,3])
+)
+
+combined_curve = actual_curve + estimated_curve
+
+layered_line_prop(combined_curve, 'Actual Vs. Predicted Cumulative Sales by Depth of Repeat Level')
+```
+
+```{python}
+forecast_df = pl.DataFrame({
+    'Week (t)': t,
+    'AR(t)': np.sum(repeat[:,1:], axis=1)
+})
+
+actual_ar_curve = (
+    ChartTemp(modified_cum_trans)
+    .line_encode(x_col='Week (t)',y_col='AR(t):Q', y_title='Cumulative AR Sales (# of Transactions)')
+)
+
+froecast_ar_curve = (
+    ChartTemp(forecast_df)
+    .line_encode(x_col='Week (t)',y_col='AR(t):Q', y_title='Cumulative AR Sales (# of Transactions)', dash=[5,3])
+)
+
+ar_chart = actual_ar_curve + froecast_ar_curve
+
+layered_line_prop(ar_chart, 'Cumulative Additional Repeat Forecast')
+```
+
+```{python}
+ar_forecast_index = forecast_df.select('AR(t)').item(-1,0) / modified_cum_trans.select('AR(t)').item(-1,0) * 100
+
+display_markdown(f'''Additional Repeat Forecast Index: = **{ar_forecast_index:0.0f}**''', raw=True)
+```
+
+### Bringing It All Together
+
+```{python}
+display_markdown(f'''Our forecast horizon is {endwk} weeks and we allow for up to {endwk-1} level of repeats.
+
+**Trial Model Parameters:**
+- $P_{0}$ = {p_0:0.4f}
+- $\\theta_{{T}}$ = {theta_T:0.4f}
+
+**First Repeat Model Parameters:**
+- $P_{1}$ = {p_1:0.4f}
+- $\\theta_{{FR}}$ = {theta_FR:0.4f}
+
+**Additioanl Repeat Model Parameters:**
+- $p_{{\\infty}}$ = {p_inf:0.4f}
+- $\\gamma$ = {gamma:0.4f}
+- $\\theta_{{AR}}$ = {theta_AR:0.4f}''', raw=True)
+```
+
+We can now compute $A R(t)=R_{2}(t)+\cdots+R_{52}(t)$, and print out our forecasts of $T(t), F R(t), A R(t)$, and $S(t)(=T(t)+F R(t)+A R(t))$.
+
+```{python}
+ar = np.sum(repeat[:,1:], axis=1)
+totals = cum_trial + np.sum(repeat, axis=1)
+
+forecast_df = pl.DataFrame({
+    'Week (t)': t,
+    'T(t)': cum_trial,
+    'FR(t)': repeat[:,0],
+    'AR(t)': ar,
+    'S(t)': totals
+})
+
+forecast_df
+```
+
+```{python}
+forecasted_curve = (
+    ChartTemp(forecast_df)
+    .transform_fold(['T(t)', 'FR(t)', 'AR(t)', 'S(t)'], as_=['Type', 'Cum DoR'])
+    .line_encode(x_col='Week (t)',y_col='Cum DoR:Q', dash=[5,3], color='Type:N')
+)
+
+forecasted_curve.line_prop('Overall Sales Forecast for the Extended Model')
+```
+
+```{python}
+chart = forecasted_curve + actual_sales_curve
+
+layered_line_prop(chart, 'Overall Sales Forecast for the Extended Model')
+```
+
+```{python}
+trial_forecast_index = forecast_df.select('T(t)').item(-1,0) / modified_cum_trans.select('T(t)').item(-1,0) * 100
+fr_forecast_index = forecast_df.select('FR(t)').item(-1,0) / modified_cum_trans.select('FR(t)').item(-1,0) * 100
+ar_forecast_index = forecast_df.select('AR(t)').item(-1,0) / modified_cum_trans.select('AR(t)').item(-1,0) * 100
+total_forecast_index = forecast_df.select('S(t)').item(-1,0) / modified_cum_trans.select('S(t)').item(-1,0) * 100
+
+display_markdown(f'''**Forecast Index**:
+
+- Trial Forecast Index: **{trial_forecast_index:0.0f}**
+- First Repeat Forecast Index: **{fr_forecast_index:0.0f}**
+- Additional Repeat Forecast Index: **{ar_forecast_index:0.0f}**
+- Total Forecast Index: **{total_forecast_index:0.0f}**''', raw=True)
+```
+
+##### Actual vs Estimated Depth-of-Repeat Curves
+<a id='depth_of_repeat_curve'></a>
+
+```{python}
+# Step 1: Time Since Last Purchase (TSLP)
+tslp_df = (
+    shifted_lf
+    .drop('Week', 'Day', 'Units')
+    .sort('ID', 'shWeek')
+    .with_columns(
+        pl.col('shWeek').shift(1).over('ID').alias('LP Week'),
+        (pl.col('shWeek') - pl.col('shWeek').shift(1)).over('ID').alias('TSLP'),
+    )
+)
+
+# Step 2: Aggregate Purchases by Depth and Week
+j_1_tj_1 = (
+    shifted_lf
+    .group_by('DoR', 'shWeek')
+    .agg(pl.col("ID").n_unique().alias("Eligible"))
+    .sort('DoR', 'shWeek')
+    .with_columns((pl.col('DoR') + 1).alias('DoR'))
+)
+
+# Step 3: Generate All Possible Combinations pf DoR LP Weeks_tslp)
+dor_values = np.arange(0, 12, dtype='uint16')
+week_range = np.arange(1, 53, dtype='int16')
+tslp_range = np.arange(1, 53, dtype='int16')
+
+full_dor_week_tslp = (
+    pl.LazyFrame({
+        'DoR': np.repeat(dor_values, len(week_range) * len(tslp_range)),
+        'shWeek': np.tile(np.repeat(week_range, len(tslp_range)), len(dor_values)),
+        'TSLP': np.tile(tslp_range, len(dor_values) * len(week_range)),
+    }).filter(pl.col('TSLP') <= (53 - pl.col('shWeek')))
+)
+
+# Step 4: Join and Aggregate Eligible Counts
+join_eligible = (
+    full_dor_week_tslp
+    .join(j_1_tj_1, on=['DoR', 'shWeek'], how='left')
+    .filter((pl.col('DoR') != 0) & (pl.col('DoR') != 12))
+    .fill_null(0)
+    .rename({'shWeek': 'LP Week'})
+)
+
+# Step 5: Count Panelists for Each Combination
+week_tslp_count = (
+    tslp_df
+    .group_by("DoR", 'LP Week', 'TSLP')
+    .agg(pl.col("ID").n_unique().alias("Count"))
+    .sort('DoR', 'LP Week', 'TSLP')
+    .filter(pl.col('DoR') > 0)
+)
+
+# Step 6: Compute Cumulative Proportions
+jth_repeat = (
+    join_eligible
+    .join(week_tslp_count, on=['DoR', 'LP Week', 'TSLP'], how='left')
+    .fill_null(0)
+    .with_columns(
+        pl.col('Count').cum_sum().over('DoR', 'LP Week').alias('Cum J Repeat by LP Week')
+    )
+    .with_columns(
+        pl.when(pl.col('LP Week') > (52 - pl.col('TSLP')))
+        .then(None)
+        .otherwise(
+            pl.when(pl.col('Eligible') > 0)
+            .then(pl.col('Cum J Repeat by LP Week') / pl.col('Eligible'))
+            .otherwise(0)
+        ).alias('Cum J Repeat by J-1 Repeat')
+    )
+    .with_columns(
+        (pl.col('Cum J Repeat by J-1 Repeat') * pl.col('Eligible')).alias('Weights')
+    )
+    .filter((pl.col('LP Week') <= 26) & (pl.col('TSLP') <= 26))
+    .group_by('DoR', 'TSLP')
+    .agg(
+        Eligible=pl.col('Eligible').sum(),
+        Weights=pl.col('Weights').sum(),
+    )
+    .with_columns(
+        (pl.col('Weights') / pl.col('Eligible')).alias('Prob Purch')
+    )
+    .sort('TSLP')
+    .filter(pl.col('DoR') < 5)
+)
+```
+
+```{python}
+actual_curve = (
+    ChartTemp(jth_repeat.collect())
+    .line_encode(x_col='TSLP', y_col='Prob Purch:Q', color='DoR:N',x_title='Time Since Last Purchase', y_title='P(Purchase)', x_range=26)
+)
+actual_curve.line_prop({'text': 'Depth-of-Repeat Curves', 'subtitle': 'Cumulative Proportion Repurchasing J Times (Out of Those Purchasing J - 1 Times)'})
+```
+
+```{python}
+p_j1 = p_1 * (1 - np.exp(-theta_FR * (t[:27] - 1)))
+p_j2 = p_j[0] * (1 - np.exp(-theta_AR * (t[1:28] - 2)))
+p_j3 = p_j[1] * (1 - np.exp(-theta_AR * (t[2:29] - 3)))
+p_j4 = p_j[2] * (1 - np.exp(-theta_AR * (t[3:30] - 4)))
+
+est_jth_repeat = pl.DataFrame({
+    'DoR': np.concat([[i]*27 for i in range(1,5)], dtype='int16'), 
+    'TSLP': np.concat([[i for i in range(27)] for _ in range(4)], dtype='int16'),
+    'Prob Purch': np.concat([p_j1, p_j2, p_j3, p_j4])})
+
+estimated_curve = (
+    ChartTemp(est_jth_repeat)
+    .line_encode(x_col='TSLP', y_col='Prob Purch:Q', color='DoR:N',x_title='Time Since Last Purchase', y_title='P(Purchase)', x_range=26, dash=[5,3])
+)
+estimated_curve.line_prop('Estimated Depth-of-Repeat Curves')
+```
+
+```{python}
+combined_curve = actual_curve + estimated_curve
+
+layered_line_prop(combined_curve, 'Actual Vs Estimated Depth-of-Repeat Curves')
+```
+
+## Extending the Basic Model
+
+- The trial model assumes all triers have the same underlying trial rate $θ_{T}$ — a bit simplistic.
+- Allow for individual **differences in (latent) trial rates** across the population.
+- We incorporate the effects of **marketing mix covariates** by assuming that the probability of an individual buying in week $t$, *given* she has yet to make a trial purchase, is a function of marketing activity in week $t$.
+- Similar modifications to first repeat model, etc.
+

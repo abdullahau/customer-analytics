@@ -66,6 +66,8 @@ import altair as alt
 import numpy as np
 from great_tables import GT, style, loc, md
 import gc
+
+alt.renderers.enable("html")
 ```
 
 ### Import Panel Data

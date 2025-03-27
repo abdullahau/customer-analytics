@@ -3,37 +3,37 @@ title: Calculating Customer Acquisition Cost
 author: Abdullah Mahmood
 date: last-modified
 format:
-  html:
-    theme: cosmo
-    css: quarto-style/style.css
-    highlight-style: atom-one
-    mainfont: Palatino
-    fontcolor: black
-    monobackgroundcolor: white
-    monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
-    fontsize: 13pt
-    linestretch: 1.4
-    number-sections: true
-    number-depth: 5
-    toc: true
-    toc-location: right
-    toc-depth: 5
-    code-fold: false
-    code-copy: true
-    cap-location: bottom
-    format-links: false
-    embed-resources: true
-    anchor-sections: true
-    code-links:
-      - text: GitHub Repo
-        icon: github
-        href: https://github.com/abdullahau/customer-analytics/
-      - text: Quarto Markdown
-        icon: file-code
-        href: https://github.com/abdullahau/customer-analytics/blob/main/Customer-Acquisition-Cost.qmd
-    html-math-method:
-      method: mathjax
-      url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: false
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/Customer-Acquisition-Cost.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
 Source: [Video Series - Customer Acquisition Cost (by Dan McCarthy)](https://www.youtube.com/watch?v=PZe6LUAyREQ)

@@ -25,18 +25,6 @@ format:
         html-math-method:
             method: mathjax
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
-jupyter:
-    jupytext:
-        formats: ipynb,qmd
-        text_representation:
-            extension: .qmd
-            format_name: quarto
-            format_version: '1.0'
-            jupytext_version: 1.16.7
-    kernelspec:
-            display_name: main
-            language: python
-            name: main
 ---
 
 ## Pages:
@@ -56,6 +44,7 @@ jupyter:
 - [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-panel-data)
 - [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-transaction-log)
 - [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
+- [RFM: Recency, Frequency, Monetary value Summary](https://abdullahau.github.io/customer-analytics/RFM-Summary)
 
 ### Data Preparation
 

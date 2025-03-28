@@ -1,0 +1,505 @@
+---
+title: "RFM: Recency, Frequency, Monetary value Summary"
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: false
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/RFM-Summary.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+## Introduction
+
+**Source**:
+
+-   [Creating an RFM Summary Using Excel](https://www.brucehardie.com/notes/022/)
+-   [Notes on the CDNOW Master Data Set](https://www.brucehardie.com/notes/026/)
+-   [RFM and CLV: Using Iso-value Curves for Customer Base Analysis](http://www.brucehardie.com/papers/rfm_clv_2005-02-16.pdf)
+
+In order to estimate the parameters of **transaction-flow models** such as the Pareto/NBD and BG/NBD, as well as those of the associated models for **spend per transaction** (spend model), we need an RFM (recency, frequency, monetary value) summary of each customer’s purchasing behavior. In particular,
+
+1.   The **transaction-flow model** requires three pieces of information about each customer’s purchasing history: their “recency”(when their last transaction occurred), “frequency” (how many transactions they made in a specified time period), and the length of time over which we have observed their purchasing behavior. The notation used to represent this information is $(x, tx, T)$, where $x$ is the number of transactions observed in the time period $(0, T]$ and $t_{x}$ $(0 \le tx \le T)$ is the time of the last transaction.
+2.   The **spend model** requires two pieces of information about each customer’s purchasing history: the average “monetary value” of each transaction (denoted by $m_x$) and the number of transactions over which this average is computed (i.e., frequency, $x$).
+
+## Imports
+
+### Import Packages
+
+```{python}
+import polars as pl
+import numpy as np
+
+import matplotlib.pyplot as plt
+%config InlineBackend.figure_formats = ['svg']
+```
+
+### Import Data
+
+We will make use of the CDNOW dataset. The master dataset contains the entire purchase history up to the end of June 1998 of the cohort of 23,570 individuals who made their first-ever purchase at CDNOW in the first quarter of 1997. 
+
+The file `CDNOW_sample.csv` contains purchasing data for a 1/10th systematic sample of the whole cohort (2357 customers). Each record in this file, 6919 in total, comprises five fields: the customer’s ID in the master dataset, the customer’s ID in the 1/10th sample dataset (ranging from 1 to 2357), the date of the transaction, the number of CDs purchased, and the dollar value of the transaction.
+
+```{python}
+CDNOW = (
+    pl.scan_csv(
+        source="data/CDNOW/CDNOW_master.csv",
+        has_header=False,
+        separator=",",
+        schema={
+            "ID": pl.Int32,  # customer id
+            "Date": pl.String,  # transaction date
+            "Quant": pl.Int16,  # number of CDs purchased
+            "Spend": pl.Float64,
+        },
+    )  # dollar value (excl. S&H)
+    .with_columns(pl.col("Date").str.to_date("%Y%m%d"))
+    .with_columns(
+        (pl.col("Date") - pl.date(1996, 12, 31))
+        .dt.total_days()
+        .cast(pl.UInt16)
+        .alias("PurchDay")
+    )
+    .with_columns((pl.col("Spend") * 100).round(0).cast(pl.Int64).alias("Spend Scaled"))
+    .group_by("ID", "Date")
+    .agg(
+        pl.col("*").exclude("PurchDay").sum(), pl.col("PurchDay").max()
+    )  # Multiple transactions by a customer on a single day are aggregated into one
+    .sort("ID", "Date")
+    .with_columns(
+        (pl.col("ID").cum_count().over("ID") - 1).cast(pl.UInt16).alias("DoR")
+    )  # DoR = Depth of Repeat ('Transaction' time: starts with 0 as trial, 1 as 1st repeat and so on)
+)
+
+unauthorized_resellers = (
+    CDNOW.filter(pl.col("DoR") != 0)
+    .group_by("ID")
+    .agg(pl.col("Spend Scaled").sum())
+    .filter(pl.col("Spend Scaled") > 400000)
+    .collect()
+)
+
+CDNOW = CDNOW.filter(~pl.col("ID").is_in(unauthorized_resellers.select("ID")))
+```
+
+```{python}
+# MATLAB Sampling (due to numerical float precision handling differences, original sampling results cannot be replicated unless spend is scaled in MATLAB)
+CDNOW_sample = (
+    pl.scan_csv(
+        source="data/CDNOW/CDNOW_sample.csv",
+        has_header=False,
+        separator=",",
+        schema={
+            "CustID": pl.Int32,
+            "NewID": pl.Int32,
+            "Date": pl.String,
+            "Quant": pl.Int16,
+            "Spend": pl.Float64,
+        },
+    )
+    .with_columns(pl.col("Date").str.to_date("%Y%m%d"))
+    .with_columns(
+        (pl.col("Date") - pl.date(1996, 12, 31))
+        .dt.total_days()
+        .cast(pl.UInt16)
+        .alias("PurchDay")
+    )
+    .with_columns((pl.col("Spend") * 100).round(0).cast(pl.Int64).alias("Spend Scaled"))
+    .group_by("NewID", "Date")
+    .agg(pl.col("*").exclude("PurchDay").sum(), pl.col("PurchDay").max())
+    .sort("NewID", "Date")
+    .with_columns(
+        (pl.col("NewID").cum_count().over("NewID") - 1).cast(pl.UInt16).alias("DoR")
+    )
+    .drop("CustID")
+    .rename({"NewID": "ID"})
+)
+```
+
+1.   We assume that the records in the raw transaction data file are grouped by customer, and sorted within customer by date of transaction. If in doubt, sort the raw dataset by customer ID and date of transaction.
+2.   As they are of no interest to us in this particular case, we delete the first and fourth columns (master dataset customer ID and # CDs purchased, respectively). 
+3.   We note that some customers had more than one transaction on a given day. For example, customer 26 had two separate transactions on 13 January 1997, while customer 46 had two separate transactions on 28 August 1997. There are about 233 such "additional" transactions. The transaction-flow models are developed by telling a story about **interpurchase times**. As we only know the date (and not the time) of each transaction, we need to aggregate the records associated with same-day transactions—we can’t have an interpurchase time of 0
+
+## “Frequency” and “Monetary Value”
+
+We now compute the frequency and monetary value summaries for each customer.
+
+Most of the previous analyses undertaken using this dataset have split the 78 weeks of data in half, creating a 39-week calibration period (1997-01-01 to 1997-09-30) and 39-week validation period (1997-10-01 to 1998-06-30). Furthermore, these analyses have generally ignored each customer’s first-ever purchase at CDNOW, which signals the start of the customer’s “relationship” with the firm; this means calibration-period “frequency” has usually been the number of repeat transactions, and “monetary value” has been the average dollar value per repeat transaction.
+
+```{python}
+calwk = 273  # 39 week calibration period
+
+CDNOW_sample = CDNOW_sample.with_columns(
+    pl.when(pl.col("DoR") == 0)
+    .then(pl.lit("first"))
+    .otherwise(
+        pl.when(pl.col("PurchDay") <= calwk)
+        .then(pl.lit("calib"))
+        .otherwise(pl.lit("valid"))
+    )
+    .alias("Period")
+)
+```
+
+```{python}
+CDNOW = CDNOW.with_columns(
+    pl.when(pl.col("DoR") == 0)
+    .then(pl.lit("first"))
+    .otherwise(
+        pl.when(pl.col("PurchDay") <= calwk)
+        .then(pl.lit("calib"))
+        .otherwise(pl.lit("valid"))
+    )
+    .alias("Period")
+)
+```
+
+```{python}
+# the number of repeat transactions made in the calibration and validation periods
+num_repeat_trans_sample = CDNOW_sample.group_by("ID", "Period").agg(pl.len().alias("x"))
+```
+
+```{python}
+# the number of repeat transactions made in the calibration and validation periods
+num_repeat_trans = CDNOW.group_by("ID", "Period").agg(pl.len().alias("x"))
+```
+
+```{python}
+# the average spend per repeat transaction for the calibration and validation periods
+avg_spend_per_repeat_trans_sample = CDNOW_sample.group_by("ID", "Period").agg(
+    pl.col("Spend Scaled").mean().alias("m_x")
+)
+```
+
+```{python}
+# the average spend per repeat transaction for the calibration and validation periods
+avg_spend_per_repeat_trans = CDNOW.group_by("ID", "Period").agg(
+    pl.col("Spend Scaled").mean().alias("m_x")
+)
+```
+
+## “Recency”
+
+The next step is to compute recency, as well as the length of time over which we have observed each customer’s purchasing behavior.
+
+$T$ is the effective calibration period, the length of time we observe each customer (i.e., the time between the customer’s first-ever purchase at CDNOW and the end of the calibration period)
+
+```{python}
+# Effective calibration period - the length of time we observe each customer
+eff_cal_period_sample = (
+    CDNOW_sample.filter(pl.col("DoR") == 0)
+    .with_columns(
+        ((pl.lit(calwk) - pl.col("PurchDay")) / 7).alias("T")
+    )  # Eff. Calibration Period
+    .rename({"PurchDay": "Trial Day"})
+)
+```
+
+```{python}
+# Effective calibration period - the length of time we observe each customer
+eff_cal_period = (
+    CDNOW.filter(pl.col("DoR") == 0)
+    .with_columns(
+        ((pl.lit(calwk) - pl.col("PurchDay")) / 7).alias("T")
+    )  # Eff. Calibration Period
+    .rename({"PurchDay": "Trial Day"})
+)
+```
+
+For modeling purposes, “recency” is not the calendar date of the last observed purchase; rather the time origin for $t_x$ is the start of the observation period. Since we track customers’ purchasing from their first-ever purchase at CDNOW, the date of this first purchase is the time origin. Therefore, $t_x$ is the length of time between the first-ever purchase and the last observed purchase (in the calibration period), i.e., Last Purchase − First Purchase.
+
+```{python}
+# time of last calibration period repeat purchase (in weeks) - recency number in days
+ttlrp_sample = (
+    CDNOW_sample.filter(pl.col("Period") != "valid")
+    .group_by("ID")
+    .agg(pl.col("PurchDay").max())
+    .join(other=eff_cal_period_sample, on="ID", how="left")
+    .with_columns(
+        ((pl.col("PurchDay") - pl.col("Trial Day")) / 7).alias(
+            "t_x"
+        ),  # Time to Last Repeat
+        (pl.col("PurchDay") / 7).alias(
+            "p1rec"
+        ),  # Calendar week of the last observed purchase - Calendar Recency
+    )
+    .select("ID", "T", "t_x", "p1rec")
+)
+```
+
+```{python}
+# time of last calibration period repeat purchase (in weeks) - recency number in days
+ttlrp = (
+    CDNOW.filter(pl.col("Period") != "valid")
+    .group_by("ID")
+    .agg(pl.col("PurchDay").max())
+    .join(other=eff_cal_period, on="ID", how="left")
+    .with_columns(
+        ((pl.col("PurchDay") - pl.col("Trial Day")) / 7).alias(
+            "t_x"
+        ),  # Time to Last Repeat
+        (pl.col("PurchDay") / 7).alias(
+            "p1rec"
+        ),  # Calendar week of the last observed purchase - Calendar Recency
+    )
+    .select("ID", "T", "t_x", "p1rec")
+)
+```
+
+## RFM Summary
+
+RFM summary of calibration-period transactions:
+
+This is the required “RFM” summary of calibration-period buying behavior needed to estimate the previously mentioned models of *transaction flow* and *spend per transaction*.
+
+```{python}
+rfm_calib_sample = (
+    CDNOW_sample.group_by("ID")
+    .agg()
+    .join(
+        other=num_repeat_trans_sample.filter(pl.col("Period") == "calib").drop(
+            "Period"
+        ),
+        on="ID",
+        how="left",
+    )
+    .join(
+        other=avg_spend_per_repeat_trans_sample.filter(
+            pl.col("Period") == "calib"
+        ).drop("Period"),
+        on="ID",
+        how="left",
+    )
+    .join(other=ttlrp_sample, on="ID", how="left")
+    .fill_null(0)
+)
+```
+
+```{python}
+rfm_calib = (
+    CDNOW.group_by("ID")
+    .agg()
+    .join(
+        other=num_repeat_trans.filter(pl.col("Period") == "calib").drop("Period"),
+        on="ID",
+        how="left",
+    )
+    .join(
+        other=avg_spend_per_repeat_trans.filter(pl.col("Period") == "calib").drop(
+            "Period"
+        ),
+        on="ID",
+        how="left",
+    )
+    .join(other=ttlrp, on="ID", how="left")
+    .fill_null(0)
+)
+```
+
+We can create a summary of validation-period purchasing behavior by extracting the corresponding number of transactions and average spend per transaction numbers from the dataframes constructed above.
+
+### The number of repeat transactions made by each customer in each period
+
+```{python}
+calwk = 273  # 39 week calibration period
+
+# The number of repeat transactions made by each customer in each period
+px = CDNOW.group_by("ID", maintain_order=True).agg(
+    pl.col("PurchDay")
+    .filter((pl.col("PurchDay") <= calwk) & (pl.col("DoR") > 0))
+    .count()
+    .alias("P1X"),  # Period 1: Calibration Period Frequency (x)
+    pl.col("PurchDay")
+    .filter((pl.col("PurchDay") > calwk) & (pl.col("DoR") > 0))
+    .count()
+    .alias("P2X"),  # Period 2: Longitudinal Holdout Period Frequency (x)
+)
+```
+
+### The number of CDs purchased and total spend across these repeat transactions
+
+```{python}
+# The number of CDs purchased and total spend across these repeat transactions
+pSpendQuant = (
+    CDNOW.join(px, on="ID", how="left")
+    .group_by("ID", maintain_order=True)
+    .agg(
+        pl.col("Spend Scaled")
+        .filter(
+            (pl.col("DoR") > 0)
+            & (pl.col("DoR") <= pl.col("P1X"))
+            & (pl.col("P1X") != 0)
+        )
+        .sum()
+        .alias("P1X Spend"),
+        pl.col("Quant")
+        .filter(
+            (pl.col("DoR") > 0)
+            & (pl.col("DoR") <= pl.col("P1X"))
+            & (pl.col("P1X") != 0)
+        )
+        .sum()
+        .alias("P1X Quant"),
+        pl.col("Spend Scaled")
+        .filter((pl.col("DoR") > 0) & (pl.col("DoR") > pl.col("P1X")))
+        .sum()
+        .alias("P2X Spend"),
+        pl.col("Quant")
+        .filter((pl.col("DoR") > 0) & (pl.col("DoR") > pl.col("P1X")))
+        .sum()
+        .alias("P2X Quant"),
+    )
+)
+```
+
+### The average spend per repeat transaction
+
+```{python}
+# The average spend per repeat transaction
+m_x = (
+    pSpendQuant.join(px, on="ID", how="left")
+    .with_columns(
+        (pl.col("P1X Spend") / pl.col("P1X")).alias("P1_m_x"),
+        (pl.col("P2X Spend") / pl.col("P2X")).alias("P2_m_x"),
+    )
+    .fill_nan(0)
+)
+```
+
+### Recency & effective calibration period
+
+When fitting models such as the Pareto/NBD and BG/NBD to these data, we also want to know the “recency” information for each customer, as well as their effective calibration period:
+
+```{python}
+# time of last calibration period repeat purchase (in weeks) - Recency
+ttlrp = (
+    CDNOW.join(px, on="ID", how="left")
+    .with_columns(
+        pl.col("PurchDay")
+        .filter(pl.col("DoR") == 0)
+        .first()
+        .over("ID")
+        .alias("Trial Day")
+    )
+    .group_by("ID", maintain_order=True)
+    .agg((pl.col("PurchDay", "Trial Day").filter(pl.col("DoR") <= pl.col("P1X")).max()))
+    .with_columns(
+        (pl.col("PurchDay") / 7).alias(
+            "p1rec"
+        ),  # Calendar week of the last observed purchase - Calendar Recency
+        ((pl.col("PurchDay") - pl.col("Trial Day")) / 7).alias(
+            "t_x"
+        ),  # Time to Last Repeat Purchase from Trial - Model Recency
+        ((calwk - pl.col("Trial Day")) / 7).alias(
+            "T"
+        ),  # effective calibration period (in weeks)
+    )
+    .drop("PurchDay", "Trial Day")
+)
+```
+
+## RFM Charts
+
+```{python}
+from utils import CDNOW
+
+rfm_summary = CDNOW(master=True, calib_p=273, remove_unauthorized=True).rfm_summary()
+```
+
+```{python}
+data = (
+    rfm_summary.with_columns((pl.col("p1rec") + 0.36).round(0).alias("rev_rec"))
+    .with_columns(
+        pl.col("P1X").cut(np.arange(7))
+    )  # labels=[str(i) if i < 7 else '7+' for i in range(10)]
+    .with_columns(pl.col("rev_rec").cut(np.arange(40)))
+    .collect()
+    .sort("rev_rec")
+    .pivot(on="rev_rec", index="P1X", values="P2X Spend", aggregate_function="mean")
+    .sort("P1X")
+    .fill_null(0)
+    .to_numpy()
+)
+
+Z = (data[:, 1:] / 100).astype(np.float32)
+```
+
+```{python}
+Z_mod = np.vstack([np.zeros((1, Z.shape[0])), Z.T, np.zeros((1, Z.shape[0]))])
+Z_mod[1:-1, 0] = Z.T[0, 0]
+X, Y = np.meshgrid(np.arange(Z_mod.shape[1]), np.arange(Z_mod.shape[0]))
+
+fig, ax = plt.subplots(figsize=(6, 6), subplot_kw={"projection": "3d"})
+
+ax.plot_wireframe(X, Y, Z_mod, rstride=0, cstride=1, color="black", linewidth=0.75)
+ax.set_xlabel("Frequency ($x$)")
+ax.set_ylabel("Recency ($t_{x}$)")
+ax.zaxis.set_rotate_label(False)
+ax.set_zlabel("Average Total Spend\nin Weeks 40–78 ($)", rotation=92)
+ax.zaxis.labelpad = 7
+ax.set_title(
+    " Average Total Spend in Weeks 40–78 by Recency and\nFrequency in Weeks 1–39",
+    pad=-230,
+)
+
+ax.view_init(elev=25, azim=-40, roll=0)
+
+ax.set_xlim(7, 0)
+ax.set_ylim(0, 40)
+ax.set_zlim(0, 400)
+
+ax.grid(True, linestyle=":", color="lightgray")
+
+ax.xaxis._axinfo["grid"].update({"linestyle": ":", "color": "gray"})
+ax.yaxis._axinfo["grid"].update({"linestyle": ":", "color": "gray"})
+ax.zaxis._axinfo["grid"].update({"linestyle": ":", "color": "gray"})
+
+ax.xaxis.pane.fill = False
+ax.yaxis.pane.fill = False
+ax.zaxis.pane.fill = False
+
+ax.set_box_aspect(None, zoom=0.85)
+ax.zaxis._axinfo["juggled"] = (1, 2, 0)
+plt.tight_layout()
+plt.show();
+```
+
+```{python}
+X, Y = np.meshgrid(np.arange(Z.shape[1]), np.arange(Z.shape[0]))
+
+cs = plt.contour(X, Y, Z, levels=8, linewidths=0.75)
+plt.clabel(cs, fontsize=8)
+plt.xlabel("Recency ($t_{x}$)")
+plt.ylabel("Frequency ($x$)")
+plt.title(
+    "Contour Plot Of Average Week 40–78 Total Spend By\nRecency And Frequency", pad=15
+);
+```
+

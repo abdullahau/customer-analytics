@@ -1,0 +1,1279 @@
+---
+title: Beta-discrete-Weibull (BdW) Model
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/BdW-Model.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+**Source**:
+
+-   [“How to Project Customer Retention” Revisited: The Role of Duration Dependence](https://brucehardie.com/papers/037/)
+-   [How to Project Customer Retention](http://www.brucehardie.com/papers/021/)
+-   [Customer-Base Valuation in a Contractual Setting: The Perils of Ignoring Heterogeneity](https://brucehardie.com/papers/022/)
+-   [Technical Appendix - Customer-Base Valuation in a Contractual Setting: The Perils of Ignoring Heterogeneity](https://brucehardie.com/notes/020/)
+-   [Computing DERL for the sBG Model Using Excel](http://www.brucehardie.com/notes/018/)
+-   [How Not to Project Customer Retention](https://brucehardie.com/notes/016/)
+
+## Imports
+
+### Import Packages
+
+```{python}
+#| code-fold: false
+import numpy as np
+from scipy.optimize import minimize
+from scipy.stats import beta, chi2
+from scipy.special import beta as beta_fn
+from scipy.special import hyp2f1
+
+import matplotlib.pyplot as plt
+from IPython.display import display_markdown
+import polars as pl
+from great_tables import GT
+
+%config InlineBackend.figure_formats = ['svg']
+plt.rcParams["axes.spines.right"] = False
+plt.rcParams["axes.spines.top"] = False
+```
+
+### Import Data
+
+```{python}
+#| code-fold: false
+year, alive_regular, alive_highend = np.loadtxt(
+    "data/2-segment-retention.csv",
+    dtype="object",
+    delimiter=",",
+    unpack=True,
+    skiprows=1,
+)
+year = year.astype(int)
+
+alive_regular = alive_regular.astype(float)
+survivor_function_regular = alive_regular / alive_regular[0]
+retention_rate_regular = survivor_function_regular[1:] / survivor_function_regular[:-1]
+
+alive_highend = alive_highend.astype(float)
+survivor_function_highend = alive_highend / alive_highend[0]
+retention_rate_highend = survivor_function_highend[1:] / survivor_function_highend[:-1]
+```
+
+### Helper Functions
+
+```{python}
+#| code-fold: false
+# Log-likelihood function
+def ll_function(observed_churn, observed_alive_t, pmf, survival_func_t):
+    """
+    observed_churn: number of customers chruned each period
+    observed_alive_t: number of customers alive at the end of the calibration period
+    pmf: probability mass function
+    survival_func_t: survival function at the end of the calibration period
+    """
+    return np.sum(observed_churn * np.log(pmf)) + (
+        observed_alive_t * np.log(survival_func_t)
+    )
+
+
+# Polarization Index = φ = 1/(γ+δ+1)
+def polarization_index(gamma, delta):
+    return 1 / (gamma + delta + 1)
+
+
+# Mean E(Θ) = γ/(γ+δ)
+def beta_mean(gamma, delta):
+    return gamma / (gamma + delta)
+
+
+# https://www.wolframalpha.com/input?i2d=true&i=Divide%5Ba%2Ca%2Bb%5D%3Dj+and+Divide%5B1%2Ca%2Bb%2B1%5D%3Dp%5C%2844%29+solve+for+a+and+b
+def beta_params(polarizaition, mean):
+    gamma = mean * (1 / polarizaition - 1)
+    delta = (mean - 1) * (polarizaition - 1) / polarizaition
+    return gamma, delta
+```
+
+```{python}
+#| code-fold: false
+def model_plots(**kwargs):
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+
+    axes[0].plot(year, survivor_function_regular, "k-", linewidth=1)
+    axes[0].plot(year, kwargs["est_sf"], "k--", linewidth=0.75)
+    axes[0].text(x=1.5, y=0.4, s="Regular")
+    axes[0].plot(year, survivor_function_highend, "k-", linewidth=1)
+    axes[0].plot(year, kwargs["est_sf_highend"], "k--", linewidth=0.75)
+    axes[0].text(x=3.5, y=0.8, s="High End")
+    axes[0].plot(
+        [kwargs["calib_p"] + 0.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    axes[0].set_xlabel("Tenure (years)")
+    axes[0].set_ylabel("% Surviving")
+    axes[0].set_title(
+        f"Actual vs. {kwargs['model']}-model-based estimates of the surival\n"
+        f"given an {kwargs['calib_p']}-year model calibration period",
+        pad=30,
+    )
+    axes[0].set_ylim(0, 1)
+    axes[0].set_xlim(0, 13)
+
+    axes[1].plot(
+        year[1:] - 1, retention_rate_regular, "k-", linewidth=1, label="Actual"
+    )
+    axes[1].plot(year[1:] - 1, kwargs["est_rr"], "k--", linewidth=0.75, label="BG")
+    axes[1].text(x=3, y=0.75, s="Regular")
+    axes[1].plot(year[1:] - 1, retention_rate_highend, "k-", linewidth=1)
+    axes[1].plot(year[1:] - 1, kwargs["est_rr_highend"], "k--", linewidth=0.75)
+    axes[1].text(x=2, y=0.95, s="High End")
+    axes[1].plot(
+        [kwargs["calib_p"] - 0.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    axes[1].set_xlabel("Year")
+    axes[1].set_ylabel("Retention Rate")
+    axes[1].set_title(
+        f"Actual vs. {kwargs['model']}-model-based estimates of retention\n"
+        f"given an {kwargs['calib_p']}-year model calibration period",
+        pad=30,
+    )
+    axes[1].set_ylim(0.5, 1)
+    axes[1].set_xlim(0, 13)
+
+    fig.tight_layout()
+    fig.legend(loc=7, frameon=False);   
+```
+
+## Beta-Geometric Model
+
+```{python}
+#| code-fold: false
+def sbg_S(gamma, delta, t):
+    return beta_fn(gamma, delta + t) / beta_fn(gamma, delta)
+
+
+def sbg_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        gamma, delta = x[0], x[1]
+        survivor_function = sbg_S(gamma, delta, year - 1)
+        P_T_t = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], P_T_t, survivor_function[-1])
+
+    return minimize(log_likelihood, x0=[0.1, 0.1], bounds=[(0, np.inf), (0, np.inf)])
+```
+
+### 8-Year Model Calibration
+
+```{python}
+res_regular = sbg_param(year[:8], alive_regular[:8])
+gamma, delta = res_regular.x
+ll = res_regular.fun
+est_survivor_function_regular = sbg_S(gamma, delta, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}""",
+    raw=True,
+)
+
+res_highend = sbg_param(year[:8], alive_highend[:8])
+gamma, delta = res_highend.x
+ll = res_highend.fun
+est_survivor_function_highend = sbg_S(gamma, delta, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+
+display_markdown(
+    f"""**High-End Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}""",
+    raw=True,
+)
+```
+
+```{python}
+model_plots(
+    est_sf=est_survivor_function_regular,
+    est_sf_highend=est_survivor_function_highend,
+    est_rr=est_retention_rate_regular,
+    est_rr_highend=est_retention_rate_highend,
+    calib_p=8,
+    model="BG",
+)
+```
+
+### 5-Year Model Calibration
+
+```{python}
+res_regular = sbg_param(year[:5], alive_regular[:5])
+gamma, delta = res_regular.x
+ll_bg_regular = res_regular.fun
+est_survivor_function_regular = sbg_S(gamma, delta, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll_bg_regular:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}""",
+    raw=True,
+)
+
+res_highend = sbg_param(year[:5], alive_highend[:5])
+gamma, delta = res_highend.x
+ll_bg_highend = res_highend.fun
+est_survivor_function_highend = sbg_S(gamma, delta, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+
+display_markdown(
+    f"""**High-End Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll_bg_highend:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}""",
+    raw=True,
+)
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+ax1, ax2 = axes
+ax1.plot(year, survivor_function_regular, "k-", linewidth=1, label="Actual")
+ax1.plot(year, est_survivor_function_regular, "k--", linewidth=0.75, label="BG")
+ax1.text(x=1.5, y=0.4, s="Regular")
+ax2.plot(year, survivor_function_highend, "k-", linewidth=1)
+ax2.plot(year, est_survivor_function_highend, "k--", linewidth=0.75)
+ax2.text(x=3.5, y=0.8, s="High End")
+
+
+def plotting_elements(ax):
+    ax.plot(
+        [5.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    ax.set_xlabel("Tenure (years)")
+    ax.set_ylabel("% Surviving")
+    ax.set_ylim(0, 1)
+    ax.set_xlim(0, 13)
+
+
+plotting_elements(ax1)
+plotting_elements(ax2)
+fig.suptitle(
+    "Actual vs. BG-model-based estimates of the surival given an five-year model calibration period"
+)
+fig.tight_layout()
+fig.legend(loc=1, frameon=False);
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+ax1, ax2 = axes
+ax1.plot(year[1:] - 1, retention_rate_regular, "k-", linewidth=1, label="Actual")
+ax1.plot(year[1:] - 1, est_retention_rate_regular, "k--", linewidth=0.75, label="BG")
+ax1.text(x=3, y=0.78, s="Regular")
+ax2.plot(year[1:] - 1, retention_rate_highend, "k-", linewidth=1)
+ax2.plot(year[1:] - 1, est_retention_rate_highend, "k--", linewidth=0.75)
+ax2.text(x=2, y=0.95, s="High End")
+
+
+def plotting_elements(ax):
+    ax.plot(
+        [4.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Retention Rate")
+    ax.set_ylim(0.5, 1)
+    ax.set_xlim(0, 13)
+
+
+plotting_elements(ax1)
+plotting_elements(ax2)
+fig.suptitle(
+    "Actual vs. BG-model-based estimates of retention given an five-year model calibration period"
+)
+fig.tight_layout()
+fig.legend(loc=1, frameon=False);
+```
+
+## Discrete Weibull (dW) Model
+
+```{python}
+#| code-fold: false
+def dw_S(theta, c, t):
+    return (1 - theta) ** (t**c)
+
+
+def dw_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        theta, c = x[0], x[1]
+        survivor_function = dw_S(theta, c, year - 1)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    return minimize(
+        log_likelihood, x0=[0.4, 0.4], bounds=[(0.001, np.inf), (0.001, np.inf)]
+    )
+```
+
+```{python}
+res_regular = dw_param(year[:5], alive_regular[:5])
+theta, c = res_regular.x
+ll = res_regular.fun
+est_survivor_function_regular = dw_S(theta, c, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $\\theta$ = {theta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+
+res_highend = dw_param(year[:5], alive_highend[:5])
+theta, c = res_highend.x
+ll = res_highend.fun
+est_survivor_function_highend = dw_S(theta, c, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+
+display_markdown(
+    f"""**High-End Customers:**
+
+Parameters:
+
+- $\\theta$ = {theta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+ax1, ax2 = axes
+ax1.plot(year, survivor_function_regular, "k-", linewidth=1, label="Actual")
+ax1.plot(year, est_survivor_function_regular, "k--", linewidth=0.75, label="dW")
+ax1.text(x=1.5, y=0.4, s="Regular")
+ax2.plot(year, survivor_function_highend, "k-", linewidth=1)
+ax2.plot(year, est_survivor_function_highend, "k--", linewidth=0.75)
+ax2.text(x=3.5, y=0.8, s="High End")
+
+
+def plotting_elements(ax):
+    ax.plot(
+        [5.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    ax.set_xlabel("Tenure (years)")
+    ax.set_ylabel("% Surviving")
+    ax.set_ylim(0, 1)
+    ax.set_xlim(0, 13)
+
+
+plotting_elements(ax1)
+plotting_elements(ax2)
+fig.suptitle(
+    "Actual vs. dW-model-based estimates of the surival given an five-year model calibration period"
+)
+fig.tight_layout()
+fig.legend(loc=1, frameon=False);
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+ax1, ax2 = axes
+ax1.plot(year[1:] - 1, retention_rate_regular, "k-", linewidth=1, label="Actual")
+ax1.plot(year[1:] - 1, est_retention_rate_regular, "k--", linewidth=0.75, label="dW")
+ax1.text(x=2, y=0.85, s="Regular")
+ax2.plot(year[1:] - 1, retention_rate_highend, "k-", linewidth=1)
+ax2.plot(year[1:] - 1, est_retention_rate_highend, "k--", linewidth=0.75)
+ax2.text(x=2, y=0.95, s="High End")
+
+
+def plotting_elements(ax):
+    ax.plot(
+        [4.5 for _ in np.arange(0, 1.1, 0.5)],
+        [_ for _ in np.arange(0, 1.1, 0.5)],
+        "k--",
+        linewidth=0.75,
+    )
+    ax.set_xlabel("Year")
+    ax.set_ylabel("Retention Rate")
+    ax.set_ylim(0.5, 1)
+    ax.set_xlim(0, 13)
+
+
+plotting_elements(ax1)
+plotting_elements(ax2)
+fig.suptitle(
+    "Actual vs. dW-model-based estimates of retention given an five-year model calibration period"
+)
+fig.tight_layout()
+fig.legend(loc=1, frameon=False);
+```
+
+## Beta-discrete-Weibull (BdW) Model
+
+```{python}
+#| code-fold: false
+def bdw_S(gamma, delta, c, t):
+    return beta_fn(gamma, delta + t**c) / beta_fn(gamma, delta)
+
+
+def bdw_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        gamma, delta, c = x[0], x[1], x[2]
+        survivor_function = bdw_S(gamma, delta, c, year - 1)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    return minimize(
+        log_likelihood,
+        x0=[0.1, 0.1, 0.1],
+        bounds=[(0, np.inf), (0, np.inf), (0, np.inf)],
+    )
+
+
+def retention_curve(c, gamma, delta, year):
+    return beta_fn(gamma, delta + year**c) / beta_fn(gamma, delta + (year - 1) ** c)
+```
+
+```{python}
+res_regular = bdw_param(year[:5], alive_regular[:5])
+gamma, delta, c = res_regular.x
+ll = res_regular.fun
+est_survivor_function_regular = bdw_S(gamma, delta, c, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+# Model Fit - BG vs. BdW
+lr = 2 * (ll_bg_regular - ll)
+p_value = chi2.sf(lr, df=1)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}
+
+Model Fit: LR = {lr:.2f}, p-Value = {p_value:.3f}""",
+    raw=True,
+)
+
+res_highend = bdw_param(year[:5], alive_highend[:5])
+gamma, delta, c = res_highend.x
+ll = res_highend.fun
+est_survivor_function_highend = bdw_S(gamma, delta, c, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+# Model Fit - BG vs. BdW
+lr = 2 * (ll_bg_highend - ll)
+p_value = chi2.sf(lr, df=1)
+
+display_markdown(
+    f"""**High End Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}
+
+Model Fit: LR = {lr:.2f}, p-Value = {p_value:.3f}""",
+    raw=True,
+)
+```
+
+```{python}
+model_plots(
+    est_sf=est_survivor_function_regular,
+    est_sf_highend=est_survivor_function_highend,
+    est_rr=est_retention_rate_regular,
+    est_rr_highend=est_retention_rate_highend,
+    calib_p=5,
+    model="BdW",
+)
+```
+
+The parameters of the beta distribution can be characterized in terms of the mean $E(Θ) = γ/(γ+δ)$ and polarization index $\phi = 1/(γ+δ+1)$. The logic behind the polarization index is as follows: as $γ, δ → 0$ (thus $\phi → 1$), the values of $θ$ are concentrated near $θ = 0$ and $θ = 1$ and we can think of the values of $θ$ as being very different, or “highly polarized.” As $γ, δ → ∞$ (thus $\phi → 0$), the beta distribution becomes a spike at its mean; there is no “polarization” in the values of $θ$.
+
+Given the five-year calibration period parameter estimates for the High End dataset from the BG model estimates, $\hat\phi_{BG} = 0.099$; given the parameter estimates from BdW model estimation, $\hat\phi_{BdW} = 0.335$. We observe that there is greater heterogeneity in the presence of the positive duration dependence to capture the dominant pattern of increasing aggregate retention rates observed in the data.
+
+## Exploring the Shape of $r(t)$
+
+```{python}
+case1 = beta(a=4.75, b=14.25)
+case2 = beta(a=0.5, b=1.5)
+case3 = beta(a=0.083, b=0.25)
+x = np.arange(0,1.01,0.01)
+```
+
+While the associated distributions of $Θ$ have the same mean ($E(Θ) = 0.25$), they take on quite different shapes. In Case 1, the distribution of $Θ$ is relatively homogeneous ($\phi = 0.05$) with an interior mode. In Case 2, there is quite a bit of heterogeneity ($\phi = 0.33$) in the distribution of $Θ$, with the majority of
+individuals having lowish values of $θ$. The heterogeneity in Case 3 ($\phi = 0.75$) is extreme; this U-shaped distribution indicates that some of the acquired customers have a high value of $θ$ (which maps to a low probability of renewal), while a larger number of customers have small values of $θ$.
+
+```{python}
+plt.figure(figsize=(8, 5), dpi=100)
+plt.plot(
+    x,
+    case1.pdf(x),
+    "k--",
+    linewidth=0.75,
+    label=f"Case 1: $E(\\Theta)$ = {case1.mean():0.2f}, $\\phi$ = {polarization_index(4.75, 14.25):0.2f}",
+)
+plt.plot(
+    x,
+    case2.pdf(x),
+    "k-",
+    linewidth=0.75,
+    label=f"Case 2: $E(\\Theta)$ = {case2.mean():0.2f}, $\\phi$ = {polarization_index(0.5, 1.5):0.2f}",
+)
+plt.plot(
+    x,
+    case3.pdf(x),
+    "k:",
+    linewidth=0.75,
+    label=f"Case 3: $E(\\Theta)$ = {case3.mean():0.2f}, $\\phi$ = {polarization_index(0.083, 0.25):0.2f}",
+)
+plt.xlabel("$\\theta$")
+plt.ylabel("$g(\\theta)$")
+plt.title("Shape of the beta distribution for Cases 1–3", pad=30)
+plt.ylim(0, 5)
+plt.xlim(0, 1)
+plt.legend(loc=7, frameon=False);
+```
+
+```{python}
+# Iiteratively increases γ until the polarization is smaller than a specified threshold
+def target_beta_param(target_mean, target_polarization=1e-2):
+    gamma = 1  # Start with a small gamma value
+    while True:
+        delta = gamma * (
+            1 / target_mean - 1
+        )  # when mean is know, rerrange γ/(γ+δ) to isolate δ
+        polarization = 1 / (gamma + delta + 1)
+        if polarization < target_polarization:
+            break
+        gamma += 1
+    return gamma, delta, polarization
+
+
+mean = 0.25
+gamma, delta, polarization = target_beta_param(target_mean=mean)
+print(f"Gamma: {gamma}, Delta: {delta}, Polarization: {polarization:0.2f}")
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=200)
+c_range = [0.75, 1.25]
+for i in range(2):
+    ax = axes[i]
+    ax.plot(
+        year,
+        retention_curve(c_range[i], 4.75, 14.25, year),
+        "k--",
+        linewidth=0.75,
+        label=f"Case 1 ($\\phi$ = {polarization_index(4.75, 14.25):0.2f})",
+    )
+    ax.plot(
+        year,
+        retention_curve(c_range[i], 0.5, 1.5, year),
+        "k-",
+        linewidth=0.75,
+        label=f"Case 2 ($\\phi$ = {polarization_index(0.5, 1.5):0.2f})",
+    )
+    ax.plot(
+        year,
+        retention_curve(c_range[i], 0.083, 0.25, year),
+        "k:",
+        linewidth=0.75,
+        label=f"Case 3 ($\\phi$ = {polarization_index(0.083, 0.25):0.2f})",
+    )
+    ax.plot(
+        year,
+        retention_curve(c_range[i], 25, 75, year),
+        "k-.",
+        linewidth=0.75,
+        label="Homogeneous ($\\phi$ → 0)",
+    )
+    ax.set_xlabel("Period")
+    ax.set_ylabel("Retention Rate")
+    ax.set_ylim(0.5, 1)
+    ax.set_xlim(0.5, 10)
+    ax.set_title(f"$c = {c_range[i]}$")
+fig.suptitle(
+    "Shape of the beta-discrete-Weibull retention curve for different levels of\nheterogeneity in $Θ$ and different values of $c$ (with $E(Θ) = 0.25$ in all cases)"
+)
+fig.legend(
+    *axes[1].get_legend_handles_labels(),
+    loc="lower center",
+    frameon=False,
+    ncol=2,
+    bbox_to_anchor=(0.5, -0.05),
+)
+fig.tight_layout();
+```
+
+```{python}
+c_target = 1.25
+mean_target = 0.25
+polarization_range = [0.001, 0.025, 0.05, 0.075, 0.219, 0.3, 0.4]
+dashed_lines = ["k-", "k--", "k-.", "k:", "k-", "k--", "k-."]
+
+plt.figure(figsize=(8, 5), dpi=100)
+for i, pol in enumerate(polarization_range):
+    implied_gamma, implied_delta = beta_params(pol, mean_target)
+    y = retention_curve(c_target, implied_gamma, implied_delta, year[:-3])
+    plt.plot(
+        year[:-3],
+        y,
+        dashed_lines[i],
+        linewidth=0.75,
+        label=f"Case {i + 1} ($\\phi$ = {pol})",
+    )
+    plt.annotate(
+        f"$\\phi$ = {pol:.3f}" if pol != 0.001 else "$\\phi$ → 0",
+        xy=(year[-4], y[-1]),
+        xytext=(1.02 * year[-4], 0.995 * y[-1]),
+    )
+plt.xlabel("Period")
+plt.ylabel("Retention Rate")
+plt.title(
+    "Evolution of the shape of the beta-discrete-Weibull retention curve as the level\n\
+of heterogeneity in $\\Theta$ increases (with $E(\\Theta) = 0.25$ and $c = 1.25$ in all cases)",
+    pad=30,
+)
+plt.ylim(0.5, 1)
+plt.xlim(0.5, 10);
+```
+
+## “Beta of Second Kind” (B2) Distribution Model
+
+```{python}
+#| code-fold: false
+def b2_S(r, alpha, s, x):
+    return 1 - (1 / (s * beta_fn(r, s))) * (alpha / (alpha + x)) ** r * (
+        x / (alpha + x)
+    ) ** s * hyp2f1(r + s, 1, s + 1, x / (alpha + x))
+
+
+def b2_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        r, alpha, s = x[0], x[1], x[2]
+        survivor_function = b2_S(r, alpha, s, year - 1)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    return minimize(
+        log_likelihood,
+        x0=[0.1, 0.1, 0.1],
+        bounds=[(0, np.inf), (0, np.inf), (0, np.inf)],
+    )
+```
+
+```{python}
+res_regular = b2_param(year[:5], alive_regular[:5])
+r, alpha, s = res_regular.x
+ll = res_regular.fun
+est_survivor_function_regular = b2_S(r, alpha, s, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $r$ = {r:0.4f}
+- $\\alpha$ = {alpha:0.4f}
+- $s$ = {s:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+
+res_highend = b2_param(year[:5], alive_highend[:5])
+r, alpha, s = res_highend.x
+ll = res_highend.fun
+est_survivor_function_highend = b2_S(r, alpha, s, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+
+display_markdown(
+    f"""**High End Customers:**
+
+Parameters:
+
+- $r$ = {r:0.4f}
+- $\\alpha$ = {alpha:0.4f}
+- $s$ = {s:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+model_plots(
+    est_sf=est_survivor_function_regular,
+    est_sf_highend=est_survivor_function_highend,
+    est_rr=est_retention_rate_regular,
+    est_rr_highend=est_retention_rate_highend,
+    calib_p=5,
+    model="B2",
+)
+```
+
+## 2-Component Discrete Weibull (dW) Models
+
+```{python}
+#| code-fold: false
+# Discrete Weibull (dW) Model Survivor Function
+def dw_S(t, *params):
+    "Params: theta1, theta2, c1, c2, pi"
+    return params[4] * (1 - params[0]) ** (t ** params[2]) + (1 - params[4]) * (
+        1 - params[1]
+    ) ** (t ** params[3])
+
+
+# 2-Component Discrete Weibull (dW) Model - Heterogenous θ and Heterogenous c
+def seg2_dW_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        theta1, theta2, c1, c2, pi = x
+        survivor_function = dw_S(year - 1, theta1, theta2, c1, c2, pi)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    guess = [0.05, 0.1, 0.5, 1, 0.5]
+    bounds = [(1e-4, 1), (1e-4, 1), (1e-4, np.inf), (1e-4, np.inf), (1e-4, 1)]
+    res = minimize(log_likelihood, x0=guess, bounds=bounds)
+    return {
+        "theta1": res.x[0],
+        "theta2": res.x[1],
+        "c1": res.x[2],
+        "c2": res.x[3],
+        "pi": res.x[4],
+        "ll": res.fun,
+    }
+
+
+# 2-Component Discrete Weibull (dW) Model - Heterogenous θ and Homogenous c
+def seg2_dW_homc_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        theta1, theta2, c, pi = x
+        survivor_function = dw_S(year - 1, theta1, theta2, c, c, pi)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    guess = [0.05, 0.1, 0.5, 0.5]
+    bounds = [(1e-4, 1), (1e-4, 1), (1e-4, np.inf), (1e-4, 1)]
+    res = minimize(log_likelihood, x0=guess, bounds=bounds)
+    return {
+        "theta1": res.x[0],
+        "theta2": res.x[1],
+        "c1": res.x[2],
+        "c2": res.x[2],
+        "pi": res.x[3],
+        "ll": res.fun,
+    }
+
+
+# 2-Component Discrete Weibull (dW) Model - Homogenous θ and Heterogenous c
+def seg2_dW_homt_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        theta, c1, c2, pi = x
+        survivor_function = dw_S(year - 1, theta, theta, c1, c2, pi)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    guess = [0.05, 0.5, 1, 0.5]
+    bounds = [(1e-4, 1), (1e-4, np.inf), (1e-4, np.inf), (1e-4, 1)]
+    res = minimize(log_likelihood, x0=guess, bounds=bounds)
+    return {
+        "theta1": res.x[0],
+        "theta2": res.x[0],
+        "c1": res.x[1],
+        "c2": res.x[2],
+        "pi": res.x[3],
+        "ll": res.fun,
+    }
+
+
+# Discrete Weibull (dW) Model - Homogenous θ and Homogenous c
+def dw_param(year, alive):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        theta, c = x[0], x[1]
+        survivor_function = dw_S(year - 1, theta, theta, c, c, 1)
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -ll_function(num_lost, alive[-1], pmf, survivor_function[-1])
+
+    res = minimize(
+        log_likelihood, x0=[0.4, 0.4], bounds=[(0.001, np.inf), (0.001, np.inf)]
+    )
+    return {
+        "theta1": res.x[0],
+        "theta2": res.x[0],
+        "c1": res.x[1],
+        "c2": res.x[1],
+        "pi": 1,
+        "ll": res.fun,
+    }
+```
+
+The five model parameters are not identified if we use the five-year model calibration period (as we only observe four renewal opportunities). We will therefore use the whole dataset, which contains 12 renewal opportunities, in our investigations of heterogeneity in $c$.
+
+```{python}
+#| code-fold: false
+# https://en.wikipedia.org/wiki/Akaike_information_criterion
+def aic(k, log_likelihood):
+    """
+    k: number of parameters in the model
+    log_likelihood: minimized, negative log value of the likelihood function
+    """
+    return (2 * k) + (2 * log_likelihood)
+
+
+# https://en.wikipedia.org/wiki/Bayesian_information_criterion
+def bic(k, n, log_likelihood):
+    """
+    k:  number of parameters in the model
+    n:  number of data points or number of observations, i.e. the x in the  likelihood function L = p(x | θ, M)
+        where M is the model, θ  are the parameters values that maximize the likelihood function and x is the observed data
+        x in our case is the total number of customers in in the cohort
+    log_likelihood: minimized, negative log value of the likelihood function
+    """
+    return (k * np.log(n)) + (2 * log_likelihood)
+
+
+def evidence_ratio(aic_i, aci_min):
+    """
+    Evidence ratio: E_{i} = exp((AIC_{i} - AIC_{min})/2)
+    """
+    return np.exp((aic_i - aci_min) / 2)
+```
+
+```{python}
+models = [seg2_dW_param, seg2_dW_homc_param, seg2_dW_homt_param, dw_param]
+model_features = [
+    ["2 Component dW", 5],
+    ["dW - Hom. c", 4],
+    ["dW - Hom. θ", 4],
+    ["dW", 2],
+]
+crosstab = pl.DataFrame(
+    {
+        "Model Specifications": [
+            "θ₁",
+            "θ₂",
+            "θ",
+            "c₁",
+            "c₂",
+            "c",
+            "π",
+            "LL",
+            "AIC",
+            "BIC",
+            "Evidence Ratio",
+        ],
+        "Group Names": ["Parameter" for _ in range(7)]
+        + ["Model Fit" for _ in range(4)],
+    }
+)
+for i, fn in enumerate(models):
+    res = fn(year, alive_highend)
+    est_survivor_func = dw_S(year - 1, *res.values())
+    est_retention_rate = est_survivor_func[1:] / est_survivor_func[:-1]
+    AIC = aic(model_features[i][1], res["ll"])
+    BID = bic(model_features[i][1], 1000, res["ll"])
+    res["theta"], res["c"] = 0.0, 0.0
+    if model_features[i][0] == "dW - Hom. c":
+        res["c"] = res["c1"]
+        res["c1"], res["c2"] = 0.0, 0.0
+    elif model_features[i][0] == "dW - Hom. θ":
+        res["theta"] = res["theta1"]
+        res["theta1"], res["theta2"] = 0.0, 0.0
+    elif model_features[i][0] == "dW":
+        res["theta"], res["c"] = res["theta1"], res["c1"]
+        res["theta1"], res["theta2"], res["c1"], res["c2"] = 0.0, 0.0, 0.0, 0.0
+        res["pi"] = 0.0
+    df = pl.DataFrame(
+        {
+            model_features[i][0]: [
+                res["theta1"],
+                res["theta2"],
+                res["theta"],
+                res["c1"],
+                res["c2"],
+                res["c"],
+                res["pi"],
+                res["ll"],
+                AIC,
+                BID,
+                evidence_ratio(AIC, 4015.6),
+            ]
+        }
+    )
+    crosstab = crosstab.hstack(df)
+
+    res = fn(year, alive_regular)
+    est_survivor_func_regular = dw_S(year - 1, *res.values())
+    est_retention_rate_regular = est_survivor_func[1:] / est_survivor_func[:-1]
+
+    model_plots(
+        est_sf=est_survivor_func_regular,
+        est_sf_highend=est_survivor_func,
+        est_rr=est_retention_rate_regular,
+        est_rr_highend=est_retention_rate,
+        calib_p=14,
+        model=model_features[i][0],
+    )
+
+(
+    GT(crosstab, rowname_col="Model Specifications", groupname_col="Group Names")
+    .fmt_number(decimals=3)
+    .sub_zero(zero_text="")
+    .fmt_number(decimals=1, rows=[7, 8, 9, 10])
+    .fmt_scientific(columns=["dW"], rows=10, n_sigfig=1)
+    .opt_stylize()
+)
+```
+
+```{python}
+res_regular = bdw_param(year, alive_regular)
+gamma, delta, c = res_regular.x
+ll = res_regular.fun
+est_survivor_function_regular = bdw_S(gamma, delta, c, year - 1)
+est_retention_rate_regular = (
+    est_survivor_function_regular[1:] / est_survivor_function_regular[:-1]
+)
+
+display_markdown(
+    f"""**Regular Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}
+
+Model Fit: 
+
+- AIC = {aic(3, ll):.1f}
+- BIC = {bic(3, 1000, ll):.1f}""",
+    raw=True,
+)
+
+res_highend = bdw_param(year, alive_highend)
+gamma, delta, c = res_highend.x
+ll = res_highend.fun
+est_survivor_function_highend = bdw_S(gamma, delta, c, year - 1)
+est_retention_rate_highend = (
+    est_survivor_function_highend[1:] / est_survivor_function_highend[:-1]
+)
+
+display_markdown(
+    f"""**High End Customers:**
+
+Parameters:
+
+- $\\gamma$ = {gamma:0.4f}
+- $\\delta$ = {delta:0.4f}
+- $c$ = {c:0.4f}
+
+Log-Likelihood = {-ll:0.4f}
+
+Summary Stats: $E(\\Theta)$ = {beta_mean(gamma, delta):0.3f}, $\\phi$ = {polarization_index(gamma, delta):0.3f}
+
+Model Fit: 
+
+- AIC = {aic(3, ll):.1f}
+- BIC = {bic(3, 1000, ll):.1f}""",
+    raw=True,
+)
+```
+
+```{python}
+model_plots(
+    est_sf=est_survivor_function_regular,
+    est_sf_highend=est_survivor_function_highend,
+    est_rr=est_retention_rate_regular,
+    est_rr_highend=est_retention_rate_highend,
+    calib_p=14,
+    model="BdW",
+)
+```
+
+## Computing CLV under the BdW Model
+
+```{python}
+#| code-fold: false
+# DEL - Discounted Expected Lifetime: Expected Discounted Lifetime E(DL)
+def sbg_del(gamma, delta, d):
+    return hyp2f1(1, delta, gamma + delta, 1 / (1 + d))
+
+
+# DERL - Discounted Expected Residual Lifetime: Expected Discounted Residual Lifetime E(DRL)
+def sbg_drl(gamma, delta, n, d, mode=1):
+    """
+    mode 1: discounted expected residual lifetime of a just-acquired customer (equals DEL(d)−1, since it does not count the first-ever purchase by the customer)
+    mode 2: Standing at the end of period n, just prior to the point in time at which the contract renewal decision is made (i.e., the customer has renewed his
+            contract n − 1 times and we have yet to learn whether or not the nth contract renewal will be made); just before the point in time at which the
+            contract renewal decision is made
+    mode 3: The discounted expected residual lifetime of a customer evaluated immediately after we have received the payment associated with her nth contract renewal
+    """
+    if mode == 1:
+        return (
+            delta
+            / ((gamma + delta) * (1 + d))
+            * hyp2f1(1, delta + 1, gamma + delta + 1, 1 / (1 + d))
+        )
+    if mode == 2:
+        return (
+            (delta + n - 1)
+            / (gamma + delta + n - 1)
+            * hyp2f1(1, delta + n, gamma + delta + n, 1 / (1 + d))
+        )
+    if mode == 3:
+        return (
+            (delta + n)
+            / ((gamma + delta + n) * (1 + d))
+            * hyp2f1(1, delta + n + 1, gamma + delta + n + 1, 1 / (1 + d))
+        )
+
+
+# Lifetimes characterized by the BdW model do not have a closed-form DEL & DERL
+# DEL - Discounted Expected Lifetime: Expected Discounted Lifetime E(DL)
+def bdw_del(gamma, delta, c, d, t):
+    survivor_function = bdw_S(gamma, delta, c, t)
+    disc = 1 / (1 + d) ** t
+    return np.sum(survivor_function * disc)
+
+
+def bdw_drl(gamma, delta, c, n, d, t):
+    survivor_function = bdw_S(gamma, delta, c, t)
+    conditional_sf = survivor_function[n:] / survivor_function[n - 1]
+    disc = 1 / (1 + d) ** (t[:-n])
+    return np.sum(conditional_sf * disc)
+```
+
+```{python}
+d = 0.1
+n = 5
+
+# sBG Model
+res = sbg_param(year[:5], alive_regular[:5])
+gamma, delta = res.x
+e_dl_regular = sbg_del(gamma, delta, d)
+e_drl_regular = sbg_drl(gamma, delta, n, d, 2)
+
+res = sbg_param(year[:5], alive_highend[:5])
+gamma, delta = res.x
+e_dl_highend = sbg_del(gamma, delta, d)
+e_drl_highend = sbg_drl(gamma, delta, n, d, 2)
+
+display_markdown(
+    f"""**sBG Model - DEL & DRL:**
+
+Regular Segement:
+
+- $E(DL)$ = {e_dl_regular:0.2f}
+- $E(DRL)$ = {e_drl_regular:0.2f}
+
+Highend Segement:
+
+- $E(DL)$ = {e_dl_highend:0.2f}
+- $E(DRL)$ = {e_drl_highend:0.2f}""",
+    raw=True,
+)
+
+# BdW Model
+res = bdw_param(year[:5], alive_regular[:5])
+gamma, delta, c = res.x
+e_dl_regular = bdw_del(gamma, delta, c, d, t=np.arange(100))
+e_drl_regular = bdw_drl(gamma, delta, c, n, d, t=np.arange(100))
+
+res = bdw_param(year[:5], alive_highend[:5])
+gamma, delta, c = res.x
+e_dl_highend = bdw_del(gamma, delta, c, d, t=np.arange(100))
+e_drl_highend = bdw_drl(gamma, delta, c, n, d, t=np.arange(100))
+
+display_markdown(
+    f"""**BdW Model - DEL & DRL:**
+
+Regular Segement:
+
+- $E(DL)$ = {e_dl_regular:0.2f}
+- $E(DRL)$ = {e_drl_regular:0.2f}
+
+Highend Segement:
+
+- $E(DL)$ = {e_dl_highend:0.2f}
+- $E(DRL)$ = {e_drl_highend:0.2f}""",
+    raw=True,
+)
+
+```
+
+## Work-In-Progress
+
+```{python}
+#| code-fold: false
+def c_est(gamma, delta, year=year[:5], alive=alive_regular[:5]):
+    num_lost = alive[:-1] - alive[1:]
+
+    def log_likelihood(x):
+        c = x[0]
+        survivor_function = beta_fn(gamma, delta + (year - 1) ** c) / beta_fn(
+            gamma, delta
+        )
+        pmf = survivor_function[:-1] - survivor_function[1:]
+        return -np.sum(num_lost * np.log(pmf)) - (
+            alive[-1] * np.log(survivor_function[-1])
+        )
+
+    res = minimize(log_likelihood, x0=[0.1], bounds=[(0.01, np.inf)])
+    return res.x
+```
+
+```{python}
+polarization_range = np.arange(0.01, 1, 0.02)
+mean_range = [0.1, 0.25, 0.4]
+
+plt.figure(figsize=(8, 5), dpi=100)
+for i, mu in enumerate(mean_range):
+    implied_gamma, implied_delta = beta_params(polarization_range, mu)
+    y = np.vectorize(c_est)(implied_gamma, implied_delta)
+    plt.plot(
+        polarization_range,
+        y,
+        dashed_lines[i],
+        linewidth=0.75,
+        label=f"Case {i + 1} ($\\phi$ = {pol})",
+    )
+plt.xlabel("$\\phi$")
+plt.ylabel("c")
+plt.title(
+    "Shape of the beta-discrete-Weibull retention curve as a\n function of $c$ and $\\phi$ for $E(\\Theta) = {0.10, 0.25, 0.40}$",
+    pad=30,
+)
+plt.ylim(0, 2)
+plt.xlim(0, 1);
+```

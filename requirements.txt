@@ -1,6 +1,8 @@
+quarto
 stan
 bridgestan
 xarray
+arviz
 altair
 great-tables
 ipykernel
@@ -16,7 +18,6 @@ numpy
 pandas
 plotly
 polars
-pymdown-extensions
 scikit-learn
 scikit-optimize
 scipy

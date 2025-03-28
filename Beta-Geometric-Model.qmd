@@ -1,0 +1,288 @@
+---
+title: Beta-Geometric (BG) Model
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/Beta-Geometric-Model.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+The beta-geometric (BG) distribution is a robust simple model for characterizing and forecasting the length of a customer's relationship with a firm in a contractual setting.
+
+**Source**:
+
+-   [A Spreadsheet-Literate Non-Statistician's Guide to the Beta-Geometric Model](http://www.brucehardie.com/notes/032/)
+-   [Customer-Base Valuation in a Contractual Setting: The Perils of Ignoring Heterogeneity](https://brucehardie.com/papers/022/)
+-   [How to Project Customer Retention](http://www.brucehardie.com/papers/021/)
+-   [How Not to Project Customer Retention](https://brucehardie.com/notes/016/)
+-   [Computing DERL for the sBG Model Using Excel](https://brucehardie.com/notes/018/)
+
+## Import
+
+### Import Packages
+
+```{python}
+#| code-fold: false
+import numpy as np
+from scipy.optimize import minimize
+from scipy.stats import beta
+from scipy.special import hyp2f1
+import polars as pl
+
+import matplotlib.pyplot as plt
+from IPython.display import display_markdown
+from great_tables import GT
+
+%config InlineBackend.figure_formats = ['svg']
+plt.rcParams["axes.spines.right"] = False
+plt.rcParams["axes.spines.top"] = False
+```
+
+### Import Data
+
+```{python}
+#| code-fold: false
+year, alive = np.loadtxt(
+    "data/hardie-sample-retention.csv",
+    dtype="object",
+    delimiter=",",
+    unpack=True,
+    skiprows=1,
+)
+year = year.astype(int)
+alive = alive.astype(float)
+
+train_period = 4
+train_year = year[: train_period + 1]
+train_alive = alive[: train_period + 1]
+```
+
+## Estimate of Model Parameters
+
+```{python}
+#| code-fold: false
+def bg_param(year, alive):
+    actual_retention = alive[1:] / alive[:-1]
+
+    def SSE(x):
+        gamma, delta = x[0], x[1]
+        est_retention = (delta + year[1:] - 1) / (gamma + delta + year[1:] - 1)
+        return np.sum((actual_retention - est_retention) ** 2)
+
+    return minimize(SSE, x0=[0.1, 0.1], bounds=[(0, np.inf), (0, np.inf)])
+```
+
+```{python}
+res = bg_param(train_year, train_alive)
+gamma, delta = res.x
+SSE = res.fun
+
+display_markdown(
+    f"""$\\gamma$ = {gamma:0.4f}
+
+$\\delta$ = {delta:0.4f}
+
+Sum of Squared Errors = {SSE:0.4E}""",
+    raw=True,
+)
+```
+
+## Actual Vs. Predicted Retention Rate
+
+```{python}
+act_retention_rate = alive[1:] / alive[:-1]
+
+est_retention_rate = (delta + year[1:] - 1) / (gamma + delta + year[1:] - 1)
+est_survivor_function = np.ones(year.shape)
+est_survivor_function[1:] = est_retention_rate
+est_survivor_function = np.cumprod(est_survivor_function)
+est_survivors = est_survivor_function * alive[0]
+```
+
+```{python}
+plt.figure(figsize=(8, 5), dpi=100)
+plt.plot(year[1:], act_retention_rate, "k-", linewidth=1, label="Actual")
+plt.plot(year[1:], est_retention_rate, "k--", linewidth=0.75, label="Model")
+plt.axvline(5, color="black", linestyle="--", linewidth=0.75)
+plt.xlabel("Year")
+plt.ylabel("Retention Rate")
+plt.title("Actual vs. model-based estimates of the annual retention rates", pad=30)
+plt.ylim(0.5, 1)
+plt.xlim(0, 13)
+plt.legend(loc=7, frameon=False);
+```
+
+## Actual Vs. Predicted Surviving Customer
+
+```{python}
+plt.figure(figsize=(8, 5), dpi=100)
+plt.plot(year + 1, alive, "k-", linewidth=1, label="Actual")
+plt.plot(year + 1, est_survivors, "k--", linewidth=0.75, label="Model")
+plt.axvline(5, color="black", linestyle="--", linewidth=0.75)
+plt.xlabel("Tenure (years)")
+plt.ylabel("Number of Customers")
+plt.title(
+    "Actual vs. model-based estimates of the number of surviving customers", pad=30
+)
+plt.ylim(0, 1000)
+plt.xlim(0, 13)
+plt.legend(loc=7, frameon=False);
+```
+
+## Interpreting the Model Parameters
+
+```{python}
+e_churn = gamma / (gamma + delta)  # E(Θ) - Expected number of churn next period
+e_renewals = alive[0] - e_churn
+alive_t0 = (1 - e_churn) * alive[0]
+
+x = np.arange(0, 1.02, 0.02)
+y = np.around(np.diff(beta.cdf(x, gamma, delta)) * alive[0])
+plt.figure(figsize=(8, 5), dpi=100)
+plt.bar(x[1:], y, align="edge", width=0.01, color="black")
+plt.xlim(0, 1)
+plt.xlabel("Prob(T)")
+plt.ylabel("# People")
+plt.title("Estimated Distribution of Prob(T)", pad=30)
+plt.text(
+    x=0.3,
+    y=55,
+    s=f"E(Θ) = {e_churn:0.3f} -> Expect {alive_t0:.0f} renewals\nfrom {alive[0]:.0f} customers at end of Year 1",
+    fontsize=10,
+);
+```
+
+```{python}
+renewals = 4
+x = np.arange(0, 1.02, 0.02)
+
+fig, axes = plt.subplots(2, 2, figsize=(10, 7), dpi=200)
+for n in range(renewals):
+    alive_t0 = est_survivors[n + 1]
+    y = np.around(np.diff(beta.cdf(x, gamma, delta + n + 1)) * alive_t0)
+    e_churn = gamma / (gamma + delta + n + 1)
+    e_renewals = alive_t0 - e_churn
+    ax = axes[n // 2][n % 2]
+
+    ax.bar(x[1:], y, align="edge", width=0.01, color="black")
+    ax.set_xlim(0, 1)
+    ax.set_xlabel("Prob(T)")
+    ax.set_ylabel("# People")
+    ax.set_title(f"Year {n + 2}")
+    ax.text(
+        x=0.3,
+        y=55,
+        s=f"E(Θ) = {e_churn:0.3f} -> Expect {e_renewals:.0f} renewals\nfrom {alive_t0:.0f} customers at end of Year {n + 2}",
+        fontsize=7,
+    )
+    ax.spines[["right", "top"]].set_visible(False)
+
+fig.suptitle(r"Distribution of Prob(T) amongst surviving customers over time")
+plt.tight_layout()
+plt.show();
+```
+
+## Working with Multi-Cohort Data
+
+```{python}
+#  Number of Active Customers Each Year by Year-of-Acquisition Cohort
+columns = ["Cohort 1", "Cohort 2", "Cohort 3", "Cohort 4", "Cohort 5"]
+cohort_data = pl.read_csv(
+    "data/contractual-setting-multi-cohort-data.csv"
+).with_columns(pl.sum_horizontal(columns).alias("Total"))
+
+(
+    GT(cohort_data, rowname_col="Year")
+    .fmt_integer(columns=columns + ["Total"], sep_mark=",")
+    .sub_missing(columns=columns + ["Total"], missing_text="")
+    .tab_header(
+        title="Number of Active Customers Each Year by Year-of-Acquisition Cohort"
+    )
+    .tab_stubhead("Year")
+    .opt_stylize(style=1, color="gray")
+)
+```
+
+```{python}
+# Annual Retention Rates by Cohort
+cohort_annual_retention = cohort_data.drop("Total").with_columns(
+    pl.col("*").exclude("Year").pct_change() + 1
+)
+
+(
+    GT(cohort_annual_retention, rowname_col="Year")
+    .fmt_number(columns=columns, decimals=3)
+    .sub_missing(columns=columns, missing_text="")
+    .tab_header(title="Annual Retention Rates by Cohort")
+    .tab_stubhead("Year")
+    .opt_stylize(style=1, color="gray")
+)
+```
+
+## Computing CLV under the sBG Model
+
+```{python}
+#| code-fold: false
+# DEL - Discounted Expected Lifetime: Expected Discounted Lifetime E(DL)
+def sbg_del(gamma, delta, d):
+    return hyp2f1(1, delta, gamma + delta, 1 / (1 + d))
+
+
+# DERL - Discounted Expected Residual Lifetime: Expected Discounted Residual Lifetime E(DRL)
+def sbg_drl(gamma, delta, n, d, mode=1):
+    """
+    mode 1: discounted expected residual lifetime of a just-acquired customer (equals DEL(d)−1, since it does not count the first-ever purchase by the customer)
+    mode 2: Standing at the end of period n, just prior to the point in time at which the contract renewal decision is made (i.e., the customer has renewed his
+            contract n − 1 times and we have yet to learn whether or not the nth contract renewal will be made); just before the point in time at which the
+            contract renewal decision is made
+    mode 3: The discounted expected residual lifetime of a customer evaluated immediately after we have received the payment associated with her nth contract renewal
+    """
+    if mode == 1:
+        return (
+            delta
+            / ((gamma + delta) * (1 + d))
+            * hyp2f1(1, delta + 1, gamma + delta + 1, 1 / (1 + d))
+        )
+    if mode == 2:
+        return (
+            (delta + n - 1)
+            / (gamma + delta + n - 1)
+            * hyp2f1(1, delta + n, gamma + delta + n, 1 / (1 + d))
+        )
+    if mode == 3:
+        return (
+            (delta + n)
+            / ((gamma + delta + n) * (1 + d))
+            * hyp2f1(1, delta + n + 1, gamma + delta + n + 1, 1 / (1 + d))
+        )
+```
+

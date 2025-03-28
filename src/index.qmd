@@ -48,6 +48,7 @@ jupyter:
 - [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/gamma-gamma)
 - [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/subscription-retention-model)
+- [RFM and CLV: Using Iso-Value Curves for Customer Base Analysis](https://abdullahau.github.io/customer-analytics/RFM-and-CLV)
 
 ### Analaysis & Summaries
 

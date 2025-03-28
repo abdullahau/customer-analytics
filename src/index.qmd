@@ -41,13 +41,22 @@ jupyter:
 
 ## Pages:
 
-- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-panel-data)
-- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-transaction-log)
-- [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
-- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
+### Models
+
 - [Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/DoR-Model)
 - [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric)
+- [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/gamma-gamma)
+- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/subscription-retention-model)
+
+### Analaysis & Summaries
+
+- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-panel-data)
+- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/buyer-behavior-summary-transaction-log)
+- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/Customer-Acquisition-Cost)
+
+### Data Preparation
+
 - [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/CDNOW-Dataset)
 
 ## Source Files

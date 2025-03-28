@@ -68,37 +68,52 @@ $$
 
 ```{python}
 d = pd.DataFrame({
-    'num_units': range(6),
-    'num_people': [70, 45, 25, 15, 10, 5],
-    'total_units': [0, 45, 50, 45, 40, 25]
+    'x': range(6),
+    'f_x': [70, 45, 25, 15, 10, 5],
 })
 
-total_units = d.where(d.num_units > 0).total_units
-total_buyers = d.where(d.num_units > 0).num_people
+d['total_units'] = d.x * d.f_x
+total_units = d.where(d.x > 0).total_units
+total_buyers = d.where(d.x > 0).f_x
 
 print('Total Units = ', total_units.sum())
 print('Total Buyers = ', total_buyers.sum())
 ```
 
-```{python}
-d = pd.DataFrame({
-    'num_units': range(6),
-    'num_people': [70, 45, 25, 15, 10, 5],
-    'total_units': [0, 45, 50, 45, 40, 25]
-})
+Consider those buyers that purchased $x$ times $(x ≥ 1)$:
 
+-   What proportion of total buyers are they?
+
+$$
+\frac{P(X=x)}{1-P(X=0)},
+$$
+
+    -   where $P(X=x)$ is the percentage of customers for all levels of purchases, and 
+    -   $P(X=0)$ is the percentage of people who made 0 purchase.
+
+-   What proportion of total purchasing do they account for?
+
+$$
+\frac{xP(X=x)}{E(X)}
+$$
+
+    -   where $xP(X=x)$ is the product of purchase levels and percentage of customers who made those purchases, and
+    -   $E(x)$ is the sum total of $xP(X=x)$.
+
+```{python}
 d['pct_buyers'] = total_buyers / total_buyers.sum()
 d['pct_purchases'] = total_units / total_units.sum()
 d['cum_pct_buyers'] = d.pct_buyers.cumsum()
 d['cum_pct_purchases'] = d.pct_purchases.cumsum()
 
 d = d.fillna(0)
+d
 ```
 
 
 ```{python}
 plt.clf()
-plt.bar(d.num_units, d.num_people, color='k')
+plt.bar(d.x, d.f_x, color='k')
 plt.xlabel('# Units')
 plt.ylabel('# People')
 plt.title('Hypothetical distribution of purchases (n = 170 people)');
@@ -116,3 +131,19 @@ plt.title('Lorenz Curve')
 plt.legend();
 ```
 
+## Problem
+
+Consider the following data on the number of bottles of champagne purchased in a year by a sample of 568 French households:
+
+```{python}
+d = pd.DataFrame({
+    'x': range(9),
+    'f_x': [400, 60, 30, 20, 8, 8, 9, 6, 27],
+})
+
+total_units = d.where(d.x > 0).total_units
+total_buyers = d.where(d.x > 0).f_x
+
+print('Total Units = ', total_units.sum())
+print('Total Buyers = ', total_buyers.sum())
+```

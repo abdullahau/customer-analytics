@@ -55,7 +55,6 @@ from scipy.stats import chisquare, chi2
 
 import polars as pl
 import matplotlib.pyplot as plt
-import matplotlib_inline
 from IPython.display import display_markdown
 
 from utils import CDNOW, bic

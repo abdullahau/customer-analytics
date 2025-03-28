@@ -1,0 +1,1508 @@
+---
+title: BG/BB Model - Discrete-Time, Noncontractual Setting
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/BG-BB-Model.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+**Source**:
+
+-   [Customer-Base Analysis in a Discrete-Time Noncontractual Setting](http://www.brucehardie.com/papers/020/)
+-   [Implementing the BG/BB Model for Customer-Base Analysis in Excel](http://www.brucehardie.com/notes/010/)
+-   [Implementing the $S_{BB}-G/B$ Model in MATLAB](http://www.brucehardie.com/notes/023/)
+
+## Imports
+
+### Import Packages
+
+```{python}
+#| code-fold: false
+import polars as pl
+import numpy as np
+from utils import Donation
+from scipy.optimize import minimize
+from scipy.special import gammaln, comb, hyp2f1
+from scipy.special import beta as beta_fn
+from scipy.stats import beta as beta_dist
+from scipy.integrate import quad
+
+import altair as alt
+import matplotlib.pyplot as plt
+from IPython.display import display_markdown
+
+alt.renderers.enable("html")
+%config InlineBackend.figure_formats = ['svg']
+```
+
+### Import Data
+
+```{python}
+#| code-fold: false
+data = Donation()
+rfm_summary_calib = data.p1x_data()
+rfm_array_calib = rfm_summary_calib.collect().to_numpy()
+rfm_summary_valid = data.p2x_data()
+p1x, t_x, _, num_donors = [*rfm_array_calib.T]
+
+n = 6
+n * (n + 1) / 2 + 1  # Possible recency/frequency patterns in calibration period
+years = data.years
+```
+
+```{python}
+#| code-fold: false
+def rfcalib_cross_tab(df, values, title, subtitle=None, color_range=[0, 1]):
+    tx_year_map = {tx: int(year) for tx, year in enumerate(years)}
+
+    return (
+        df.with_columns(pl.col("t_x").replace(tx_year_map).alias("Year"))
+        .sort("Year")
+        .pivot(on="Year", index="P1X", values=values)
+        .sort("P1X")
+        .style.tab_header(title=title, subtitle=subtitle)
+        .tab_stub(rowname_col="P1X")
+        .tab_stubhead(label="P1X")
+        .fmt_number(decimals=2)
+        .tab_spanner(label="Year of last transaction", columns=years[:7])
+        .data_color(
+            domain=color_range,
+            palette=["white", "rebeccapurple"],
+            na_color="white",
+            columns=years[:7]
+        )
+        .sub_missing(columns=pl.col("*"), missing_text="")
+    )
+
+```
+
+## BG/BB Model
+
+### Parameter Estimation
+
+```{python}
+#| code-fold: false
+def bgbb_est(rfm_data, guess={"alpha": 1, "beta": 0.5, "gamma": 0.5, "delta": 2.5}):
+    p1x, t_x, n, num_donors = [*rfm_data.T]
+
+    def log_likelihood(param):
+        alpha, beta, gamma, delta = param
+        B_alpha_beta = beta_fn(alpha, beta)
+        B_gamma_delta = beta_fn(gamma, delta)
+
+        A1 = (
+            beta_fn(alpha + p1x, beta + n - p1x)
+            / B_alpha_beta
+            * beta_fn(gamma, delta + n)
+            / B_gamma_delta
+        )
+        i = np.arange(6).reshape(-1, 1)
+        A2 = (
+            beta_fn(alpha + p1x, beta + t_x - p1x + i)
+            / B_alpha_beta
+            * beta_fn(gamma + 1, delta + t_x + i)
+            / B_gamma_delta
+        )
+        A2 = np.where(i <= (n - t_x - 1), A2, 0)
+
+        return -np.sum(num_donors * np.log(A1 + np.sum(A2, axis=0)))
+
+    bnds = [[0, np.inf] for _ in range(4)]
+    return minimize(log_likelihood, x0=list(guess.values()), bounds=bnds)
+```
+
+```{python}
+# Sample parameters
+# alpha = 1.20352083040498
+# beta = 0.749714243061896
+# gamma = 0.656712169147878
+# delta = 2.78340801635898
+
+res = bgbb_est(rfm_array_calib)
+alpha, beta, gamma, delta = res.x
+ll = res.fun
+
+display_markdown(
+    f"""$\\alpha$ = {alpha:0.4f}
+
+$\\beta$ = {beta:0.4f}
+
+$\\gamma$ = {gamma:0.4f}
+
+$\\delta$ = {delta:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+### Likelihood Function
+
+Likelihood function for a randomly chosen customer with purchase history ($x, t_{x}, n$)
+
+```{python}
+B_alpha_beta = beta_fn(alpha, beta)
+B_gamma_delta = beta_fn(gamma, delta)
+
+A1 = (
+    beta_fn(alpha + p1x, beta + n - p1x)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n)
+    / B_gamma_delta
+)
+i = np.arange(6).reshape(-1, 1)
+A1a = (
+    beta_fn(alpha + p1x, beta + t_x - p1x + i)
+    / B_alpha_beta
+    * beta_fn(gamma + 1, delta + t_x + i)
+    / B_gamma_delta
+)
+A1a = np.where(i <= (n - t_x - 1), A1a, 0)
+L = A1 + np.sum(A1a, axis=0)
+
+L_df = rfm_summary_calib.collect().hstack([pl.Series("Likelihood", L)])
+```
+
+### In-Sample Model Fit Plot
+
+```{python}
+x = np.arange(n + 1)
+A1 = (
+    comb(n, x)
+    * beta_fn(alpha + x, beta + n - x)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n)
+    / B_gamma_delta
+)
+i = np.arange(n).reshape(-1, 1)
+A2 = (
+    comb(i, x)
+    * beta_fn(alpha + x, beta + i - x)
+    / B_alpha_beta
+    * beta_fn(gamma + 1, delta + i)
+    / B_gamma_delta
+)
+P_X_n = A1 + np.sum(A2, axis=0)
+
+model_repeat_calib = pl.DataFrame({"Model": P_X_n * np.sum(rfm_array_calib[:, 3])})
+
+actual_model_repeat_calib = (
+    rfm_summary_calib.group_by("P1X")
+    .agg((pl.col("Count").sum()).alias("Actual"))
+    .sort("P1X")
+    .collect()
+    .hstack(model_repeat_calib)
+    .unpivot(
+        on=["Actual", "Model"],
+        index="P1X",
+        value_name="No of people",
+        variable_name="Actual Vs Estimated",
+    )
+)
+
+(
+    alt.Chart(actual_model_repeat_calib)
+    .mark_bar()
+    .encode(
+        x=alt.X(
+            "P1X:O", title="No. of repeat transactions", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("No of people:Q", title="No. of people"),
+        color="Actual Vs Estimated:N",
+        xOffset="Actual Vs Estimated",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Frequency of Repeat Transactions (Calibration Period) in 1996 to 2001",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Calibration Period Model Fit Plot
+
+```{python}
+n_star = 5
+x_star = np.arange(n_star + 1)
+
+A1 = (
+    comb(n_star, x_star)
+    * beta_fn(alpha + x_star, beta + n_star - x_star)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n + n_star)
+    / B_gamma_delta
+)
+A1 += np.where(x_star == 0, 1 - beta_fn(gamma, delta + n) / B_gamma_delta, 0)
+i = np.arange(n_star).reshape(-1, 1)
+A2 = (
+    comb(i, x_star)
+    * beta_fn(alpha + x_star, beta + i - x_star)
+    / B_alpha_beta
+    * beta_fn(gamma + 1, delta + n + i)
+    / B_gamma_delta
+)
+P_X_n_star = A1 + np.sum(A2, axis=0)
+
+valid_repeat_count = rfm_summary_valid.collect().to_numpy()[:, 2]
+model_repeat_valid = pl.DataFrame({"Model": P_X_n_star * np.sum(valid_repeat_count)})
+
+actual_model_repeat_valid = (
+    rfm_summary_valid.group_by("P2X")
+    .agg((pl.col("Count").sum()).alias("Actual"))
+    .sort("P2X")
+    .collect()
+    .hstack(model_repeat_valid)
+    .unpivot(
+        on=["Actual", "Model"],
+        index="P2X",
+        value_name="No of people",
+        variable_name="Actual Vs Estimated",
+    )
+)
+
+(
+    alt.Chart(actual_model_repeat_valid)
+    .mark_bar()
+    .encode(
+        x=alt.X(
+            "P2X:O", title="No. of repeat transactions", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("No of people:Q", title="No. of people"),
+        color="Actual Vs Estimated:N",
+        xOffset="Actual Vs Estimated",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Frequency of Repeat Transactions (Validation Period) in 2002-2006",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Tracking Plots
+
+```{python}
+act_yearly_repeat = (
+    data.data.select(pl.col("*").exclude("ID", "1995")).sum().collect().to_numpy()
+)
+act_cum_repeat = act_yearly_repeat.cumsum()
+
+A1 = alpha / (alpha + beta)
+A2 = 1 / (gamma - 1)
+n_trans = np.arange(1, len(years))
+A3 = np.exp(
+    gammaln(delta + n_trans + 1)
+    + gammaln(gamma + delta)
+    - gammaln(delta)
+    - gammaln(gamma + delta + n_trans)
+)
+E_X_n = A1 * (delta * A2 - A2 * A3)
+
+est_cum_repeat = np.sum(rfm_array_calib[:, 3]) * E_X_n
+est_yearly_repeat = np.diff(est_cum_repeat, prepend=0)
+
+yearly_repeat = pl.DataFrame(
+    {
+        "Year": years[1:],
+        "Actual": act_yearly_repeat.flatten(),
+        "Model": est_yearly_repeat.flatten(),
+    }
+)
+yearly_repeat = yearly_repeat.unpivot(
+    on=["Actual", "Model"],
+    index="Year",
+    variable_name="Actual Vs Model",
+    value_name="Repeat Trans",
+)
+cum_repeat = pl.DataFrame(
+    {
+        "Year": years[1:],
+        "Actual": act_cum_repeat.flatten(),
+        "Model": est_cum_repeat.flatten(),
+    }
+)
+cum_repeat = cum_repeat.unpivot(
+    on=["Actual", "Model"],
+    index="Year",
+    variable_name="Actual Vs Model",
+    value_name="Repeat Trans",
+)
+
+(
+    alt.Chart(yearly_repeat)
+    .mark_line()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="No. of repeat transactions"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650, height=250, title="Predicted vs. Actual Annual Repeat Transactions"
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(yearly_repeat)
+    .mark_bar()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="No. of repeat transactions"),
+        color="Actual Vs Model",
+        xOffset="Actual Vs Model",
+    )
+    .properties(
+        width=650, height=250, title="Predicted vs. Actual Annual Repeat Transactions"
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(cum_repeat)
+    .mark_line()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="Cumulative no. of repeat transactions"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Cumulative Repeat Transactions",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(cum_repeat)
+    .mark_bar()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="Cumulative no. of repeat transactions"),
+        color="Actual Vs Model",
+        xOffset="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Cumulative Repeat Transactions",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Conditional Expectations
+
+```{python}
+n_star = 5
+
+A2 = beta_fn(alpha + p1x + 1, beta + n - p1x) / B_alpha_beta
+A3 = (
+    delta
+    / (gamma - 1)
+    * np.exp(gammaln(gamma + delta) - gammaln(delta + 1))
+    * (
+        np.exp(gammaln(1 + delta + n) - gammaln(gamma + delta + n))
+        - np.exp(gammaln(1 + delta + n + n_star) - gammaln(gamma + delta + n + n_star))
+    )
+)
+
+ce = A2 * A3 / L
+
+exp_total = ce * num_donors
+
+ce_df = (
+    data.rfm_data()
+    .group_by("P1X", "t_x", "np1x")
+    .agg(pl.col("P2X").sum().alias("Actual Total - Valid"))
+    .sort(["t_x", "P1X"], descending=True)
+    .collect()
+    .hstack([pl.Series("Exp Total", exp_total)])
+    .hstack([pl.Series("Conditional Expectation", ce)])
+)
+
+# Actual total 2002-2006 donations by p1x / tx
+actual_ce_mat = (
+    ce_df.sort("t_x")
+    .pivot(index="P1X", on="t_x", values="Actual Total - Valid")
+    .sort("P1X")
+    .fill_null(0)
+    .to_numpy()
+)
+p1x_frequency = actual_ce_mat[:, 0]
+actual_ce_mat = actual_ce_mat[:, 1:]
+
+# Expected total 2002-2006 donations by p1x / tx
+est_ce_mat = (
+    ce_df.sort("t_x")
+    .pivot(index="P1X", on="t_x", values="Exp Total")
+    .sort("P1X")
+    .fill_null(0)
+    .to_numpy()[:, 1:]
+)
+
+# Number of Donors
+num_donors_mat = (
+    rfm_summary_calib.collect()
+    .sort("t_x")
+    .pivot(index="P1X", on="t_x", values="Count")
+    .sort("P1X")
+    .fill_null(0)
+    .to_numpy()[:, 1:]
+)
+
+# CE by Frequency
+actual_ce_freq = np.sum(actual_ce_mat, axis=1) / np.sum(num_donors_mat, axis=1)
+est_ce_freq = np.sum(est_ce_mat, axis=1) / np.sum(num_donors_mat, axis=1)
+ce_freq = pl.DataFrame(
+    {"x": p1x_frequency, "Actual": actual_ce_freq, "Model": est_ce_freq}
+)
+ce_freq = ce_freq.unpivot(
+    index="x",
+    on=["Actual", "Model"],
+    variable_name="Actual Vs Model",
+    value_name="CE by Freq",
+)
+
+# CE by Recency
+actual_ce_rec = np.sum(actual_ce_mat, axis=0) / np.sum(num_donors_mat, axis=0)
+est_ce_rec = np.sum(est_ce_mat, axis=0) / np.sum(num_donors_mat, axis=0)
+ce_rec = pl.DataFrame(
+    {"t_x": years[: len(p1x_frequency)], "Actual": actual_ce_rec, "Model": est_ce_rec}
+).with_columns(pl.col("t_x").cast(pl.Int16))
+ce_rec = ce_rec.unpivot(
+    index="t_x",
+    on=["Actual", "Model"],
+    variable_name="Actual Vs Model",
+    value_name="CE by Rec",
+)
+```
+
+```{python}
+(
+    alt.Chart(ce_freq)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "x",
+            title="No. of repeat transactions (1996-2001)",
+            axis=alt.Axis(labelAngle=0, values=np.arange(7)),
+        ),
+        y=alt.Y("CE by Freq", title="No. of repeat transactions (2002–2006)"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Conditional Expectations of Repeat Transactions in 2002–2006 as a Function of Frequency",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(ce_rec)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "t_x",
+            title="Year of last transaction",
+            axis=alt.Axis(labelAngle=0, values=np.arange(1995, 2002, 1), format=".0f"),
+        ),
+        y=alt.Y("CE by Rec", title="No. of repeat transactions (2002–2006)"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Conditional Expectations of Repeat Transactions in 2002–2006 as a Function of Recency",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+rfcalib_cross_tab(
+    ce_df,
+    values="Conditional Expectation",
+    title="Expected Number of Repeat Transactions in 2002–2006",
+    subtitle="as a Function of Recency and Frequency",
+    color_range=[0, 4],
+)
+```
+
+### P(Alive) as a Function of Recency and Frequency
+
+```{python}
+A1 = (
+    np.exp(gammaln(alpha + p1x) + gammaln(beta + n - p1x) - gammaln(alpha + beta + n))
+    / B_alpha_beta
+    * np.exp(gammaln(gamma) + gammaln(delta + n + 1) - gammaln(gamma + delta + n + 1))
+    / B_gamma_delta
+)
+P_alive = A1 * L**-1
+
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(pl.DataFrame({"P(Alive)": P_alive})),
+    values="P(Alive)",
+    title="P(Alive in 2002) as a Function of Recency and Frequency",
+    color_range=[0, 1],
+)
+```
+
+### Posterior Mean of P as a Function of Recency and Frequency
+
+```{python}
+l = 1
+m = 0
+alphal = alpha + l
+gammam = gamma + m
+
+B_alphal_beta = beta_fn(alphal, beta)
+B_gammam_delta = beta_fn(gammam, delta)
+
+A1 = (
+    beta_fn(alphal + p1x, beta + n - p1x)
+    / B_alphal_beta
+    * beta_fn(gammam, delta + n)
+    / B_gammam_delta
+)
+i = np.arange(6).reshape(-1, 1)
+A2 = (
+    beta_fn(alphal + p1x, beta + t_x - p1x + i)
+    / B_alphal_beta
+    * beta_fn(gammam + 1, delta + t_x + i)
+    / B_gammam_delta
+)
+A2 = np.where(i <= (n - t_x - 1), A2, 0)
+L_lm = A1 + np.sum(A2, axis=0)
+
+E_P_Theta = (
+    (B_alphal_beta / B_alpha_beta) * (B_gammam_delta / B_gamma_delta) * (L_lm / L)
+)
+
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(pl.DataFrame({"E_P_Theta": E_P_Theta})),
+    values="E_P_Theta",
+    title="Posterior Mean of P as a Function of Recency and Frequency",
+    color_range=[0.2, 1],
+)
+```
+
+### Prior and Selected Posterior Distributions of (a) $P$ and (b) $\Theta$
+
+A customer’s latent transaction $P$ and dropout probabilities $\theta$.
+
+```{python}
+def marginal_posterior(x, tx, p_theta, theta=False):
+    i = np.arange(n).reshape(-1, 1)
+    if not theta:
+        B1 = (
+            p_theta ** (alpha + x - 1)
+            * (1 - p_theta) ** (beta + n - x - 1)
+            / B_alpha_beta
+            * beta_fn(gamma, delta + n)
+            / B_gamma_delta
+        )
+        B2 = (
+            p_theta ** (alpha + x - 1)
+            * (1 - p_theta) ** (beta + tx - x + i - 1)
+            / B_alpha_beta
+            * beta_fn(gamma + 1, delta + tx + i)
+            / B_gamma_delta
+        )
+    else:
+        B1 = (
+            beta_fn(alpha + x, beta + n - x)
+            / B_alpha_beta
+            * (p_theta ** (gamma - 1) * (1 - p_theta) ** (delta + n - 1))
+            / B_gamma_delta
+        )
+        B2 = (
+            beta_fn(alpha + x, beta + tx - x + i)
+            / B_alpha_beta
+            * (p_theta**gamma * (1 - p_theta) ** (delta + tx + i - 1))
+            / B_gamma_delta
+        )
+    B2 = np.where(i <= (n - tx - 1), B2, 0)
+    L = (
+        L_df.filter((pl.col("P1X") == x) & (pl.col("t_x") == tx))
+        .select("Likelihood")
+        .item()
+    )
+    return (B1 + np.sum(B2, axis=0)) / L
+
+
+def compute_mean(x, tx, theta=False):
+    # Function for the marginal posterior distribution
+    def posterior_func(p_theta):
+        return p_theta * marginal_posterior(x, tx, p_theta, theta=theta)
+
+    # Integrate over the range [0, 1] for p or theta
+    mean, _ = quad(posterior_func, 0, 1)
+    return mean
+```
+
+```{python}
+def annotate(ax, xy, xytext, str):
+    return ax.annotate(
+        str,
+        xy=xy,
+        xycoords="data",
+        xytext=xytext,
+        textcoords="data",
+        arrowprops=dict(arrowstyle="->", connectionstyle="arc3"),
+    )
+
+
+fig, ax = plt.subplots(figsize=(8, 5))
+p = np.linspace(beta_dist.ppf(0, alpha, beta), beta_dist.ppf(0.99, alpha, beta), 100)
+ax.plot(
+    p[1:-1], beta_dist.pdf(p[1:-1], alpha, beta), "k", lw=1, alpha=0.6, label="Prior"
+)
+ax.plot(
+    p[1:],
+    marginal_posterior(3, 3, p[1:]),
+    "b--",
+    lw=1,
+    alpha=0.6,
+    label="Posterior for $x = 3$, $t_{x} = 3$ (1998)",
+)
+ax.plot(
+    p,
+    marginal_posterior(3, 6, p),
+    "g--",
+    lw=1,
+    alpha=0.6,
+    label="Posterior for $x = 3$, $t_{x} = 6$ (2001)",
+)
+ax.set_xlabel("$p$")
+ax.set_ylabel("$f(p)$")
+ax.set_title("Prior and Selected Posterior Distributions of $P$")
+ax.legend()
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 6)
+annotate(ax, (0.45, 2), (0.3, 2.5), f"$E(P) = {compute_mean(3, 6):.2f}$")
+annotate(ax, (0.97, 4), (0.7, 5), f"$E(P) = {compute_mean(3, 3):.2f}$")
+annotate(
+    ax, (0.97, 2), (0.7, 3), f"$E(P) = {beta_dist.stats(alpha, beta, moments='m'):.2f}$"
+);
+```
+
+```{python}
+fig, ax = plt.subplots(figsize=(8, 5))
+p = np.linspace(beta_dist.ppf(0, alpha, beta), beta_dist.ppf(0.99, alpha, beta), 100)
+ax.plot(p, beta_dist.pdf(p, gamma, delta), "k", lw=1, alpha=0.6, label="Prior")
+ax.plot(
+    p[1:],
+    marginal_posterior(3, 3, p[1:], theta=True),
+    "b--",
+    lw=1,
+    alpha=0.6,
+    label="Posterior for $x = 3$, $t_{x} = 3$ (1998)",
+)
+ax.plot(
+    p[1:],
+    marginal_posterior(3, 6, p[1:], theta=True),
+    "g--",
+    lw=1,
+    alpha=0.6,
+    label="Posterior for $x = 3$, $t_{x} = 6$ (2001)",
+)
+ax.set_xlabel("$\\theta$")
+ax.set_ylabel("$f(\\theta)$")
+ax.set_title("Prior and Selected Posterior Distributions of $\\Theta$")
+ax.legend()
+ax.set_xlim(0, 1)
+ax.set_ylim(0, 14)
+annotate(
+    ax, (0.02, 10), (0.1, 12), f"$E(\\Theta) = {compute_mean(3, 6, theta=True):.2f}$"
+)
+annotate(
+    ax, (0.25, 2), (0.35, 3.5), f"$E(\\Theta) = {compute_mean(3, 3, theta=True):.2f}$"
+)
+annotate(
+    ax,
+    (0.015, 5),
+    (0.1, 6.7),
+    f"$E(\\Theta) = {beta_dist.stats(gamma, delta, moments='m'):.2f}$",
+);
+```
+
+### Conditional Penetration
+
+Probability that a customer with purchase history ($x, t_{x}, n$) makes $x^{*}$ transactions in the interval $(n,n + n^{*}]$.
+
+The probability that a customer is active in the 2002–2006 period ($n^{*} = 5$) is computed as $1-P(X(n,n+n^{*})=0 \mid x,t_{x}, n)$, where $x^{*}=0$, conditional on each of the 22 ($x,t_{x}$) patterns associated with $n = 6$.
+
+```{python}
+n_star = 5
+x_star = 0
+
+A1 = (
+    beta_fn(alpha + p1x, beta + n - p1x)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n)
+    / B_gamma_delta
+)
+B1 = np.where(x_star == 0, 1 - (A1 / L), 0)
+A2 = (
+    comb(n_star, x_star)
+    * beta_fn(alpha + p1x + x_star, beta + n - p1x + n_star - x_star)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n + n_star)
+    / beta_fn(gamma, delta)
+)
+i = np.arange(n_star).reshape(-1, 1)
+A2 += np.sum(
+    comb(i, x_star)
+    * beta_fn(alpha + p1x + x_star, beta + n - p1x + i - x_star)
+    / B_alpha_beta
+    * beta_fn(gamma + 1, delta + n + i)
+    / B_gamma_delta,
+    axis=0,
+)
+
+prob_alive_valid = 1 - (B1 + A2 / L)
+
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(
+        [pl.Series("Prob Alive in Valid Period", prob_alive_valid)]
+    ),
+    values="Prob Alive in Valid Period",
+    title="Probability of Being Active in 2002–2006",
+    subtitle="as a Function of Recency and Frequency",
+    color_range=[0, 1],
+)
+```
+
+### Discounted Expected Residual Transactions (DERT)
+
+Assuming that there are $k$ transaction opportunities per year, an annual discount rate of $r$ maps to a discount rate of $d = (1+r)^{1/k} −1$.
+
+```{python}
+d = 0.1  # discount rate
+
+A1 = (
+    beta_fn(alpha + p1x + 1, beta + n - p1x)
+    / B_alpha_beta
+    * beta_fn(gamma, delta + n + 1)
+    / (B_gamma_delta * (1 + d))
+)
+A2 = hyp2f1(1, delta + n + 1, gamma + delta + n + 1, 1 / (1 + d)) / L
+DERT = A1 * A2
+DERT
+```
+
+## $S_{BB}$-G/B Model - Extending the Basic BG/BB Model
+
+### Uncorrelated $S_{BB}$-G/B Model
+
+Generate two vectors of random numbers drawn from a normal distribution with mean zero and variance one:
+
+```{python}
+# Set the seed for purposes of replication
+# np.random.seed(100)
+
+# Generate two vectors of random numbers drawn from a normal distribution with mean zero and variance one
+# np.random.normal(loc=0.0, scale=1.0, size=(100_000, 2))
+Z = np.random.randn(100_000, 2)
+Z
+```
+
+This model sees us replacing the beta distributions for $p$ and $θ$ with logit-normal distributions. We will first consider the uncorrelated model.
+
+```{python}
+#| code-fold: false
+# computes the value of the sample log-likelihood function for a given set of model parameters
+def SbbGB_ll_uncorr(param):
+    """
+    evaluate the log-likelihood function for the uncorrelated S_BB-G/B model
+
+    Parameters:
+    param: array-like
+        [μ_p, μ_θ, σ²_p, σ²_θ] for the logit-normal distributions
+    """
+    # Part A - Initial calculations
+    Mu = param[:2]
+    Sigma = np.diag(param[2:4])
+    Y = Z @ np.sqrt(Sigma)
+
+    # Compute p and t for all samples at once
+    p = 1 / (1 + np.exp(-(Y[:, 0] + Mu[0])))  # More numerically stable
+    t = 1 / (1 + np.exp(-(Y[:, 1] + Mu[1])))
+
+    # Part B - Vectorized likelihood computation
+    ll = np.empty(len(p1x))
+
+    # Pre-compute log terms for p and (1-p)
+    log_p = np.log(p)
+    log_1mp = np.log1p(-p)  # More accurate than np.log(1-p)
+    log_t = np.log(t)
+    log_1mt = np.log1p(-t)
+
+    for i in range(len(p1x)):
+        # Base term (j = n - t_x[i])
+        base_term = p1x[i] * log_p + (n - p1x[i]) * log_1mp + n * log_1mt
+        base_lik = np.exp(base_term)
+
+        # Compute all j terms at once
+        j_range = np.arange(n - t_x[i])
+
+        # Broadcast shapes for vectorized computation
+        j_terms = (
+            p1x[i] * log_p[:, None]
+            + (t_x[i] - p1x[i] + j_range) * log_1mp[:, None]
+            + log_t[:, None]
+            + (t_x[i] + j_range) * log_1mt[:, None]
+        )
+
+        # Sum all likelihoods
+        total_lik = base_lik + np.sum(np.exp(j_terms), axis=1)
+
+        # Compute log mean
+        ll[i] = np.log(np.mean(total_lik))
+
+    return -np.sum(ll * num_donors)
+```
+
+```{python}
+bnds = [[-10, 10], [-10, 10], [0, 10], [0, 10]]
+res = minimize(SbbGB_ll_uncorr, x0=[0.1 for _ in range(4)], bounds=bnds)
+
+display_markdown(
+    f"""$\\mu_{{p}}$ = {res.x[0]:0.4f}
+
+$\\mu_{{\\Theta}}$ = {res.x[1]:0.4f}
+
+$\\sigma^{{2}}_{{P}}$ = {res.x[2]:0.4f}
+
+$\\sigma^{{2}}_{{\\Theta}}$ = {res.x[3]:0.4f}
+
+$LL$ = {res.fun:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+# Uncorrelated Moments
+Mu = res.x[:2]
+Sigma = np.diag(res.x[2:])
+Y = Z @ np.sqrt(Sigma)
+
+p = 1 / (1 + np.exp(-(Y[:, 0] + Mu[0])))
+t = 1 / (1 + np.exp(-(Y[:, 1] + Mu[1])))
+
+EP, ET = np.mean(p), np.mean(t)
+VP, VT = np.mean(p * p) - EP**2, np.mean(t * t) - ET**2
+
+display_markdown(
+    f"""$E(P)$ = {EP:0.4f}
+
+$var(P)$ = {VP:0.4f}
+
+$E(\\Theta)$ = {ET:0.4f}
+
+$var(\\Theta)$ = {VT:0.4f}""",
+    raw=True,
+)
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].hist(p, bins=100, color="blue", edgecolor="black", alpha=0.7)
+axes[0].set_xlim(0, 1)
+axes[0].set_xlabel("$p$")
+axes[1].hist(t, bins=100, color="blue", edgecolor="black", alpha=0.7)
+axes[1].set_xlim(0, 1)
+axes[1].set_xlabel("$\\theta$");
+```
+
+### Correlated $S_{BB}$-G/B Model
+
+```{python}
+#| code-fold: false
+def SbbGB_ll_corr(param):
+    """
+    evaluate the log-likelihood function for the correlated S_BB-G/B model
+
+    Parameters:
+    param: array-like
+        [μ_p, μ_θ, σ²_p, σ²_θ, σ_pθ] for the logit-normal distributions
+    """
+    # Part A
+    Mu = param[:2]
+    R = np.array([param[2:4], [0, param[4]]])
+    Y = Z @ R
+
+    p = 1 / (1 + np.exp(-(Y[:, 0] + Mu[0])))
+    t = 1 / (1 + np.exp(-(Y[:, 1] + Mu[1])))
+
+    # Part B
+    ll = np.empty(len(p1x))
+    for i in range(len(p1x)):
+        tmp_lik = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+        for j in range(n - t_x[i]):
+            tmp_lik += (
+                p ** p1x[i]
+                * (1 - p) ** (t_x[i] - p1x[i] + j)
+                * t
+                * (1 - t) ** (t_x[i] + j)
+            )
+        ll[i] = np.log(np.mean(tmp_lik))
+
+    return -np.sum(ll * num_donors)
+```
+
+```{python}
+res = minimize(
+    SbbGB_ll_corr, x0=[0.1 for _ in range(5)], bounds=[[-10, 10] for _ in range(5)]
+)
+
+display_markdown(
+    f"""$\\mu_{{p}}$ = {res.x[0]:0.4f}
+
+$\\mu_{{\\Theta}}$ = {res.x[1]:0.4f}
+
+$\\sigma^{{2}}_{{P}}$ = {res.x[2]:0.4f}
+
+$\\sigma^{{2}}_{{\\Theta}}$ = {res.x[3]:0.4f}
+
+$\\sigma_{{P\\Theta}}$ = {res.x[4]:0.4f}
+
+$LL$ = {res.fun:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+# Uncorrelated Moments
+Mu = res.x[:2]
+R = np.array([res.x[2:4], [0, res.x[4]]])
+Y = Z @ R
+
+p = 1 / (1 + np.exp(-(Y[:, 0] + Mu[0])))
+t = 1 / (1 + np.exp(-(Y[:, 1] + Mu[1])))
+
+EP, ET = np.mean(p), np.mean(t)
+VP, VT = np.mean(p * p) - EP**2, np.mean(t * t) - ET**2
+covPT = np.mean(p * t) - EP * ET
+corrPT = covPT / np.sqrt(VP * VT)
+
+display_markdown(
+    f"""$E(P)$ = {EP:0.4f}
+
+$var(P)$ = {VP:0.4f}
+
+$E(\\Theta)$ = {ET:0.4f}
+
+$var(\\Theta)$ = {VT:0.4f}
+
+$corr(P,\\Theta)$ = {corrPT:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+axes[0].hist(p, bins=100, color="blue", edgecolor="black", alpha=0.7)
+axes[0].set_xlim(0, 1)
+axes[0].set_xlabel("$p$")
+axes[1].hist(t, bins=100, color="blue", edgecolor="black", alpha=0.7)
+axes[1].set_xlim(0, 1)
+axes[1].set_xlabel("$\\theta$");
+```
+
+### Tracking Plots
+
+```{python}
+est_cum_repeat = np.mean(
+    p * (1 - t) / t - p * (1 - t) ** (n_trans[:, None] + 1) / t, axis=1
+) * np.sum(rfm_array_calib[:, 3])
+est_yearly_repeat = np.diff(est_cum_repeat, prepend=0)
+
+cum_repeat = cum_repeat.with_columns(
+    pl.when(pl.col("Actual Vs Model") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Model"))
+    .alias("Actual Vs Model")
+).vstack(
+    pl.DataFrame(
+        {
+            "Year": years[1:],
+            "Actual Vs Model": ["S_BB-G/B"] * len(years[1:]),
+            "Repeat Trans": est_cum_repeat.flatten(),
+        }
+    )
+)
+
+yearly_repeat = yearly_repeat.with_columns(
+    pl.when(pl.col("Actual Vs Model") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Model"))
+    .alias("Actual Vs Model")
+).vstack(
+    pl.DataFrame(
+        {
+            "Year": years[1:],
+            "Actual Vs Model": ["S_BB-G/B"] * len(years[1:]),
+            "Repeat Trans": est_yearly_repeat.flatten(),
+        }
+    )
+)
+```
+
+```{python}
+(
+    alt.Chart(cum_repeat)
+    .mark_line()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="Cumulative no. of repeat transactions"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Cumulative Repeat Transactions",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(yearly_repeat)
+    .mark_line()
+    .encode(
+        x=alt.X("Year", axis=alt.Axis(labelAngle=0)),
+        y=alt.Y("Repeat Trans", title="No. of repeat transactions"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650, height=250, title="Predicted vs. Actual Annual Repeat Transactions"
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### In-Sample Model Fit Plot
+
+```{python}
+PX = np.zeros(n + 1)
+for s in range(n + 1):
+    temp_px = comb(n, s) * p**s * (1 - p) ** (n - s) * (1 - t) ** n
+    for j in range(s, n):
+        temp_px += comb(j, s) * p**s * (1 - p) ** (j - s) * t * (1 - t) ** j
+    PX[s] = np.mean(temp_px)
+
+actual_model_repeat_calib = actual_model_repeat_calib.with_columns(
+    pl.when(pl.col("Actual Vs Estimated") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Estimated"))
+    .alias("Actual Vs Estimated")
+).vstack(
+    pl.DataFrame(
+        {
+            "P1X": np.arange(n + 1, dtype=np.int8),
+            "Actual Vs Estimated": ["S_BB-G/B"] * (n + 1),
+            "No of people": PX * np.sum(rfm_array_calib[:, 3]),
+        }
+    )
+)
+
+(
+    alt.Chart(actual_model_repeat_calib)
+    .mark_bar()
+    .encode(
+        x=alt.X(
+            "P1X:O", title="No. of repeat transactions", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("No of people:Q", title="No. of people"),
+        color="Actual Vs Estimated:N",
+        xOffset="Actual Vs Estimated",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Frequency of Repeat Transactions (Calibration Period) in 1996 to 2001",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Calibration Period Model Fit Plot
+
+```{python}
+n_star = 5
+PXf = np.zeros(n_star + 1)
+for s in range(n_star + 1):
+    temp_px = (s == 0) * (1 - (1 - t) ** n) + comb(n_star, s) * p**s * (1 - p) ** (
+        n_star - s
+    ) * (1 - t) ** (n + n_star)
+    for j in range(s, n_star):
+        temp_px += comb(j, s) * p**s * (1 - p) ** (j - s) * t * (1 - t) ** (n + j)
+    PXf[s] = np.mean(temp_px)
+
+actual_model_repeat_valid = actual_model_repeat_valid.with_columns(
+    pl.when(pl.col("Actual Vs Estimated") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Estimated"))
+    .alias("Actual Vs Estimated")
+).vstack(
+    pl.DataFrame(
+        {
+            "P2X": np.arange(n_star + 1, dtype=np.int8),
+            "Actual Vs Estimated": ["S_BB-G/B"] * (n_star + 1),
+            "No of people": PXf * np.sum(valid_repeat_count),
+        }
+    )
+)
+
+(
+    alt.Chart(actual_model_repeat_valid)
+    .mark_bar()
+    .encode(
+        x=alt.X(
+            "P2X:O", title="No. of repeat transactions", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("No of people:Q", title="No. of people"),
+        color="Actual Vs Estimated:N",
+        xOffset="Actual Vs Estimated",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Frequency of Repeat Transactions (Validation Period) in 2002-2006",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Conditional Expectations
+
+```{python}
+# Conditional Expectations
+n_star = 5
+CE = np.empty(len(p1x))
+for i in range(len(p1x)):
+    tmp_lik = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+    tmp_CE = (p * (1 - t) / t - p * (1 - t) ** (n_star + 1) / t) * tmp_lik
+    for j in range(n - t_x[i]):
+        tmp_lik += (
+            p ** p1x[i] * (1 - p) ** (t_x[i] - p1x[i] + j) * t * (1 - t) ** (t_x[i] + j)
+        )
+    CE[i] = np.mean(tmp_CE) / np.mean(tmp_lik)
+```
+
+```{python}
+ce_df_updated = ce_df.hstack([pl.Series("CE - S_BB-G/B", CE)])
+rfcalib_cross_tab(
+    ce_df_updated,
+    values="CE - S_BB-G/B",
+    title="Expected Number of Repeat Transactions in 2002–2006",
+    subtitle="as a Function of Recency and Frequency, as Predicted by the S_{BB}-G/B Model",
+    color_range=[0, 4],
+)
+```
+
+```{python}
+exp_total = CE * num_donors
+
+ce_df_mod = (
+    ce_df.rename(
+        {"Exp Total": "Exp Total - BG/BB", "Conditional Expectation": "CE - BG/BB"}
+    )
+    .hstack([pl.Series("Exp Total - SbbG/B", exp_total)])
+    .hstack([pl.Series("CE - SbbG/B", CE)])
+)
+
+# Expected total 2002-2006 donations by p1x / tx
+est_ce_mat = (
+    ce_df_mod.sort("t_x")
+    .pivot(index="P1X", on="t_x", values="Exp Total - SbbG/B")
+    .sort("P1X")
+    .fill_null(0)
+    .to_numpy()[:, 1:]
+)
+
+# CE by Frequency
+est_ce_freq = np.sum(est_ce_mat, axis=1) / np.sum(num_donors_mat, axis=1)
+ce_freq = ce_freq.with_columns(
+    pl.when(pl.col("Actual Vs Model") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Model"))
+    .alias("Actual Vs Model")
+).vstack(
+    pl.DataFrame(
+        {
+            "x": p1x_frequency,
+            "Actual Vs Model": ["S_BB-G/B"] * len(p1x_frequency),
+            "CE by Freq": est_ce_freq,
+        }
+    )
+)
+
+# CE by Recency
+est_ce_rec = np.sum(est_ce_mat, axis=0) / np.sum(num_donors_mat, axis=0)
+ce_rec = ce_rec.with_columns(
+    pl.when(pl.col("Actual Vs Model") == "Model")
+    .then(pl.lit("BG/BB"))
+    .otherwise(pl.col("Actual Vs Model"))
+    .alias("Actual Vs Model")
+).vstack(
+    pl.DataFrame(
+        {
+            "t_x": years[: len(p1x_frequency)],
+            "Actual Vs Model": ["S_BB-G/B"] * len(p1x_frequency),
+            "CE by Rec": est_ce_rec,
+        }
+    ).with_columns(pl.col("t_x").cast(pl.Int16))
+)
+```
+
+```{python}
+(
+    alt.Chart(ce_freq)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "x",
+            title="No. of repeat transactions (1996-2001)",
+            axis=alt.Axis(labelAngle=0, values=np.arange(7)),
+        ),
+        y=alt.Y("CE by Freq", title="No. of repeat transactions (2002–2006)"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Conditional Expectations of Repeat Transactions in 2002–2006 as a Function of Frequency",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    alt.Chart(ce_rec)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "t_x",
+            title="Year of last transaction",
+            axis=alt.Axis(labelAngle=0, values=np.arange(1995, 2002, 1), format=".0f"),
+        ),
+        y=alt.Y("CE by Rec", title="No. of repeat transactions (2002–2006)"),
+        strokeDash="Actual Vs Model",
+    )
+    .properties(
+        width=650,
+        height=250,
+        title="Predicted vs. Actual Conditional Expectations of Repeat Transactions in 2002–2006 as a Function of Recency",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### P(Alive) as a Function of Recency and Frequency
+
+```{python}
+# P(Alive at n | p, t, x, t_x, n)
+P_alive = np.empty(len(p1x))
+for i in range(len(p1x)):
+    A1 = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+    num = np.mean(A1)
+    for j in range(n - t_x[i]):
+        A1 += (
+            p ** p1x[i] * (1 - p) ** (t_x[i] - p1x[i] + j) * t * (1 - t) ** (t_x[i] + j)
+        )
+    P_alive[i] = num / np.mean(A1)
+
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(pl.DataFrame({"P(Alive) - S_BB-G/B": P_alive})),
+    values="P(Alive) - S_BB-G/B",
+    title="P(Alive in 2002) as a Function of Recency and Frequency",
+    color_range=[0, 1],
+)
+```
+
+```{python}
+# P(Alive at n + 1 | p, t, x, t_x, n)
+P_alive = np.empty(len(p1x))
+for i in range(len(p1x)):
+    num = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** (n + 1)
+    A1 = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+    for j in range(n - t_x[i]):
+        A1 += (
+            p ** p1x[i] * (1 - p) ** (t_x[i] - p1x[i] + j) * t * (1 - t) ** (t_x[i] + j)
+        )
+    P_alive[i] = np.mean(num) / np.mean(A1)
+
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(pl.DataFrame({"P(Alive) - S_BB-G/B": P_alive})),
+    values="P(Alive) - S_BB-G/B",
+    title="P(Alive in 2002) as a Function of Recency and Frequency",
+    color_range=[0, 1],
+)
+```
+
+```{python}
+# Output array should be length n_star+1 (6), representing probabilities for each possible x*
+PXf = np.empty((len(p1x), n_star + 1))
+
+# For each possible number of future transactions x*
+for x_star in range(n_star + 1):
+    # Calculate the mean probability across all customers
+
+    # For each customer
+    for i in range(len(p1x)):
+        # Calculate P(alive at n) for this customer
+        A1 = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+        numerator = np.mean(A1)
+        for j in range(n - t_x[i]):
+            A1 += (
+                p ** p1x[i]
+                * (1 - p) ** (t_x[i] - p1x[i] + j)
+                * t
+                * (1 - t) ** (t_x[i] + j)
+            )
+        P_alive = numerator / np.mean(A1)
+
+        # Calculate P(X(n,n+n*)=x*|p,θ,alive at n)
+        temp_px = (
+            comb(n_star, x_star)
+            * p**x_star
+            * (1 - p) ** (n_star - x_star)
+            * (1 - t) ** (n_star)
+        )
+        for j in range(x_star, n_star):
+            temp_px += (
+                comb(j, x_star) * p**x_star * (1 - p) ** (j - x_star) * t * (1 - t) ** j
+            )
+
+        PXf[i, x_star] = (x_star == 0) * (1 - P_alive) + np.mean(temp_px) * P_alive
+```
+
+```{python}
+rfcalib_cross_tab(
+    rfm_summary_calib.collect().hstack(
+        pl.DataFrame({"P(Alive) - S_BB-G/B": PXf[:, 0]})
+    ),
+    values="P(Alive) - S_BB-G/B",
+    title="P(Alive in 2002) as a Function of Recency and Frequency",
+    color_range=[0, 1],
+)
+```
+
+```{python}
+PXf = np.empty(len(p1x))
+n_star = 5
+x_star = 1
+
+for i in range(len(p1x)):
+    A1 = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+    numerator = np.mean(A1)
+    for j in range(n - t_x[i]):
+        A1 += (
+            p ** p1x[i] * (1 - p) ** (t_x[i] - p1x[i] + j) * t * (1 - t) ** (t_x[i] + j)
+        )
+    P_alive = numerator / np.mean(A1)
+    temp_px = (
+        comb(n_star, x_star)
+        * p**x_star
+        * (1 - p) ** (n_star - x_star)
+        * (1 - t) ** (n_star)
+    )
+    for j in range(x_star, n_star):
+        temp_px += (
+            comb(j, x_star) * p**x_star * (1 - p) ** (j - x_star) * t * (1 - t) ** j
+        )
+    PXf[i] = (x_star == 0) * (1 - P_alive) + np.mean(temp_px) * P_alive
+
+PXf
+```
+
+### Discounted Expected Residual Transactions (DERT)
+
+```{python}
+# DERT
+d = 0.1  # discount rate
+DERT_SbbGB = np.empty(len(p1x))
+for i in range(len(p1x)):
+    A1 = p ** (p1x[i] + 1) * (1 - p) ** (n - p1x[i]) * (1 - t) ** (n + 1) / (d + t)
+    tmp_lik = p ** p1x[i] * (1 - p) ** (n - p1x[i]) * (1 - t) ** n
+    for j in range(n - t_x[i]):
+        tmp_lik += (
+            p ** p1x[i] * (1 - p) ** (t_x[i] - p1x[i] + j) * t * (1 - t) ** (t_x[i] + j)
+        )
+    DERT_SbbGB[i] = np.mean(A1) * (1 / np.mean(tmp_lik))
+
+DERT_SbbGB
+```
+

@@ -1,0 +1,49 @@
+---
+title: Pareto/NBD Model
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:   
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/Pareto-NBD-Model.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+**Source**:
+
+-   ["Counting Your Customers" the Easy Way: An Alternative to the Pareto/NBD Model](https://www.brucehardie.com/abstracts/abstract-fhl_2004-04.html)
+-   [A Note on Implementing the Pareto/NBD Model in MATLAB](https://www.brucehardie.com/notes/008/)
+-   [A Note on Deriving the Pareto/NBD Model and Related Expressions](https://brucehardie.com/notes/009/)
+-   [Deriving an Expression for P(X(t)=x) Under the Pareto/NBD Model](http://www.brucehardie.com/notes/012/)
+-   [Deriving an Expression for P(X(t,t+τ)=x) Under the Pareto/NBD Model](http://www.brucehardie.com/notes/013/)
+-   [Incorporating Time-Invariant Covariates into the Pareto/NBD and BG/NBD Models](http://www.brucehardie.com/notes/019/)
+-   [Implementing the Pareto/NBD Model Given Interval-Censored Data](http://www.brucehardie.com/notes/011/)
+-   [A Correlated Pareto/NBD Model](http://www.brucehardie.com/notes/034/)
+

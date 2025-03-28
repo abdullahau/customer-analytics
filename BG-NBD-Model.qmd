@@ -1,0 +1,912 @@
+---
+title: BG/NBD Model
+author: Abdullah Mahmood
+date: last-modified
+format:
+    html:
+        theme: cosmo
+        css: quarto-style/style.css        
+        highlight-style: atom-one        
+        mainfont: Palatino
+        fontcolor: black
+        monobackgroundcolor: white
+        monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+        fontsize: 13pt
+        linestretch: 1.4
+        number-sections: true
+        number-depth: 5
+        toc: true
+        toc-location: right
+        toc-depth: 5
+        code-fold: true
+        code-copy: true
+        cap-location: bottom
+        format-links: false
+        embed-resources: true
+        anchor-sections: true
+        code-links:
+        -   text: GitHub Repo
+            icon: github
+            href: https://github.com/abdullahau/customer-analytics/
+        -   text: Quarto Markdown
+            icon: file-code
+            href: https://github.com/abdullahau/customer-analytics/blob/main/BG-NBD-Model.qmd
+        html-math-method:
+            method: mathjax
+            url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+---
+
+**Source**:
+
+-   ["Counting Your Customers" the Easy Way: An Alternative to the Pareto/NBD Model](https://www.brucehardie.com/abstracts/abstract-fhl_2004-04.html)
+-   [Implementing the BG/NBD Model for Customer Base Analysis in Excel](https://www.brucehardie.com/notes/004/)
+-   [A Note on Implementing the Pareto/NBD Model in MATLAB](https://www.brucehardie.com/notes/008/)
+-   [Creating a Fit Histogram for the BG/NBD Model](https://www.brucehardie.com/notes/014/)
+-   [Deriving an Expression for P(X(t)=x) Under the Pareto/NBD Model](http://www.brucehardie.com/notes/012/)
+-   [Deriving an Expression for P(X(t,t+τ)=x) Under the Pareto/NBD Model](http://www.brucehardie.com/notes/013/)
+-   [Computing P(alive) Using the BG/NBD Model](http://www.brucehardie.com/notes/021/)
+-   [A Step-by-Step Derivation of the BG/NBD Model](https://www.brucehardie.com/notes/039/bgnbd_derivation__2019-11-06.pdf)
+-   [Incorporating Time-Invariant Covariates into the Pareto/NBD and BG/NBD Models](http://www.brucehardie.com/notes/019/)
+-   [Implementing the Pareto/NBD Model Given Interval-Censored Data](http://www.brucehardie.com/notes/011/)
+-   [Overcoming the BG/NBD Model's #NUM! Error Problem](http://www.brucehardie.com/notes/027/)
+-   [A Note on Deriving the Pareto/NBD Model and Related Expressions](https://brucehardie.com/notes/009/)
+-   [Computing P(X(t,t+s)=x) Under the BG/NBD Model](https://brucehardie.com/notes/029/)
+
+## Imports
+
+### Import Packages
+
+```{python}
+#| code-fold: false
+import polars as pl
+import numpy as np
+from scipy.optimize import minimize
+from scipy.special import gammaln, hyp2f1, gamma, factorial
+from utils import CDNOW
+
+import altair as alt
+from IPython.display import display_markdown
+
+alt.renderers.enable("html")
+```
+
+### Import Data
+
+```{python}
+#| code-fold: false
+calib_p = 273  # 39 week calibration period
+
+data = CDNOW(master=False, calib_p=calib_p)
+
+rfm_data = data.rfm_summary()
+
+# Time of trial purchase (in weeks)
+tofp = data.time_to_trail_purch()
+
+# actual weekly & cumulative repeat sales data
+actual_repeat_sales = data.repeat_sales()
+
+forecast_horizon_week = (calib_p * 2) // 7
+forecast_horizon_day = forecast_horizon_week * 7
+forecast_horizon_day
+t = np.arange(forecast_horizon_day, dtype=np.int16) + 1
+
+tofp_array = tofp.collect().to_numpy()
+num_triers = tofp_array[:, 1]
+trial_weeks = tofp_array[:, 0]
+trial_days = np.arange(np.max(trial_weeks) * 7, dtype=np.int16) + 1
+```
+
+## BG/NBD Model
+
+### Parameter Estimation
+
+```{python}
+#| code-fold: false
+def bgnbd_est(rfm_data, guess={"r": 0.01, "alpha": 0.01, "a": 0.01, "b": 0.01}):
+    def log_likelihood(x):
+        r, alpha, a, b = x
+        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+
+        ln_A_1 = gammaln(p1x + r) - gammaln(r) + r * np.log(alpha)
+        ln_A_2 = gammaln(a + b) + gammaln(b + p1x) - gammaln(b) - gammaln(a + b + p1x)
+        ln_A_3 = -(r + p1x) * np.log(alpha + T)
+        ln_A_4 = np.where(
+            p1x > 0,
+            np.log(a) - np.log(b + p1x - 1) - (r + p1x) * np.log(alpha + t_x),
+            0,
+        )
+        return -np.sum(
+            ln_A_1 + ln_A_2 + np.log(np.exp(ln_A_3) + (p1x > 0) * np.exp(ln_A_4))
+        )
+
+    bnds = [(1e-6, np.inf) for _ in range(4)]
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 10000},
+    )
+```
+
+```{python}
+result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, a, b = result.x
+ll = result.fun
+
+# Sample Parameters
+# r = 0.24259395230803
+# alpha = 4.41359091416604
+# a = 0.792919955839573
+# b = 2.42589404751842
+
+display_markdown(
+    f"""$r$ = {r:0.4f}
+
+$\\alpha$ = {alpha:0.4f}
+
+$a$ = {a:0.4f}
+
+$b$ = {b:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+#| code-fold: false
+def bgnbd_est(rfm_data, guess={"r": 0.01, "alpha": 0.01, "a": 0.01, "b": 0.01}):
+    def log_likelihood(x):
+        r, alpha, a, b = x
+        p1x, t_x, T = (
+            rfm_data[:, 0],
+            rfm_data[:, 1] / 4,
+            rfm_data[:, 2] / 4,
+        )  # change the unit of time in the above example from week to quad-week
+
+        ln_A_1 = gammaln(p1x + r) - gammaln(r) + r * np.log(alpha)
+        ln_A_2 = gammaln(a + b) + gammaln(b + p1x) - gammaln(b) - gammaln(a + b + p1x)
+        ln_A_3 = -(r + p1x) * np.log(alpha + T)
+        ln_A_4 = np.where(
+            p1x > 0,
+            np.log(a) - np.log(b + p1x - 1) - (r + p1x) * np.log(alpha + t_x),
+            0,
+        )
+        return -np.sum(
+            ln_A_1 + ln_A_2 + np.log(np.exp(ln_A_3) + (p1x > 0) * np.exp(ln_A_4))
+        )
+
+    bnds = [(1e-6, np.inf) for _ in range(4)]
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 10000},
+    )
+```
+
+```{python}
+result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, a, b = result.x
+ll = result.fun
+
+display_markdown(
+    f"""$r$ = {r:0.4f}
+
+$\\alpha$ = {alpha:0.4f}
+
+$a$ = {a:0.4f}
+
+$b$ = {b:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+#| code-fold: false
+def bgnbd_est(rfm_data, guess={"r": 0.01, "alpha": 0.01, "a": 0.01, "b": 0.01}):
+    def log_likelihood(x):
+        r, alpha, a, b = x
+        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+
+        D_1 = (
+            gammaln(r + p1x)
+            - gammaln(r)
+            + gammaln(a + b)
+            + gammaln(b + p1x)
+            - gammaln(b)
+            - gammaln(a + b + p1x)
+        )
+        D_2 = r * np.log(alpha, where=alpha > 0) - (r + p1x) * np.log(
+            alpha + t_x, where=((alpha > 0) or (t_x > 0))
+        )
+        C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
+        C_4 = a / (b + p1x - 1)
+
+        return -np.sum(
+            D_1
+            + D_2
+            + np.where(p1x > 0, np.log(C_3 + C_4, where=(C_3 + C_4) > 0), np.log(C_3))
+        )
+
+    bnds = [(1e-6, np.inf) for _ in range(4)]
+
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 10000},
+    )
+```
+
+```{python}
+result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, a, b = result.x
+ll = result.fun
+
+display_markdown(
+    f"""$r$ = {r:0.4f}
+
+$\\alpha$ = {alpha:0.4f}
+
+$a$ = {a:0.4f}
+
+$b$ = {b:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+```{python}
+#| code-fold: false
+def bgnbd_est(rfm_data, guess={"r": 0.01, "alpha": 0.01, "a": 0.01, "b": 0.01}):
+    def log_likelihood(x):
+        r, alpha, a, b = x
+        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+
+        # Logarithm calculations with numerical stability
+        log_alpha = np.log(
+            np.clip(alpha, 1e-10, None)
+        )  # Avoid log(0) by clipping to a small value
+        log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
+
+        # Components of the log-likelihood
+        D_1 = (
+            gammaln(r + p1x)
+            - gammaln(r)
+            + gammaln(a + b)
+            + gammaln(b + p1x)
+            - gammaln(b)
+            - gammaln(a + b + p1x)
+        )
+        D_2 = r * log_alpha - (r + p1x) * log_alpha_t_x
+        C_3 = ((alpha + t_x) / (alpha + T)) ** (r + p1x)
+        C_4 = a / (b + p1x - 1)
+
+        # Handle cases where p1x > 0 and apply log to valid values
+        log_term = np.log(np.clip(C_3 + C_4, 1e-10, None))
+        result = (
+            D_1 + D_2 + np.where(p1x > 0, log_term, np.log(np.clip(C_3, 1e-10, None)))
+        )
+
+        return -np.sum(result)
+
+    # Bounds for the optimization
+    bnds = [(1e-6, np.inf) for _ in range(4)]
+
+    # Optimization using minimize
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 20000},
+    )
+```
+
+```{python}
+result = bgnbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, a, b = result.x
+ll = result.fun
+
+display_markdown(
+    f"""$r$ = {r:0.4f}
+
+$\\alpha$ = {alpha:0.4f}
+
+$a$ = {a:0.4f}
+
+$b$ = {b:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+### Generating a Forecast of Aggregate Repeat Transactions
+
+```{python}
+z = (t / 7) / (alpha + (t / 7))
+h2f1 = hyp2f1(r, b, (a + b - 1), z)
+E_X_t = (a + b - 1) / (a - 1) * (1 - (alpha / (alpha + (t / 7))) ** r * h2f1)
+
+index = t.reshape(-1, 1) - trial_days
+index = np.clip(index - 1, 0, E_X_t.shape[0]).T
+
+# Compute cumulative repeat sales
+cum_rpt_sls = np.dot(num_triers, np.triu(E_X_t[index], k=1))[6::7]
+
+# Compute weekly repeat sales
+wkly_rpt_sls = np.diff(cum_rpt_sls, prepend=0)
+
+bgnbd_repeat_sales = pl.DataFrame(
+    {
+        "Week": np.arange(cum_rpt_sls.shape[0]) + 1,
+        "Weekly Sales": wkly_rpt_sls,
+        "Cum Sales": cum_rpt_sls,
+    },
+    schema={"Week": pl.UInt16, "Weekly Sales": pl.Float32, "Cum Sales": pl.Float32},
+)
+```
+
+### Computing Conditional Expectations
+
+```{python}
+rfm_data_array = rfm_data.select("P1X", "P2X", "t_x", "T").collect().to_numpy()
+
+p1x = rfm_data_array[:, 0].astype(np.int16)
+p2x = rfm_data_array[:, 1].astype(np.int16)
+t_x = rfm_data_array[:, 2]
+T = rfm_data_array[:, 3]
+t_ce = (
+    39  # the length of the period over which we wish to make the conditional forecast
+)
+
+h2f1_cust = hyp2f1(r + p1x, b + p1x, a + b + p1x - 1, t_ce / (alpha + T + t_ce))
+
+ce = (
+    (a + b + p1x - 1)
+    / (a - 1)
+    * (1 - ((alpha + T) / (alpha + T + t_ce)) ** (r + p1x) * h2f1_cust)
+    / (1 + (p1x > 0) * a / (b + p1x - 1) * ((alpha + T) / (alpha + t_x)) ** (r + p1x))
+)
+
+individual_trans = pl.DataFrame({"Actual": p2x, "BG/NBD": ce})
+
+# Compute unique levels of p1x
+unique_p1x = np.arange(p1x.max() + 1)
+# Compute counts per unique p1x
+np1x = np.bincount(p1x)
+
+ce_act = np.divide(np.bincount(p1x, weights=p2x), np1x, where=np1x != 0)
+ce_est = np.divide(np.bincount(p1x, weights=ce), np1x, where=np1x != 0)
+
+# create right-censored version for plot
+censor = 7  # right-censor at 7+
+denom = np.sum(np1x[censor:])
+
+# Compute censored actual conditional expectations
+ce_act_cen = np.zeros(censor + 1)
+ce_act_cen[:censor] = ce_act[:censor]
+ce_act_cen[censor] = np.dot(np1x[censor:], ce_act[censor:]) / denom
+
+# Compute censored estimated conditional expectations
+ce_est_cen = np.zeros(censor + 1)
+ce_est_cen[:censor] = ce_est[:censor]
+ce_est_cen[censor] = np.dot(np1x[censor:], ce_est[censor:]) / denom
+
+ce_bgnbd = pl.DataFrame(
+    {
+        "P1X": [str(i) if i < 7 else "7+" for i in range(8)],
+        "Empirical": ce_act_cen,
+        "BG/NBD": ce_est_cen,
+    }
+)
+```
+
+```{python}
+p1x_cust = 2
+t_x_cust = 30.43
+T_cust = 38.86
+t_ce = 39 # the length of the period over which we wish to make the conditional forecast
+
+h2f1_cust = hyp2f1(
+    r + p1x_cust, b + p1x_cust, a + b + p1x_cust - 1, t_ce / 
+    (alpha + T_cust + t_ce)
+)
+
+E_Y_X = (
+    (a + b + p1x_cust - 1) / (a - 1)
+    * (1 - ((alpha + T_cust) / (alpha + T_cust + t_ce)) ** (r + p1x_cust) * h2f1_cust)
+    / (
+        1 + (p1x_cust > 0) * a / (b + p1x_cust - 1)
+        * ((alpha + T_cust) / (alpha + t_x_cust)) ** (r + p1x_cust)
+    )
+)
+
+display_markdown(
+    f"""$E(Y(t) \\mid X = x, t_{{x}}, T, r, \\alpha, a, b)$ = {E_Y_X:0.4f}""", raw=True
+)
+```
+
+### Creating a Fit Histogram for the BG/NBD Model
+
+```{python}
+T = 39 - trial_weeks # length of the period of time over which the customer could have made repeat purchases
+
+B_a_b = np.exp(gammaln(a) + gammaln(b) - gammaln(a + b))
+
+T_A, p1x_A = np.meshgrid(T, np.arange(5) + 1)
+A = np.ones((T_A.shape[0] + 1, T_A.shape[1]))
+A[1:, :] = (
+    np.exp(gammaln(r + p1x_A) - gammaln(r) - gammaln(p1x_A + 1))
+    * (T_A / (alpha + T_A)) ** p1x_A
+)
+A = np.cumsum(A, axis=0)
+
+T_P_X_T, p1x_P_X_T = np.meshgrid(T, np.arange(6) + 1)
+P_X_t = np.zeros((T_P_X_T.shape[0] + 2, T_P_X_T.shape[1]))
+
+P_X_t[0] = (
+    np.exp(gammaln(a) + gammaln(b + 0) - gammaln(a + b + 0))
+    / B_a_b
+    * np.exp(gammaln(r + 0) - gammaln(r) - gammaln(0 + 1))
+    * (alpha / (alpha + T)) ** r
+    * (T / (alpha + T)) ** 0
+)
+
+P_X_t[1:-1, :] = np.exp(
+    gammaln(a) + gammaln(b + p1x_P_X_T) - gammaln(a + b + p1x_P_X_T)
+) / B_a_b * np.exp(gammaln(r + p1x_P_X_T) - gammaln(r) - gammaln(p1x_P_X_T + 1)) * (
+    alpha / (alpha + T_P_X_T)
+) ** r * (T_P_X_T / (alpha + T_P_X_T)) ** p1x_P_X_T + np.exp(
+    gammaln(a + 1) + gammaln(b + p1x_P_X_T - 1) - gammaln(a + b + p1x_P_X_T)
+) / B_a_b * (1 - (alpha / (alpha + T_P_X_T)) ** r * A)
+
+P_X_t[-1] = 1 - np.sum(P_X_t[:-1], axis=0)
+
+E_f_x = np.dot(P_X_t, num_triers)
+bgnbd_hist = pl.Series('BG/NBD', E_f_x)
+```
+
+```{python}
+fit_hist_bgnbd = (
+    rfm_data.with_columns(
+        pl.col("P1X").cut(
+            breaks=range(7), labels=[str(i) if i < 7 else "7+" for i in range(8)]
+        )
+    )
+    .group_by("P1X")
+    .agg(pl.len().alias("Actual"))
+    .sort("P1X")
+    .collect()
+    .hstack([bgnbd_hist])
+    .with_columns(
+        ((pl.col("Actual") - pl.col("BG/NBD")) ** 2 / pl.col("BG/NBD")).alias(
+            "(O-E)^2/E - BG/NBD"
+        )
+    )
+)
+
+chi_square = fit_hist_bgnbd.select("(O-E)^2/E - BG/NBD").sum()
+
+chi_square
+```
+
+## Pareto/NBD Model
+
+### Parameter Estimation
+
+```{python}
+#| code-fold: false
+def paretonbd_est(rfm_data, guess={"r": 1, "alpha": 1, "s": 1, "beta": 1}):
+    def log_likelihood(x):
+        r, alpha, s, beta = x
+        p1x, t_x, T = rfm_data[:, 0], rfm_data[:, 1], rfm_data[:, 2]
+
+        maxab = np.max((alpha, beta))
+        absab = np.abs(alpha - beta)
+        param2 = s + 1
+        if alpha < beta:
+            param2 = r + p1x
+
+        part1 = (alpha**r * beta**s / gamma(r)) * gamma(r + p1x)
+        part2 = 1 / ((alpha + T) ** (r + p1x) * (beta + T) ** s)
+
+        if absab == 0:
+            F1 = 1 / ((maxab + t_x) ** (r + s + p1x))
+            F2 = 1 / ((maxab + T) ** (r + s + p1x))
+        else:
+            F1 = hyp2f1(r + s + p1x, param2, r + s + p1x + 1, absab / (maxab + t_x)) / (
+                (maxab + t_x) ** (r + s + p1x)
+            )
+            F2 = hyp2f1(r + s + p1x, param2, r + s + p1x + 1, absab / (maxab + T)) / (
+                (maxab + T) ** (r + s + p1x)
+            )
+
+        return -np.sum(np.log(part1 * (part2 + (s / (r + s + p1x)) * (F1 - F2))))
+
+    bnds = [(1e-6, 20) for _ in range(4)]
+    return minimize(
+        log_likelihood,
+        x0=list(guess.values()),
+        bounds=bnds,
+        method="Nelder-Mead",
+        options={"maxiter": 10000},
+    )
+```
+
+```{python}
+result = paretonbd_est(rfm_data.select("P1X", "t_x", "T").collect().to_numpy())
+r, alpha, s, beta = result.x
+ll = result.fun
+
+# Sample Parameters
+# r = 0.553268332737686
+# alpha = 10.577643207793674
+# s = 0.606338658139013
+# beta = 11.672047422351444
+
+display_markdown(
+    f"""$r$ = {r:0.4f}
+
+$\\alpha$ = {alpha:0.4f}
+
+$s$ = {a:0.4f}
+
+$\\beta$ = {b:0.4f}
+
+Log-Likelihood = {-ll:0.4f}""",
+    raw=True,
+)
+```
+
+### Generating a Forecast of Aggregate Repeat Transactions
+
+```{python}
+E_X_t = r * beta / (alpha * (s - 1)) * (1 - (beta / (beta + (t / 7))) ** (s - 1))
+
+index = t.reshape(-1, 1) - trial_days
+index = np.clip(index - 1, 0, E_X_t.shape[0]).T
+
+# Compute cumulative repeat sales
+cum_rpt_sls = np.dot(num_triers, np.triu(E_X_t[index], k=1))[6::7]
+
+# Compute weekly repeat sales
+wkly_rpt_sls = np.diff(cum_rpt_sls, prepend=0)
+
+paretonbd_repeat_sales = pl.DataFrame(
+    {
+        "Week": np.arange(cum_rpt_sls.shape[0]) + 1,
+        "Weekly Sales": wkly_rpt_sls,
+        "Cum Sales": cum_rpt_sls,
+    },
+    schema={"Week": pl.UInt16, "Weekly Sales": pl.Float32, "Cum Sales": pl.Float32},
+)
+```
+
+```{python}
+cum_sales_plot_data = (
+    actual_repeat_sales.rename({"Cum Sales": "Actual"})
+    .join(other=paretonbd_repeat_sales, on="Week", how="left", suffix=" - Pareto/NBD")
+    .rename({"Cum Sales": "Pareto/NBD"})
+    .join(other=bgnbd_repeat_sales, on="Week", how="left", suffix=" - BG/NBD")
+    .rename({"Cum Sales": "BG/NBD"})
+    .unpivot(
+        on=["Actual", "Pareto/NBD", "BG/NBD"],
+        index="Week",
+        value_name="Cum Sales",
+        variable_name="Actual Vs Estimated",
+    )
+)
+
+(
+    alt.Chart(cum_sales_plot_data)
+    .mark_line()
+    .encode(
+        x=alt.X("Week", title="Week"),
+        y=alt.Y("Cum Sales", title="Cum. Rpt Transactions"),
+        strokeDash="Actual Vs Estimated:N",
+    )
+    .properties(width=550, height=400, title="Tracking Cumulative Repeat Transactions")
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+weekly_sales_plot_data = (
+    actual_repeat_sales.rename({"Weekly Sales": "Actual"})
+    .join(other=paretonbd_repeat_sales, on="Week", how="left", suffix=" - Pareto/NBD")
+    .rename({"Weekly Sales": "Pareto/NBD"})
+    .join(other=bgnbd_repeat_sales, on="Week", how="left", suffix=" - BG/NBD")
+    .rename({"Weekly Sales": "BG/NBD"})
+    .unpivot(
+        on=["Actual", "Pareto/NBD", "BG/NBD"],
+        index="Week",
+        value_name="Weekly Sales",
+        variable_name="Actual Vs Estimated",
+    )
+)
+
+(
+    alt.Chart(weekly_sales_plot_data)
+    .mark_line()
+    .encode(
+        x=alt.X("Week", title="Week"),
+        y=alt.Y("Weekly Sales", title="Weekly Rpt Transactions"),
+        strokeDash="Actual Vs Estimated:N",
+    )
+    .properties(width=650, height=250, title="Tracking Weekly Repeat Transactions")
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Computing P(active)
+
+```{python}
+# Compute P(active|p1x,tx,T)
+rfm_data_array = rfm_data.select("P1X", "P2X", "t_x", "T").collect().to_numpy()
+
+p1x = rfm_data_array[:, 0].astype(np.int16)
+p2x = rfm_data_array[:, 1].astype(np.int16)
+t_x = rfm_data_array[:, 2]
+T = rfm_data_array[:, 3]
+
+maxab = np.max((alpha, beta))
+absab = np.abs(alpha - beta)
+param2 = s + 1
+if alpha < beta:
+    param2 = r + p1x
+
+F0 = (alpha + T) ** (r + p1x) * (beta + T) ** s
+
+if absab == 0:
+    F1 = 1 / ((maxab + t_x) ** (r + s + p1x))
+    F2 = 1 / ((maxab + T) ** (r + s + p1x))
+else:
+    F1 = hyp2f1(r + s + p1x, param2, r + s + p1x + 1, absab / (maxab + t_x)) / (
+        (maxab + t_x) ** (r + s + p1x)
+    )
+    F2 = hyp2f1(r + s + p1x, param2, r + s + p1x + 1, absab / (maxab + T)) / (
+        (maxab + T) ** (r + s + p1x)
+    )
+
+pactive = 1 / (1 + (s / (r + s + p1x)) * F0 * (F1 - F2))
+
+# compute average P(active|p1x,tx,T) and determine the proportion of customers buying in the second 39 weeks for each level of p1x
+# Compute unique levels of p1x
+unique_p1x = np.arange(p1x.max() + 1)
+
+# Compute counts per unique p1x
+np1x = np.bincount(p1x)
+
+# Compute actual proportions of active customers
+pa_actual = np.divide(
+    np.bincount(p1x, weights=(p2x > 0).astype(float)), np1x, where=np1x != 0
+)
+
+# Compute estimated proportions of active customers
+pa_est = np.divide(np.bincount(p1x, weights=pactive), np1x, where=np1x != 0)
+```
+
+```{python}
+# create right-censored version for plot
+censor = 7  # Right-censor at 7+
+denom = np.sum(np1x[censor:])  # Compute denominator
+
+# Compute censored actual proportions
+pa_act_cen = np.zeros(censor + 1)
+pa_act_cen[:censor] = pa_actual[:censor]
+pa_act_cen[censor] = np.dot(np1x[censor:], pa_actual[censor:]) / denom
+
+# Compute censored estimated proportions
+pa_est_cen = np.zeros(censor + 1)
+pa_est_cen[:censor] = pa_est[:censor]
+pa_est_cen[censor] = np.dot(np1x[censor:], pa_est[censor:]) / denom
+
+prop_active_customers = pl.DataFrame(
+    {
+        "P1X": [str(i) if i < 7 else "7+" for i in range(8)],
+        "Empirical": pa_act_cen,
+        "Pareto/NBD": pa_est_cen,
+    }
+)
+prop_active_customers = prop_active_customers.unpivot(
+    on=["Empirical", "Pareto/NBD"],
+    index="P1X",
+    variable_name="Actual Vs Estimated",
+    value_name="P(active)",
+)
+
+(
+    alt.Chart(prop_active_customers)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "P1X:O", title="# Transactions in Weeks 1−39", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("P(active):Q", title="P(Active)"),
+        strokeDash="Actual Vs Estimated:N",
+    )
+    .properties(
+        width=550,
+        height=400,
+        title="Predicted vs. Actual Proportions of Active Customers",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Computing Conditional Expectations
+
+```{python}
+t_ce = 39  # period for which conditional expectations are to be computed
+
+tmp1 = (r + p1x) * (beta + T) / ((alpha + T) * (s - 1))
+tmp2 = ((beta + T) / (beta + T + t_ce)) ** (s - 1)
+ce = tmp1 * (1 - tmp2) * pactive
+
+individual_trans = individual_trans.hstack([pl.Series("Pareto/NBD", ce)])
+
+# compute average E[Y(t)|p1x,tx,T] and average actual number of
+# transactions in the second 39 weeks for each level of p1x
+
+# Compute unique levels of p1x
+unique_p1x = np.arange(p1x.max() + 1)
+
+# Compute counts per unique p1x
+np1x = np.bincount(p1x)
+ce_est = np.divide(np.bincount(p1x, weights=ce), np1x, where=np1x != 0)
+```
+
+```{python}
+# create right-censored version for plot
+censor = 7  # right-censor at 7+
+denom = np.sum(np1x[censor:])
+
+# Compute censored estimated conditional expectations
+ce_est_cen = np.zeros(censor + 1)
+ce_est_cen[:censor] = ce_est[:censor]
+ce_est_cen[censor] = np.dot(np1x[censor:], ce_est[censor:]) / denom
+
+conditional_expectation = ce_bgnbd.hstack([pl.Series("Pareto/NBD", ce_est_cen)])
+conditional_expectation = conditional_expectation.unpivot(
+    on=["Empirical", "BG/NBD", "Pareto/NBD"],
+    index="P1X",
+    variable_name="Actual Vs Estimated",
+    value_name="CE P2X",
+)
+```
+
+```{python}
+(
+    alt.Chart(conditional_expectation)
+    .mark_line()
+    .encode(
+        x=alt.X(
+            "P1X:O", title="# Transactions in Weeks 1−39", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("CE P2X:Q", title="Average # Transactions in Weeks 40−78"),
+        strokeDash=alt.StrokeDash(
+            "Actual Vs Estimated:N",
+            scale=alt.Scale(domain=["Empirical", "BG/NBD", "Pareto/NBD"]),
+        ),
+    )
+    .properties(
+        width=550,
+        height=400,
+        title="Conditional Expectations of Purchasing (Weeks 40–78)",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+### Creating a Fit Histogram for the Pareto/NBD Model
+
+```{python}
+T = 39 - trial_weeks # length of the period of time over which the customer could have made repeat purchases
+T_P_X_T, p1x_P_X_T = np.meshgrid(T, np.arange(7))
+
+maxab = np.max((alpha, beta))
+absab = np.abs(alpha - beta)
+param2 = s + 1
+if alpha < beta:
+    param2 = r + p1x_P_X_T
+
+B2i = hyp2f1(
+    r + s + p1x_P_X_T, param2, r + s + p1x_P_X_T + 1, absab / (maxab + T_P_X_T)
+) / ((maxab + T_P_X_T) ** (r + s + p1x_P_X_T))
+A = (
+    np.exp(gammaln(r + s + p1x_P_X_T) - gammaln(r + s))
+    * T_P_X_T**p1x_P_X_T
+    / factorial(p1x_P_X_T, exact=True)
+    * B2i
+)
+A = np.cumsum(A, axis=0)
+
+B1 = hyp2f1(r + s, param2, r + s + p1x_P_X_T + 1, absab / maxab) / (maxab ** (r + s))
+B_r_s = np.exp(gammaln(r) + gammaln(s) - gammaln(r + s))
+
+P_X_t = np.zeros((T_P_X_T.shape[0] + 1, T_P_X_T.shape[1]))
+P_X_t[:-1] = np.exp(gammaln(r + p1x_P_X_T) - gammaln(r) - gammaln(p1x_P_X_T + 1)) * (
+    alpha / (alpha + T_P_X_T)
+) ** r * (T_P_X_T / (alpha + T_P_X_T)) ** p1x_P_X_T * (
+    beta / (beta + T_P_X_T)
+) ** s + alpha**r * beta**s * np.exp(
+    gammaln(r + p1x_P_X_T) + gammaln(s + 1) - gammaln(r + p1x_P_X_T + s + 1)
+) / B_r_s * (B1 - A)
+P_X_t[-1] = 1 - np.sum(P_X_t[:-1], axis=0)
+
+E_f_x = np.dot(P_X_t, num_triers)
+
+paretonbd_hist = pl.Series("Pareto/NBD", E_f_x)
+```
+
+```{python}
+fit_hist = fit_hist_bgnbd.hstack([paretonbd_hist]).with_columns(
+    ((pl.col("Actual") - pl.col("Pareto/NBD")) ** 2 / pl.col("Pareto/NBD")).alias(
+        "(O-E)^2/E - Pareto/NBD"
+    )
+)
+
+chi_square_paretonbd = fit_hist.select("(O-E)^2/E - Pareto/NBD").sum()
+
+chi_square_paretonbd
+```
+
+```{python}
+barchart_data = fit_hist.unpivot(
+    on=["Actual", "BG/NBD", "Pareto/NBD"],
+    index="P1X",
+    variable_name="Actual Vs Estimated",
+    value_name="Frequency",
+)
+
+(
+    alt.Chart(barchart_data)
+    .mark_bar()
+    .encode(
+        x=alt.X(
+            "P1X:O", title="# Transactions in Weeks 1−39", axis=alt.Axis(labelAngle=0)
+        ),
+        y=alt.Y("Frequency:Q", title="Frequency"),
+        color="Actual Vs Estimated:N",
+        # column='Actual Vs Estimated:N',
+        xOffset="Actual Vs Estimated:N",
+    )
+    .properties(
+        width=550,
+        height=400,
+        title="Predicted Versus Actual Frequency of Repeat Transactions",
+    )
+    .configure_view(stroke=None)
+    .configure_axisY(grid=False)
+    .configure_axisX(grid=False)
+)
+```
+
+```{python}
+(
+    individual_trans.corr()
+    .with_columns(pl.Series(individual_trans.columns).alias("index"))
+    .style.tab_header(title="Correlations Between Forecast Period Transaction Numbers")
+    .tab_stub(rowname_col="index")
+    .fmt_number(decimals=3)
+)
+```
+

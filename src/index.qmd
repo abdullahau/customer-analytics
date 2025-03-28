@@ -45,6 +45,7 @@ jupyter:
 
 - [Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/DoR-Model)
 - [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric)
+- [BG/NBD Model](https://abdullahau.github.io/customer-analytics/BG-NBD-Model)
 - [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/gamma-gamma)
 - [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/subscription-retention-model)

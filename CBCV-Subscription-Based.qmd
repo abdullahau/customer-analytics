@@ -38,3 +38,36 @@ format:
 
 Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
 
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+
+edgar.set_identity('abdullah.au@outlook.com')
+%config InlineBackend.figure_formats = ['svg']
+```
+
+[US Census Bureau’s Housing Vacancies and Homeownership CPS/HVS](https://www.census.gov/housing/hvs/data/histtabs.html) - [Quarterly Estimates of the Housing Inventory](https://www.census.gov/housing/hvs/data/histtab8.xlsx):
+
+Alternative Source: FRED (EOCCUSQ176N) Housing Inventory Estimate: Occupied Housing Units in the United States
+
+-   **Units**: Thousands of Units, Not Seasonally Adjusted
+-   **Frequency**: Quarterly
+-   **Notes**: A housing unit is occupied if a person or group of persons is living in it at the time of the interview or if the occupants are only temporarily absent, as for example, on vacation. The persons living in the unit must consider it their usual place of residence or have no usual place of residence elsewhere. The count of occupied housing units is the same as the count of households.
+
+```{python}
+file_path = "data/quarterly-estimates-housing-inventory-US.csv"
+df_full = pd.read_csv(file_path)
+df_full
+```
+
+```{python}
+file_path = "data/revised-quarterly-estimates-housing-inventory-US.csv"
+df_revised = pd.read_csv(file_path)
+df_revised
+```
+
+```{python}
+df_full_lf = pd.wide_to_long(df_full, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
+df_rev_lf = pd.wide_to_long(df_revised, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
+```
+

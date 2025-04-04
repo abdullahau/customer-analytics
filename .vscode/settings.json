@@ -21,8 +21,8 @@
     "python.analysis.fixAll": ["source.unusedImports"],
     "editor.defaultFormatter": "charliermarsh.ruff",
         
-    "python.defaultInterpreterPath": "/Users/rehabnaeem/Documents/Coding-Projects/.venv/bin/python3.13",
-    "marimo.pythonPath": "/Users/rehabnaeem/Documents/Coding-Projects/.venv/bin/python3.13",
+    "python.defaultInterpreterPath": "/Users/rehabnaeem/Developer/.venv/bin/python3.13",
+    "marimo.pythonPath": "/Users/rehabnaeem/Developer/.venv/bin/python3.13",
     "python-envs.defaultEnvManager": "ms-python.python:venv",
     "python-envs.defaultPackageManager": "ms-python.python:pip",    
     "cSpell.words": [

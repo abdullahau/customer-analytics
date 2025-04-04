@@ -368,7 +368,9 @@ def bgnbd_ll(x, p1x, t_x, T):
     r, alpha, a, b = x
 
     # Logarithm calculations with numerical stability
-    log_alpha = np.log(np.clip(alpha, 1e-10, None))  # Avoid log(0) by clipping to a small value
+    log_alpha = np.log(
+        np.clip(alpha, 1e-10, None)
+    )  # Avoid log(0) by clipping to a small value
     log_alpha_t_x = np.log(np.clip(alpha + t_x, 1e-10, None))
 
     # Components of the log-likelihood
@@ -390,32 +392,31 @@ def bgnbd_ll(x, p1x, t_x, T):
 
     return -np.sum(result)
 
+
 def bgnbd_est():
-    guess={'r': 0.01, 'alpha': 0.01, 'a': 0.01, 'b': 0.01}
+    guess = {"r": 0.01, "alpha": 0.01, "a": 0.01, "b": 0.01}
     # Bounds for the optimization
     bnds = [(1e-6, np.inf) for _ in range(4)]
 
     # Optimization using minimize
     return minimize(
-        bgnbd_ll,
-        x0=list(guess.values()),
-        method="BFGS",
-        args=(p1x, t_x, T)
+        bgnbd_ll, x0=list(guess.values()), method="BFGS", args=(p1x, t_x, T)
     )
+
 
 result = bgnbd_est()
 r, alpha, a, b = result.x
 ll = result.fun
 
 print(
-f"""r = {r:0.4f}
+    f"""r = {r:0.4f}
 α = {alpha:0.4f}
 a = {a:0.4f}
 b = {b:0.4f}
 Log-Likelihood = {-ll:0.4f}"""
 )
 
-index = index=["r", "α", "a", "b"]
+index = ["r", "α", "a", "b"]
 scipy_params = result.x
 var_mat = result.hess_inv
 se = np.sqrt(np.diag(var_mat))
@@ -441,6 +442,7 @@ import autograd.numpy as np
 from autograd.scipy.special import gammaln, beta, gamma
 from autograd import value_and_grad, hessian
 
+
 def negative_log_likelihood(log_params, x, t_x, T):
     params = np.exp(log_params)
     r, alpha, a, b = params
@@ -452,37 +454,46 @@ def negative_log_likelihood(log_params, x, t_x, T):
 
     max_A_3_A_4 = np.maximum(A_3, A_4)
 
-    ll = (A_1 + A_2 + np.log(np.exp(A_3 - max_A_3_A_4) + np.exp(A_4 - max_A_3_A_4) * (x > 0)) + max_A_3_A_4)
+    ll = (
+        A_1
+        + A_2
+        + np.log(np.exp(A_3 - max_A_3_A_4) + np.exp(A_4 - max_A_3_A_4) * (x > 0))
+        + max_A_3_A_4
+    )
 
     return -ll.sum()
 
-def BetaGeoFitter(guess={'r': 0.1, 'alpha': 0.1, 'a': 0.0, 'b': 0.1}):
+
+def BetaGeoFitter(guess={"r": 0.1, "alpha": 0.1, "a": 0.0, "b": 0.1}):
     return minimize(
         value_and_grad(negative_log_likelihood),
         jac=True,
         method=None,
         args=(p1x, t_x, T),
-        tol=1e-7, 
+        tol=1e-7,
         x0=list(guess.values()),
-        options={'disp': True}
+        options={"disp": True},
     )
+
 
 result = BetaGeoFitter()
 r, alpha, a, b = np.exp(result.x)
 ll = result.fun
 
 print(
-f"""r = {r:0.4f}
+    f"""r = {r:0.4f}
 α = {alpha:0.4f}
 a = {a:0.4f}
 b = {b:0.4f}
 Log-Likelihood = {-ll:0.4f}"""
 )
 
-index = index=["r", "α", "a", "b"]
+index = index = ["r", "α", "a", "b"]
 lifetimes_params = np.exp(result.x)
 hessian_mat = hessian(negative_log_likelihood)(result.x, p1x, t_x, T)
-var_mat = (lifetimes_params ** 2) * np.linalg.inv(hessian_mat) # Variance-Covariance Matrix
+var_mat = (lifetimes_params**2) * np.linalg.inv(
+    hessian_mat
+)  # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
 plo = lifetimes_params - 1.96 * se
 phi = lifetimes_params + 1.96 * se
@@ -559,22 +570,25 @@ model {
 
 ```{python}
 data = {
-    'N': len(p1x),
-    'X': p1x.flatten().astype(int).tolist(),
-    'T': T.flatten().tolist(),
-    't_x': t_x.flatten().tolist()
+    "N": len(p1x),
+    "X": p1x.flatten().astype(int).tolist(),
+    "T": T.flatten().tolist(),
+    "t_x": t_x.flatten().tolist(),
 }
 
 stan_model = StanQuap(
-    stan_file='stan_models/bg-nbd', 
-    stan_code=stan_code, data=data, 
-    algorithm='LBFGS', jacobian=False,
-    tol_rel_grad=1e-7, iter=5000
+    stan_file="stan_models/bg-nbd",
+    stan_code=stan_code,
+    data=data,
+    algorithm="LBFGS",
+    jacobian=False,
+    tol_rel_grad=1e-7,
+    iter=5000,
 )
 
 index = ["r", "α", "a", "b"]
 params = np.array(list(stan_model.opt_model.stan_variables().values()))
-var_mat = stan_model.vcov_matrix() # Variance-Covariance Matrix
+var_mat = stan_model.vcov_matrix()  # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
 plo = params - 1.96 * se
 phi = params + 1.96 * se
@@ -591,10 +605,10 @@ pl.DataFrame(
 
 ```{python}
 x = [
-    stan_model.opt_model.optimized_params_pd['r'][0],
-    stan_model.opt_model.optimized_params_pd['alpha'][0],
-    stan_model.opt_model.optimized_params_pd['a'][0],
-    stan_model.opt_model.optimized_params_pd['b'][0]
+    stan_model.opt_model.optimized_params_pd["r"][0],
+    stan_model.opt_model.optimized_params_pd["alpha"][0],
+    stan_model.opt_model.optimized_params_pd["a"][0],
+    stan_model.opt_model.optimized_params_pd["b"][0]
 ]
 
 print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
@@ -664,25 +678,28 @@ model {
 
 ```{python}
 data = {
-    'N': len(p1x),
-    'X': p1x.flatten().astype(int).tolist(),
-    'T': T.flatten().tolist(),
-    't_x': t_x.flatten().tolist()
+    "N": len(p1x),
+    "X": p1x.flatten().astype(int).tolist(),
+    "T": T.flatten().tolist(),
+    "t_x": t_x.flatten().tolist(),
 }
 
 stan_model = StanQuap(
-    stan_file='stan_models/bg-nbd-1', 
-    stan_code=stan_code, data=data, 
-    algorithm='LBFGS', jacobian=False, 
-    tol_rel_grad=1e-7, iter=5000, 
-    generated_var=['a', 'b']
+    stan_file="stan_models/bg-nbd-1",
+    stan_code=stan_code,
+    data=data,
+    algorithm="LBFGS",
+    jacobian=False,
+    tol_rel_grad=1e-7,
+    iter=5000,
+    generated_var=["a", "b"],
 )
 
-index = ["r", "α", 'phi', 'kappa', "a", "b"]
+index = ["r", "α", "phi", "kappa", "a", "b"]
 MAP_params = np.array(list(stan_model.opt_model.stan_variables().values()))
-var_mat = stan_model.vcov_matrix() # Variance-Covariance Matrix
+var_mat = stan_model.vcov_matrix()  # Variance-Covariance Matrix
 se = np.sqrt(np.diag(var_mat))  # Standard Error
-se =  np.concatenate((se, np.array([se[-2] * se[-1] , (1 - se[-2]) * se[-1]])))
+se = np.concatenate((se, np.array([se[-2] * se[-1], (1 - se[-2]) * se[-1]])))
 plo = MAP_params - 1.96 * se
 phi = MAP_params + 1.96 * se
 pl.DataFrame(
@@ -698,10 +715,10 @@ pl.DataFrame(
 
 ```{python}
 x = [
-    stan_model.opt_model.optimized_params_pd['r'][0],
-    stan_model.opt_model.optimized_params_pd['alpha'][0],
-    stan_model.opt_model.optimized_params_pd['a'][0],
-    stan_model.opt_model.optimized_params_pd['b'][0]
+    stan_model.opt_model.optimized_params_pd["r"][0],
+    stan_model.opt_model.optimized_params_pd["alpha"][0],
+    stan_model.opt_model.optimized_params_pd["a"][0],
+    stan_model.opt_model.optimized_params_pd["b"][0],
 ]
 
 print("Log-Likelihood:", bgnbd_ll(x, p1x, t_x, T))
@@ -752,7 +769,12 @@ for i, var_name in enumerate(["r", "alpha", "a", "b"]):
         ax=ax,
         label="MCMC",
     )
-    ax.axvline(x=stan_model.opt_model.stan_variable(var_name), color="C1", linestyle="--", label="Stan MAP")
+    ax.axvline(
+        x=stan_model.opt_model.stan_variable(var_name),
+        color="C1",
+        linestyle="--",
+        label="Stan MAP",
+    )
     ax.axvline(x=lifetimes_params[i], color="C2", linestyle="--", label="Lifetimes")
     ax.axvline(x=scipy_params[i], color="C3", linestyle="--", label="SciPy")
     ax.legend(loc="upper right")
@@ -793,33 +815,37 @@ Note that in addition to generating random numbers of the priors or sampling par
 # probability of observing x purchases in a time period of length t
 def P_X_t(x, t, r, alpha, a, b):
     A = np.cumsum(
-        gamma(r+x[:-1])/(gamma(r)*factorial(x[:-1])) *
-        (t/(alpha+t))**x[:-1], axis=0
+        gamma(r + x[:-1])
+        / (gamma(r) * factorial(x[:-1]))
+        * (t / (alpha + t)) ** x[:-1],
+        axis=0,
     )
     pmf = (
-        beta(a,b+x)/beta(a,b) *
-        gamma(r+x)/(gamma(r)*factorial(x)) *
-        (alpha/(alpha+t))**r *
-        (t/(alpha+t))**x
+        beta(a, b + x)
+        / beta(a, b)
+        * gamma(r + x)
+        / (gamma(r) * factorial(x))
+        * (alpha / (alpha + t)) ** r
+        * (t / (alpha + t)) ** x
     )
     pmf[1:] += (
-        beta(a+1,b+x[1:]-1)/beta(a,b) *
-        (1 - (alpha/(alpha+t))**r * A)
+        beta(a + 1, b + x[1:] - 1) / beta(a, b) * (1 - (alpha / (alpha + t)) ** r * A)
     )
     return pmf
 
+
 def bgnbd_predict_trans_dist(x, n_t, T, r, alpha, a, b):
-    '''
+    """
     x - range of purchase quantites, shape (x, 1, 1)
     n_t - number of customers who have the time of birth t, shape (n_t,)
     t - age of the customer with time origin of 0, shape (1, t, 1)
     *params - parameters, shape (1,1,params)
 
     return: shape (x, param)
-    '''
+    """
     pmf = P_X_t(x, T, r, alpha, a, b)
     pmf[-1] = 1 - np.sum(pmf[:-1], axis=0)
-    return np.tensordot(pmf, n_t,  axes=([1], [0]))
+    return np.tensordot(pmf, n_t, axes=([1], [0]))
 ```
 
 ### Prior Predictive Check
@@ -876,37 +902,57 @@ generated quantities {
 
 ```{python}
 data = {
-    'N': len(p1x),
-    'T': T.flatten().tolist(),
+    "N": len(p1x),
+    "T": T.flatten().tolist(),
 }
 
-stan_model = Stan(stan_file='stan_models/bg-nbd-prior', stan_code=stan_prior_code)
+stan_model = Stan(stan_file="stan_models/bg-nbd-prior", stan_code=stan_prior_code)
 prior_fit = stan_model.sample(data=data)
 ```
 
 ```{python}
-prior_samples = prior_fit.stan_variable('X_rep').astype(int)
+prior_samples = prior_fit.stan_variable("X_rep").astype(int)
 
 # Compute prior frequency distribution
 max_purch = 9
 prior_freq_counts = np.zeros((prior_samples.shape[0], max_purch + 1))
 for i in range(prior_samples.shape[0]):
     counts = np.bincount(prior_samples[i], minlength=max_purch + 1)
-    prior_freq_counts[i] = counts[:max_purch + 1] / data['N']
+    prior_freq_counts[i] = counts[: max_purch + 1] / data["N"]
 
 mean_frequency = prior_freq_counts.mean(axis=0)
 hdi = az.hdi(prior_freq_counts, hdi_prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
-observed_frequency = observed_counts[:max_purch + 1] / data['N']
+observed_frequency = observed_counts[: max_purch + 1] / data["N"]
 
 plt.clf()
-plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
-plt.bar(np.arange(max_purch+1)-0.2,  observed_frequency, 0.4, label='Observed', color='black')
-plt.xlabel(f"Number of Repeat Purchases (0-{max_purch+1}+)")
+plt.bar(
+    np.arange(max_purch + 1) + 0.2,
+    mean_frequency,
+    width=0.4,
+    label="Estimated",
+    color="white",
+    edgecolor="black",
+    linewidth=0.5,
+    yerr=[mean_frequency - hdi[:, 0], hdi[:, 1] - mean_frequency],
+)
+plt.bar(
+    np.arange(max_purch + 1) - 0.2,
+    observed_frequency,
+    0.4,
+    label="Observed",
+    color="black",
+)
+plt.xlabel(f"Number of Repeat Purchases (0-{max_purch + 1}+)")
 plt.ylabel("% of Customer Population")
 plt.title("Prior Predictive Check: Customer Purchase Frequency")
-plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.xticks(
+    ticks=np.arange(max_purch + 1),
+    labels=[
+        f"{i}" if i < max_purch else f"{max_purch + 1}+" for i in range(max_purch + 1)
+    ],
+)
 plt.legend();
 ```
 
@@ -914,27 +960,58 @@ Now, let's compute the probability of observing $x$ purchases in a time period o
 
 ```{python}
 max_purch = 7
-params = [prior_fit.stan_variable(param).reshape(1,1, -1) for param in ['r', 'alpha', 'a', 'b']]
+params = [
+    prior_fit.stan_variable(param).reshape(1, 1, -1)
+    for param in ["r", "alpha", "a", "b"]
+]
 
 T_unique, n_t = np.unique(T, return_counts=True)
 
-frequency_counts = bgnbd_predict_trans_dist(np.arange(max_purch+1).reshape(-1,1,1), n_t, T_unique.reshape(1,-1,1), *params) / data['N']
+frequency_counts = (
+    bgnbd_predict_trans_dist(
+        np.arange(max_purch + 1).reshape(-1, 1, 1),
+        n_t,
+        T_unique.reshape(1, -1, 1),
+        *params,
+    )
+    / data["N"]
+)
 
 mean_frequency = np.nanmean(frequency_counts, axis=1)
 hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
-observed_counts_cen = observed_counts[:max_purch + 1]
-observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1:])
-observed_frequency = observed_counts_cen / data['N']
+observed_counts_cen = observed_counts[: max_purch + 1]
+observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1 :])
+observed_frequency = observed_counts_cen / data["N"]
 
 plt.clf()
-plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
-plt.bar(np.arange(max_purch+1)-0.2, observed_frequency, width=0.4, label='Observed', color='black')
+plt.bar(
+    np.arange(max_purch + 1) + 0.2,
+    mean_frequency,
+    width=0.4,
+    label="Estimated",
+    color="white",
+    edgecolor="black",
+    linewidth=0.5,
+    yerr=[mean_frequency - hdi[:, 0], hdi[:, 1] - mean_frequency],
+)
+plt.bar(
+    np.arange(max_purch + 1) - 0.2,
+    observed_frequency,
+    width=0.4,
+    label="Observed",
+    color="black",
+)
 plt.xlabel("Number of Repeat Purchases (0-10+)")
 plt.ylabel("% of Customer Population")
 plt.title("Posterior Predictive Check: Customer Purchase Frequency")
-plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.xticks(
+    ticks=np.arange(max_purch + 1),
+    labels=[
+        f"{i}" if i < max_purch else f"{max_purch + 1}+" for i in range(max_purch + 1)
+    ],
+)
 plt.legend();
 ```
 
@@ -1023,41 +1100,61 @@ generated quantities {
 
 ```{python}
 data = {
-    'N': len(p1x),
-    'X': p1x.flatten().astype(int).tolist(),
-    'T': T.flatten().tolist(),
-    't_x': t_x.flatten().tolist()
+    "N": len(p1x),
+    "X": p1x.flatten().astype(int).tolist(),
+    "T": T.flatten().tolist(),
+    "t_x": t_x.flatten().tolist(),
 }
 
-stan_model = Stan(stan_file='stan_models/bg-nbd-post', stan_code=stan_post_code)
+stan_model = Stan(stan_file="stan_models/bg-nbd-post", stan_code=stan_post_code)
 post_preds = stan_model.sample(data=data)
 ```
 
 ```{python}
-posterior = az.from_cmdstanpy(post_preds, posterior_predictive=['X_rep', 't_x_rep'])
-posterior_samples = post_preds.stan_variable('X_rep').astype(int) 
+posterior = az.from_cmdstanpy(post_preds, posterior_predictive=["X_rep", "t_x_rep"])
+posterior_samples = post_preds.stan_variable("X_rep").astype(int)
 
 # Compute frequency distribution
 max_purch = 9
 frequency_counts = np.zeros((posterior_samples.shape[0], max_purch + 1))
 for i in range(posterior_samples.shape[0]):
     counts = np.bincount(posterior_samples[i], minlength=max_purch + 1)
-    frequency_counts[i] = counts[:max_purch + 1] / data['N']
+    frequency_counts[i] = counts[: max_purch + 1] / data["N"]
 
 # Calculate mean and HDI
 mean_frequency = frequency_counts.mean(axis=0)
 hdi = az.hdi(frequency_counts, hdi_prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
-observed_frequency = observed_counts[:max_purch + 1] / data['N']
+observed_frequency = observed_counts[: max_purch + 1] / data["N"]
 
 plt.clf()
-plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
-plt.bar(np.arange(max_purch+1)-0.2, observed_frequency, width=0.4, label='Observed', color='black')
+plt.bar(
+    np.arange(max_purch + 1) + 0.2,
+    mean_frequency,
+    width=0.4,
+    label="Estimated",
+    color="white",
+    edgecolor="black",
+    linewidth=0.5,
+    yerr=[mean_frequency - hdi[:, 0], hdi[:, 1] - mean_frequency],
+)
+plt.bar(
+    np.arange(max_purch + 1) - 0.2,
+    observed_frequency,
+    width=0.4,
+    label="Observed",
+    color="black",
+)
 plt.xlabel("Number of Repeat Purchases (0-10+)")
 plt.ylabel("% of Customer Population")
 plt.title("Posterior Predictive Check: Customer Purchase Frequency")
-plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.xticks(
+    ticks=np.arange(max_purch + 1),
+    labels=[
+        f"{i}" if i < max_purch else f"{max_purch + 1}+" for i in range(max_purch + 1)
+    ],
+)
 plt.legend();
 ```
 
@@ -1065,27 +1162,58 @@ Now, let's compute the probability of observing $x$ purchases in a time period o
 
 ```{python}
 max_purch = 7
-params = [post_preds.stan_variable(param).reshape(1, 1, -1) for param in ['r', 'alpha', 'a', 'b']]
+params = [
+    post_preds.stan_variable(param).reshape(1, 1, -1)
+    for param in ["r", "alpha", "a", "b"]
+]
 
 T_unique, n_t = np.unique(T, return_counts=True)
 
-frequency_counts = bgnbd_predict_trans_dist(np.arange(max_purch+1).reshape(-1,1,1), n_t, T_unique.reshape(1,-1,1), *params) / data['N']
+frequency_counts = (
+    bgnbd_predict_trans_dist(
+        np.arange(max_purch + 1).reshape(-1, 1, 1),
+        n_t,
+        T_unique.reshape(1, -1, 1),
+        *params,
+    )
+    / data["N"]
+)
 
 mean_frequency = np.mean(frequency_counts, axis=1)
 hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
-observed_counts_cen = observed_counts[:max_purch + 1]
-observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1:])
-observed_frequency = observed_counts_cen / data['N']
+observed_counts_cen = observed_counts[: max_purch + 1]
+observed_counts_cen[-1] += np.sum(observed_counts[max_purch + 1 :])
+observed_frequency = observed_counts_cen / data["N"]
 
 plt.clf()
-plt.bar(np.arange(max_purch+1)+0.2, mean_frequency, width=0.4, label='Estimated', color='white', edgecolor='black', linewidth=0.5, yerr=[mean_frequency - hdi[:,0], hdi[:,1] - mean_frequency])
-plt.bar(np.arange(max_purch+1)-0.2, observed_frequency, width=0.4, label='Observed', color='black')
+plt.bar(
+    np.arange(max_purch + 1) + 0.2,
+    mean_frequency,
+    width=0.4,
+    label="Estimated",
+    color="white",
+    edgecolor="black",
+    linewidth=0.5,
+    yerr=[mean_frequency - hdi[:, 0], hdi[:, 1] - mean_frequency],
+)
+plt.bar(
+    np.arange(max_purch + 1) - 0.2,
+    observed_frequency,
+    width=0.4,
+    label="Observed",
+    color="black",
+)
 plt.xlabel("Number of Repeat Purchases (0-10+)")
 plt.ylabel("% of Customer Population")
 plt.title("Posterior Predictive Check: Customer Purchase Frequency")
-plt.xticks(ticks=np.arange(max_purch+1), labels=[f'{i}' if i < max_purch else f'{max_purch+1}+' for i in range(max_purch+1)])
+plt.xticks(
+    ticks=np.arange(max_purch + 1),
+    labels=[
+        f"{i}" if i < max_purch else f"{max_purch + 1}+" for i in range(max_purch + 1)
+    ],
+)
 plt.legend();
 ```
 
@@ -1104,12 +1232,14 @@ p1x_sample = p1x[example_customer_ids]
 t_x_sample = t_x[example_customer_ids]
 T_sample = T[example_customer_ids]
 
-pl.DataFrame({
-    'cust_id': example_customer_ids,
-    'p1x': p1x_sample.astype(int),
-    't_x': t_x_sample.round(2),
-    'T': T_sample.round(2)
-})
+pl.DataFrame(
+    {
+        "cust_id": example_customer_ids,
+        "p1x": p1x_sample.astype(int),
+        "t_x": t_x_sample.round(2),
+        "T": T_sample.round(2),
+    }
+)
 ```
 
 Observe that the last two customers are *frequent buyers* as compared to the others.
@@ -1118,38 +1248,47 @@ We will use the forward-looking @eq-E-Y-t to obtain the expected number of trans
 
 ```{python}
 def expected_purchases(x, t_x, T, t, r, alpha, a, b):
-    '''
+    """
     E(Y(t) | X = x, t_x, T, r,  alpha, a, b)
-    Compute the expected number of future purchases across future *t* 
+    Compute the expected number of future purchases across future *t*
     time periods given recency *t_x*, frequency *x*, and age of the customer *T* for each customer.
-    '''
-    h2f1_cust = hyp2f1(r+x, b+x, a+b+x-1, t/(alpha + T + t))
+    """
+    h2f1_cust = hyp2f1(r + x, b + x, a + b + x - 1, t / (alpha + T + t))
     return (
-        (a + b + x - 1) / (a - 1) * (1 - ((alpha + T) / (alpha + T + t))**(r + x) * h2f1_cust) /
-        (1 + (x > 0) * a / (b + x - 1) * ((alpha + T) / (alpha + t_x))**(r + x))
+        (a + b + x - 1)
+        / (a - 1)
+        * (1 - ((alpha + T) / (alpha + T + t)) ** (r + x) * h2f1_cust)
+        / (1 + (x > 0) * a / (b + x - 1) * ((alpha + T) / (alpha + t_x)) ** (r + x))
     )
 ```
 
 ```{python}
-future_t = np.arange(91) # Future Periods to analyze
-params = [post_preds.stan_variable(param).reshape(-1,1) for param in ['r', 'alpha', 'a', 'b']]
-exp_purch = expected_purchases(p1x_sample, t_x_sample, T_sample, future_t.reshape(-1,1,1), *params) # shape (91, 4000, 6)
+future_t = np.arange(91)  # Future Periods to analyze
+params = [
+    post_preds.stan_variable(param).reshape(-1, 1) for param in ["r", "alpha", "a", "b"]
+]
+exp_purch = expected_purchases(
+    p1x_sample, t_x_sample, T_sample, future_t.reshape(-1, 1, 1), *params
+)  # shape (91, 4000, 6)
 
-fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+fig, axes = plt.subplots(
+    nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True, layout="constrained"
+)
 
 for i, cust_id in enumerate(example_customer_ids):
     ax = axes[i]
     customer_data = exp_purch[:, :, i]  # Shape (91, 4000)
-    mean_purchases = customer_data.mean(axis=1) # Shape (91,)
+    mean_purchases = customer_data.mean(axis=1)  # Shape (91,)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
-    
-    ax.plot(future_t, mean_purchases, color='k', label='Mean')
-    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
-    ax.set_title(f'Customer ID: {cust_id}')
-    ax.set_ylabel('Expected Purchases')
-    if i == 0: ax.legend()
 
-axes[-1].set_xlabel('Future Time Period')
+    ax.plot(future_t, mean_purchases, color="k", label="Mean")
+    ax.fill_between(future_t, pi[0, :], pi[1, :], color="k", alpha=0.2, label="89% PI")
+    ax.set_title(f"Customer ID: {cust_id}")
+    ax.set_ylabel("Expected Purchases")
+    if i == 0:
+        ax.legend()
+
+axes[-1].set_xlabel("Future Time Period")
 plt.gcf().suptitle("Expected Number of Purchases", fontweight="bold")
 plt.show()
 ```
@@ -1163,40 +1302,47 @@ We will implement @eq-P-alive-T as a Python function:
 ```{python}
 from scipy.special import expit
 
+
 def expected_probability_alive(x, t_x, T, r, alpha, a, b):
-    '''
+    """
     P(alive at T | X = x, t_x, T, r,  alpha, a, b)
-    Compute the probability a customer with history recency *t_x*, 
+    Compute the probability a customer with history recency *t_x*,
     frequency *x*, and age of the customer *T* is currently active.
-    '''
+    """
     log_div = (r + x) * np.log((alpha + T) / (alpha + t_x)) + np.log(
         a / (b + np.maximum(x, 1) - 1)
     )
 
     return np.where(x == 0, 1.0, expit(-log_div))
+
 ```
 
 We now look into the probability of a customer being alive for the next 90 periods:
 
 ```{python}
 future_t = np.arange(91)
-future_alive = expected_probability_alive(p1x_sample, t_x_sample, (T_sample + future_t.reshape(-1,1,1)), *params)
+future_alive = expected_probability_alive(
+    p1x_sample, t_x_sample, (T_sample + future_t.reshape(-1, 1, 1)), *params
+)
 
-fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+fig, axes = plt.subplots(
+    nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True, layout="constrained"
+)
 
 for i, cust_id in enumerate(example_customer_ids):
     ax = axes[i]
     customer_data = future_alive[:, :, i]  # Shape (91, 4000)
-    mean_palive = customer_data.mean(axis=1) # Shape (91,)
+    mean_palive = customer_data.mean(axis=1)  # Shape (91,)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
-    
-    ax.plot(future_t, mean_palive, color='k', label='Mean')
-    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
-    ax.set_title(f'Customer ID: {cust_id}')
-    ax.set_ylabel('Probability Alive')
-    if i == 0: ax.legend()
 
-axes[-1].set_xlabel('Future Time Period')
+    ax.plot(future_t, mean_palive, color="k", label="Mean")
+    ax.fill_between(future_t, pi[0, :], pi[1, :], color="k", alpha=0.2, label="89% PI")
+    ax.set_title(f"Customer ID: {cust_id}")
+    ax.set_ylabel("Probability Alive")
+    if i == 0:
+        ax.legend()
+
+axes[-1].set_xlabel("Future Time Period")
 plt.gcf().suptitle("Expected Probability Alive over Time", fontweight="bold")
 plt.show()
 ```
@@ -1224,42 +1370,46 @@ def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
     If broadcasting, y must be scalar.
     """
     L_term1 = (
-        (beta(a, b + x) / beta(a, b)) * 
-        (gamma(r + x) / gamma(r)) * 
-        (alpha**r / (alpha + T)**(r + x))
+        (beta(a, b + x) / beta(a, b))
+        * (gamma(r + x) / gamma(r))
+        * (alpha**r / (alpha + T) ** (r + x))
     )
 
     L_term2 = (
-        (beta(a + 1, b + x - 1) / beta(a, b)) * 
-        (gamma(r + x) / gamma(r)) * 
-        (alpha**r / (alpha + t_x)**(r + x))
+        (beta(a + 1, b + x - 1) / beta(a, b))
+        * (gamma(r + x) / gamma(r))
+        * (alpha**r / (alpha + t_x) ** (r + x))
     ) * (x > 0)
 
     L = L_term1 + L_term2
 
     A = (
-        (beta(a + 1, b + x - 1) / beta(a, b)) * 
-        (gamma(r + x) / gamma(r)) * 
-        (alpha**r / (alpha + t_x)**(r + x))
-    ) * (x > 0) * (y == 0)
+        (
+            (beta(a + 1, b + x - 1) / beta(a, b))
+            * (gamma(r + x) / gamma(r))
+            * (alpha**r / (alpha + t_x) ** (r + x))
+        )
+        * (x > 0)
+        * (y == 0)
+    )
 
     B = (
-        (beta(a, b + x + y) / beta(a, b)) * 
-        (gamma(r + x + y) / gamma(r)) / gamma(y + 1) * 
-        (alpha**r * t**y / (alpha + T + t)**(r + x + y))
+        (beta(a, b + x + y) / beta(a, b))
+        * (gamma(r + x + y) / gamma(r))
+        / gamma(y + 1)
+        * (alpha**r * t**y / (alpha + T + t) ** (r + x + y))
     )
 
     C = 0
     if y > 0:
-        sum_terms = 0 
-        for j in range(y):  
+        sum_terms = 0
+        for j in range(y):
             term = gamma(r + x + j) / (gamma(r) * gamma(j + 1))
-            term *= (alpha**r * t**j) / (alpha + T + t)**(r + x + j)
-            sum_terms += term  
+            term *= (alpha**r * t**j) / (alpha + T + t) ** (r + x + j)
+            sum_terms += term
 
-        C_part = (
-            (beta(a + 1, b + x + y - 1) / beta(a, b)) * 
-            ((gamma(r + x) / gamma(r)) * (alpha**r / (alpha + T)**(r + x)) - sum_terms)
+        C_part = (beta(a + 1, b + x + y - 1) / beta(a, b)) * (
+            (gamma(r + x) / gamma(r)) * (alpha**r / (alpha + T) ** (r + x)) - sum_terms
         )
         C = C_part * (y > 0)
 
@@ -1271,27 +1421,32 @@ def expected_probability_y_purchase(x, t_x, T, y, t, r, alpha, a, b):
 We now look into the probability of a customer making 0 purchases between now, and the next $t$ periods between 0 and 30.
 
 ```{python}
-future_t = np.arange(31) # Future Periods to analyze
+future_t = np.arange(31)  # Future Periods to analyze
 expected_probability_zero_purchases = expected_probability_y_purchase(
-    p1x_sample, t_x_sample, T_sample, 0, future_t.reshape(-1,1,1), *params
-) # Shape (time interval, params, customer)
+    p1x_sample, t_x_sample, T_sample, 0, future_t.reshape(-1, 1, 1), *params
+)  # Shape (time interval, params, customer)
 
-fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+fig, axes = plt.subplots(
+    nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True, layout="constrained"
+)
 
 for i, cust_id in enumerate(example_customer_ids):
     ax = axes[i]
     customer_data = expected_probability_zero_purchases[:, :, i]  # Shape (91, 4000)
-    mean = customer_data.mean(axis=1) # Shape (91,)
+    mean = customer_data.mean(axis=1)  # Shape (91,)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)  # Shape (2, 91)
 
-    ax.plot(future_t, mean, color='k', label='Mean')
-    ax.fill_between(future_t, pi[0,:], pi[1,:], color='k', alpha=0.2, label='89% PI')
-    ax.set_title(f'Customer ID: {cust_id}')
-    ax.set_ylabel('Probability')
-    if i == 0: ax.legend()
+    ax.plot(future_t, mean, color="k", label="Mean")
+    ax.fill_between(future_t, pi[0, :], pi[1, :], color="k", alpha=0.2, label="89% PI")
+    ax.set_title(f"Customer ID: {cust_id}")
+    ax.set_ylabel("Probability")
+    if i == 0:
+        ax.legend()
 
-axes[-1].set_xlabel('Future Time Period')
-plt.gcf().suptitle("Expected Probability of Zero Purchases between $(T, T+t]$.", fontweight="bold")
+axes[-1].set_xlabel("Future Time Period")
+plt.gcf().suptitle(
+    "Expected Probability of Zero Purchases between $(T, T+t]$.", fontweight="bold"
+)
 plt.show()
 ```
 
@@ -1300,27 +1455,39 @@ plt.show()
 Let us look into the probability of a customer making $0, 1, 2, 3, 4, \text{ or } 5$ purchases between now and 30 period from now.
 
 ```{python}
-num_purchases = np.arange(6) # Num of purchases
-expected_probability_purchases = np.zeros((len(num_purchases), len(params[0]), len(p1x_sample))) 
-for y in num_purchases: # Shape (number of purchases, params, customer)
+num_purchases = np.arange(6)  # Num of purchases
+expected_probability_purchases = np.zeros(
+    (len(num_purchases), len(params[0]), len(p1x_sample))
+)
+for y in num_purchases:  # Shape (number of purchases, params, customer)
     expected_probability_purchases[y, :, :] = expected_probability_y_purchase(
         p1x_sample, t_x_sample, T_sample, y, 30, *params
     )
 
-fig, axes = plt.subplots(nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True,layout="constrained")
+fig, axes = plt.subplots(
+    nrows=6, ncols=1, figsize=(10, 15), sharex=True, sharey=True, layout="constrained"
+)
 
 for i, cust_id in enumerate(example_customer_ids):
     ax = axes[i]
-    customer_data = expected_probability_purchases[:, :, i]  
-    mean = customer_data.mean(axis=1) 
+    customer_data = expected_probability_purchases[:, :, i]
+    mean = customer_data.mean(axis=1)
     pi = np.quantile(customer_data, q=[0.055, 0.945], axis=1)
 
-    ax.bar(num_purchases, mean, color='white', edgecolor='black', yerr=[mean - pi[0,:], pi[1,:] - mean])
-    ax.set_title(f'Customer ID: {cust_id}')
-    ax.set_ylabel('Probability')
+    ax.bar(
+        num_purchases,
+        mean,
+        color="white",
+        edgecolor="black",
+        yerr=[mean - pi[0, :], pi[1, :] - mean],
+    )
+    ax.set_title(f"Customer ID: {cust_id}")
+    ax.set_ylabel("Probability")
 
-axes[-1].set_xlabel('Number of Purchases')
-plt.gcf().suptitle("Expected Probability of $y$ Purchases within 30 days from T.", fontweight="bold")
+axes[-1].set_xlabel("Number of Purchases")
+plt.gcf().suptitle(
+    "Expected Probability of $y$ Purchases within 30 days from T.", fontweight="bold"
+)
 plt.show()
 ```
 

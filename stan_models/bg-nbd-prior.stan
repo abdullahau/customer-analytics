@@ -14,7 +14,7 @@ generated quantities {
     real b = (1 - phi_dropout) * kappa_dropout;
 
     array[N] int X_rep;
-    vector[N] Tx_rep;
+    vector[N] t_x_rep;
 
     for (n in 1:N) {
         real lambda_n = gamma_rng(r, alpha);
@@ -38,6 +38,6 @@ generated quantities {
             }
         }
         X_rep[n] = x;
-        Tx_rep[n] = tx;
+        t_x_rep[n] = tx;
     }
 }

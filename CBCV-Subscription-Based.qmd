@@ -42,11 +42,11 @@ Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer
 import pandas as pd
 import matplotlib.pyplot as plt
 
-edgar.set_identity('abdullah.au@outlook.com')
 %config InlineBackend.figure_formats = ['svg']
 ```
 
-[US Census Bureau’s Housing Vacancies and Homeownership CPS/HVS](https://www.census.gov/housing/hvs/data/histtabs.html) - [Quarterly Estimates of the Housing Inventory](https://www.census.gov/housing/hvs/data/histtab8.xlsx):
+-  [US Census Bureau’s Housing Vacancies and Homeownership CPS/HVS](https://www.census.gov/housing/hvs/data/histtabs.html) 
+-  [Quarterly Estimates of the Housing Inventory](https://www.census.gov/housing/hvs/data/histtab8.xlsx):
 
 Alternative Source: FRED (EOCCUSQ176N) Housing Inventory Estimate: Occupied Housing Units in the United States
 
@@ -71,3 +71,13 @@ df_full_lf = pd.wide_to_long(df_full, stubnames='Q', i='Year', j='Quarter').sort
 df_rev_lf = pd.wide_to_long(df_revised, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
 ```
 
+
+Number of vehicles on the road data: 
+
+-  [Highway Statistics - State motor-vehicle registrations - MV-1](https://www.fhwa.dot.gov/policyinformation/statistics.cfm)
+-  [Automobile Profile - Bureau of Transportation Statistics](https://www.bts.gov/content/automobile-profile)
+
+
+```{python}
+
+```

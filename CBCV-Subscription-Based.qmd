@@ -36,9 +36,7 @@ format:
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
-Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
-
-```{python}
+Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)```{python}
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -56,28 +54,119 @@ Alternative Source: FRED (EOCCUSQ176N) Housing Inventory Estimate: Occupied Hous
 
 ```{python}
 file_path = "data/quarterly-estimates-housing-inventory-US.csv"
-df_full = pd.read_csv(file_path)
-df_full
+household_full = pd.read_csv(file_path)
+household_full
 ```
 
 ```{python}
 file_path = "data/revised-quarterly-estimates-housing-inventory-US.csv"
-df_revised = pd.read_csv(file_path)
-df_revised
+household_revised = pd.read_csv(file_path)
+household_revised
 ```
 
 ```{python}
-df_full_lf = pd.wide_to_long(df_full, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
-df_rev_lf = pd.wide_to_long(df_revised, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
+household_full_lf = pd.wide_to_long(household_full, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
+household_rev_lf = pd.wide_to_long(household_revised, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
+household_rev_lf.plot(figsize=(9, 4), linewidth=0.75, color='k');
 ```
 
+```{python}
+dish_op_res = pd.read_csv('data/DISH - ADD-LOSS-END.csv', index_col='Date', parse_dates=True, dayfirst=True).sort_index()
+dish_op_res.tail()
+```
+
+```{python}
+# Gross Customer Acquisition Every Quarter
+_, ax = plt.subplots(figsize=(9, 4))
+dish_ADD = dish_op_res['Combined Additions'] * 1000
+dish_ADD.plot(ax=ax, color='k', linewidth=0.75, title='ADD', ylim=(-70, 1200))
+pad = pd.DateOffset(months=12)
+ax.set_xlim(dish_ADD.index.min() - pad, dish_ADD.index.max() + pad)
+ax.set_xticks(dish_ADD.index[::8])
+ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_ADD.index[::8]], rotation=45)
+plt.tight_layout()
+plt.show();
+```
+
+```{python}
+# Customer Churn Every Quarter
+_, ax = plt.subplots(figsize=(9, 4))
+dish_LOSS = (
+    dish_op_res['Pay-TV Subscribers'].shift(periods=1) 
+    + dish_op_res['Combined Additions'] 
+    - dish_op_res['Pay-TV Subscribers'])  * 1000
+dish_LOSS.plot(ax=ax, color='k', linewidth=0.75, title='LOSS', ylim=(-70,1000))
+pad = pd.DateOffset(months=12)
+ax.set_xlim(dish_LOSS.index.min() - pad, dish_LOSS.index.max() + pad)
+ax.set_xticks(dish_LOSS.index[::8])
+ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_LOSS.index[::8]], rotation=45)
+plt.tight_layout()
+plt.show();
+```
+
+```{python}
+# Surviving Customers at the End of Quarter
+_, ax = plt.subplots(figsize=(9, 4))
+dish_END = dish_op_res['Pay-TV Subscribers'] * 1000
+dish_END.plot(ax=ax, color='k', linewidth=0.75, title='END', ylim=(-800,16000));
+pad = pd.DateOffset(months=12)
+ax.set_xlim(dish_END.index.min() - pad, dish_END.index.max() + pad)
+ax.set_xticks(dish_END.index[::8])
+ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_END.index[::8]], rotation=45)
+plt.tight_layout()
+plt.show();
+```
 
 Number of vehicles on the road data: 
 
 -  [Highway Statistics - State motor-vehicle registrations - MV-1](https://www.fhwa.dot.gov/policyinformation/statistics.cfm)
 -  [Automobile Profile - Bureau of Transportation Statistics](https://www.bts.gov/content/automobile-profile)
 
+Data description:
+-   **Units**: Number of Units
+-   **Frequency**: Annually
+-   **Notes**: Total number of registered private, commercial (incl. taxicabs), and public automobiles in the US every year (excluding buses, trucks, and motorcycles)
 
 ```{python}
-
+reg_cars = pd.read_csv('data/us_registered_vehicles.csv')
+reg_cars.tail()
 ```
+
+```{python}
+reg_cars.plot(x='Year', y='Registered Automobiles', figsize=(9, 4), color='k', linewidth=0.75);
+```
+
+Vehicle sales data (for macroeconomic covariate):
+
+- [Light vehicle and total vehicle sales - Bureau of Economic Analysis/Wards Intelligence](https://www.bea.gov/data/consumer-spending/main)
+- [Retail New Passenger Car Sales](https://www.bts.gov/content/retaila-new-passenger-car-sales-thousands-units)
+- [Monthly Transportation Statistics](https://data.bts.gov/Research-and-Statistics/Monthly-Transportation-Statistics/crem-w557/about_data)
+
+Data description:
+-  Autos--all passenger cars, including station wagons.
+-  Light trucks--trucks up to 14,000 pounds gross vehicle weight, including minivans and
+-  Sport utility vehicles.  Prior to the 2003 Benchmark Revision light trucks were up to 10,000 pounds.
+-  Heavy trucks--trucks more than 14,000 pounds gross vehicle weight.
+-  **Columns**:
+    -  Autos  -- not seasonally adjusted (Thousands)	
+    -  Light Trucks  -- not seasonally adjusted (Thousands) 	
+    -  Light Total  --not seasonally adjusted (Thousands)	
+    -  Total  -- not seasonally adjusted (Thousands)	
+    -  Autos (SAAR) -- seasonally adjusted at annual rates (Millions)	
+    -  Light Trucks (SAAR) -- seasonally adjusted at annual rates (Millions)	
+    -  Light Total (SAAR) -- seasonally adjusted at annual rates (Millions)	
+    -  Total (SAAR) -- seasonally adjusted at annual rates (Millions)
+
+```{python}
+new_vehicle_sales = pd.read_csv('data/us_new_passenger_car_sales.csv')
+new_vehicle_sales.tail()
+```
+
+```{python}
+new_vehicle_sales.plot(x='Date', y='Light Total', figsize=(9, 4), color='k', linewidth=0.75);
+```
+
+```{python}
+new_vehicle_sales.plot(x='Date', y='Light Total (SAAR)', figsize=(9, 4), color='k', linewidth=0.75);
+```
+

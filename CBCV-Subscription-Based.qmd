@@ -71,8 +71,31 @@ household_rev_lf.plot(figsize=(9, 4), linewidth=0.75, color='k');
 ```
 
 ```{python}
-dish_op_res = pd.read_csv('data/DISH - ADD-LOSS-END.csv', index_col='Date', parse_dates=True, dayfirst=True).sort_index()
+dish_op_res = pd.read_csv(
+    'data/DISH - ADD-LOSS-END.csv', 
+    index_col='Date', 
+    parse_dates=True, 
+    dayfirst=True
+).sort_index()
 dish_op_res.tail()
+```
+
+- [U.S. Recession Bars](https://fredhelp.stlouisfed.org/fred/data/understanding-the-data/recession-bars/)
+- [Business Cycle Dating](https://www.nber.org/research/business-cycle-dating)
+
+```{python}
+def dish_plot_format(ax, data):
+    # Recession bar
+    ax.axvspan(pd.to_datetime("12/1/2007"), pd.to_datetime("06/1/2009"), color='gray', alpha=0.3)
+    # Padding
+    pad = pd.DateOffset(months=12)
+    ax.set_xlim(data.index.min() - pad, data.index.max() + pad)
+    # x-ticks
+    ax.set_xticks(data.index[::8])
+    ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in data.index[::8]], rotation=45)
+    plt.tight_layout()
+    plt.show();
+    return
 ```
 
 ```{python}
@@ -80,12 +103,7 @@ dish_op_res.tail()
 _, ax = plt.subplots(figsize=(9, 4))
 dish_ADD = dish_op_res['Combined Additions'] * 1000
 dish_ADD.plot(ax=ax, color='k', linewidth=0.75, title='ADD', ylim=(-70, 1200))
-pad = pd.DateOffset(months=12)
-ax.set_xlim(dish_ADD.index.min() - pad, dish_ADD.index.max() + pad)
-ax.set_xticks(dish_ADD.index[::8])
-ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_ADD.index[::8]], rotation=45)
-plt.tight_layout()
-plt.show();
+dish_plot_format(ax, dish_ADD)
 ```
 
 ```{python}
@@ -96,25 +114,15 @@ dish_LOSS = (
     + dish_op_res['Combined Additions'] 
     - dish_op_res['Pay-TV Subscribers'])  * 1000
 dish_LOSS.plot(ax=ax, color='k', linewidth=0.75, title='LOSS', ylim=(-70,1000))
-pad = pd.DateOffset(months=12)
-ax.set_xlim(dish_LOSS.index.min() - pad, dish_LOSS.index.max() + pad)
-ax.set_xticks(dish_LOSS.index[::8])
-ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_LOSS.index[::8]], rotation=45)
-plt.tight_layout()
-plt.show();
+dish_plot_format(ax, dish_LOSS)
 ```
 
 ```{python}
 # Surviving Customers at the End of Quarter
 _, ax = plt.subplots(figsize=(9, 4))
 dish_END = dish_op_res['Pay-TV Subscribers'] * 1000
-dish_END.plot(ax=ax, color='k', linewidth=0.75, title='END', ylim=(-800,16000));
-pad = pd.DateOffset(months=12)
-ax.set_xlim(dish_END.index.min() - pad, dish_END.index.max() + pad)
-ax.set_xticks(dish_END.index[::8])
-ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in dish_END.index[::8]], rotation=45)
-plt.tight_layout()
-plt.show();
+dish_END.plot(ax=ax, color='k', linewidth=0.75, title='END', ylim=(-800,16000))
+dish_plot_format(ax, dish_END)
 ```
 
 Number of vehicles on the road data: 

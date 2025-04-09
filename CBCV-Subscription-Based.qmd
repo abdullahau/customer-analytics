@@ -36,7 +36,52 @@ format:
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
-Source: [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)```{python}
+This model presented in this notebook is a direct implementation of *Daniel M. McCarthy, Peter S. Fader and Bruce G. S. Hardie*'s 2016 paper [*Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data*](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
+
+## Introduction
+
+The relevance and popularity of subscription-based businesses—businesses whose customers pay a periodically recurring fee for access to a product or service—has grown considerably in recent years. Previously dominated by newspapers, magazines, and telecommunications companies, the subscription-based business model has made strong inroads into consumer software (Microsoft 365), food preparation (Blue Apron), health and beauty products (Dollar Shave Club), and a large array of subscription-based software-as-a-service (SaaS) enterprises in the B2B space, as businesses look to increase the predictability of their revenue streams.
+
+The increased popularity of subscription-based businesses has brought with it an increase in the public disclosure of data on (but not limited to) **customer churn**, **customer/subscriber acquisition costs**, **average revenue per user**, and **customer lifetime value** (CLV). The price of a company’s stock reflects and incorporates investors’ beliefs regarding the future cash flows the company will generate. For the subscription-based businesses, the primary source of future cash flows is customers. Therefore, customer data is important to investors and is being used by analysts as they make their recommendations. Analyst reports strongly emphasize customer data in general (and the size of the total subscriber base over time in particular) when justifying their investment recommendations. 
+
+My objective in this notebook is to implement the framework (and its models) presented in the 2016 paper [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093). At the heart of this framework are the models of the firm’s **acquisition** and **retention processes** that accommodate factors such as *customer heterogeneity*, *duration dependence*, *seasonality*, and *changes in population size*. We will will estimating the parameters of the underlying model of customer behavior using only publicly disclosed customer data. We explicitly account for the fact that publicly reported data are typically *aggregated* (temporally and across customers) and suffer from *missingness* (i.e., the reported data are not available for all periods).
+
+I start off this notebook by discussing the principles of customer-based corporate valuation, first presenting the basic concepts of firm valuation and then highlighting the nature of the customer data typically released by subscription-based businesses. I will then present the model of customer behavior for such settings, presenting models for customer *acquisition*, *retention*, and *spend*. We then fit this model to two real public companies (Dish Network, Ticker: DISH and Sirius XM, Ticker: SIRI) with publicly available economic data. After demonstrating the validity of the proposed model, I will run valuations of the firms, and explore other insights that can be derived using the model.
+
+## The Logic of Customer-Based Corporate Valuation
+
+### Valuation 101
+
+The framework summarized here is a discounted cash flow (DCF) model, which is the de-facto industry standard way in which operating assets are valued within the financial community. At the heart of any such valuation exercise is the estimation of period-by-period FCF, central to which are estimates of period-by-period revenue.
+
+Shareholder value at time $T$:
+
+$$
+\text{SHV}_T = \text{OA} + \text{NOA}_T - \text{ND}_T
+$$
+
+The value of a firm’s operating assets ($\text{OA}$) is equal to the sum of all *expected* future free cash flows (FCFs) the firm will generate, discounted at the weighted average cost of capital ($\text{WACC}$):
+
+$$
+\text{OA}_T = \sum_{t=0}^{\infty} \frac{\text{FCF}_{T+t}}{(1+\text{WACC})^{t}}
+$$
+
+
+FCF is equal to the net operating profit after taxes ($\text{NOPAT}$) minus the difference between capital expenditures ($\text{CAPEX}$) and depreciation and amortization ($\text{D\&A}$), minus the change in non-financial working capital ($\Delta\text{NFWC}$):
+
+$$
+\text{FCF}_t = \text{NOPAT}_t - (\text{CAPEX}_t - \text{D\&A}_t) - \Delta\text{NFWC}_t
+$$
+
+The most important ingredient of FCF is $\text{NOPAT}$, which is a measure of the underlying profitability of the operating assets of the firm. $\text{NOPAT}$ is equal to revenues ($\text{REV}$) times the contribution margin ratio ($1 - \text{VC}$) minus fixed operating costs ($\text{FC}$), after taxes (where $\text{TR}$ is the corporate tax rate for the firm):
+
+$$
+\text{NOPAT}_t = \left(\text{REV}_t \times (1 - \text{VC}) - \text{FC}_t \right) \times \left(1- \text{TR}_t\right)
+$$
+
+### A Data Structure for Subscription-Based Businesses
+
+```{python}
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -65,16 +110,24 @@ household_revised
 ```
 
 ```{python}
-household_full_lf = pd.wide_to_long(household_full, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
-household_rev_lf = pd.wide_to_long(household_revised, stubnames='Q', i='Year', j='Quarter').sort_index().rename(columns={'Q':'Total Household'})
-household_rev_lf.plot(figsize=(9, 4), linewidth=0.75, color='k');
+household_full_lf = (
+    pd.wide_to_long(household_full, stubnames="Q", i="Year", j="Quarter")
+    .sort_index()
+    .rename(columns={"Q": "Total Household"})
+)
+household_rev_lf = (
+    pd.wide_to_long(household_revised, stubnames="Q", i="Year", j="Quarter")
+    .sort_index()
+    .rename(columns={"Q": "Total Household"})
+)
+household_rev_lf.plot(figsize=(9, 4), linewidth=0.75, color="k");
 ```
 
 ```{python}
 dish_op_res = pd.read_csv(
     'data/DISH - ADD-LOSS-END.csv', 
     index_col='Date', 
-    parse_dates=True, 
+    parse_dates=True,
     dayfirst=True
 ).sort_index()
 dish_op_res.tail()
@@ -82,6 +135,19 @@ dish_op_res.tail()
 
 - [U.S. Recession Bars](https://fredhelp.stlouisfed.org/fred/data/understanding-the-data/recession-bars/)
 - [Business Cycle Dating](https://www.nber.org/research/business-cycle-dating)
+
+```{python}
+# Gross Customer Acquisition Every Quarter
+dish_ADD = dish_op_res['Combined Additions'] * 1000
+# Surviving Customers at the End of Quarter
+dish_END = dish_op_res['Pay-TV Subscribers'] * 1000
+# Customer Churn Every Quarter
+dish_LOSS = (
+    dish_op_res["Pay-TV Subscribers"].shift(periods=1)
+    + dish_op_res["Combined Additions"]
+    - dish_op_res["Pay-TV Subscribers"]
+) * 1000
+```
 
 ```{python}
 def dish_plot_format(ax, data):
@@ -94,14 +160,13 @@ def dish_plot_format(ax, data):
     ax.set_xticks(data.index[::8])
     ax.set_xticklabels([f"Q{((d.month-1)//3)+1} {d.year}" for d in data.index[::8]], rotation=45)
     plt.tight_layout()
-    plt.show();
+    plt.show()
     return
 ```
 
 ```{python}
 # Gross Customer Acquisition Every Quarter
 _, ax = plt.subplots(figsize=(9, 4))
-dish_ADD = dish_op_res['Combined Additions'] * 1000
 dish_ADD.plot(ax=ax, color='k', linewidth=0.75, title='ADD', ylim=(-70, 1200))
 dish_plot_format(ax, dish_ADD)
 ```
@@ -109,18 +174,13 @@ dish_plot_format(ax, dish_ADD)
 ```{python}
 # Customer Churn Every Quarter
 _, ax = plt.subplots(figsize=(9, 4))
-dish_LOSS = (
-    dish_op_res['Pay-TV Subscribers'].shift(periods=1) 
-    + dish_op_res['Combined Additions'] 
-    - dish_op_res['Pay-TV Subscribers'])  * 1000
-dish_LOSS.plot(ax=ax, color='k', linewidth=0.75, title='LOSS', ylim=(-70,1000))
+dish_LOSS.plot(ax=ax, color="k", linewidth=0.75, title="LOSS", ylim=(-70, 1000))
 dish_plot_format(ax, dish_LOSS)
 ```
 
 ```{python}
 # Surviving Customers at the End of Quarter
 _, ax = plt.subplots(figsize=(9, 4))
-dish_END = dish_op_res['Pay-TV Subscribers'] * 1000
 dish_END.plot(ax=ax, color='k', linewidth=0.75, title='END', ylim=(-800,16000))
 dish_plot_format(ax, dish_END)
 ```
@@ -136,12 +196,12 @@ Data description:
 -   **Notes**: Total number of registered private, commercial (incl. taxicabs), and public automobiles in the US every year (excluding buses, trucks, and motorcycles)
 
 ```{python}
-reg_cars = pd.read_csv('data/us_registered_vehicles.csv')
+reg_cars = pd.read_csv('data/us_registered_vehicles.csv', index_col='Year')
 reg_cars.tail()
 ```
 
 ```{python}
-reg_cars.plot(x='Year', y='Registered Automobiles', figsize=(9, 4), color='k', linewidth=0.75);
+reg_cars.plot(y='Registered Automobiles', figsize=(9, 4), color='k', linewidth=0.75);
 ```
 
 Vehicle sales data (for macroeconomic covariate):
@@ -166,15 +226,19 @@ Data description:
     -  Total (SAAR) -- seasonally adjusted at annual rates (Millions)
 
 ```{python}
-new_vehicle_sales = pd.read_csv('data/us_new_passenger_car_sales.csv')
+new_vehicle_sales = pd.read_csv(
+    'data/us_new_passenger_car_sales.csv',
+    index_col='Date',
+    parse_dates=True,
+    dayfirst=True)
 new_vehicle_sales.tail()
 ```
 
 ```{python}
-new_vehicle_sales.plot(x='Date', y='Light Total', figsize=(9, 4), color='k', linewidth=0.75);
+new_vehicle_sales.plot(y='Light Total', figsize=(9, 4), color='k', linewidth=0.75);
 ```
 
 ```{python}
-new_vehicle_sales.plot(x='Date', y='Light Total (SAAR)', figsize=(9, 4), color='k', linewidth=0.75);
+new_vehicle_sales.plot(y='Light Total (SAAR)', figsize=(9, 4), color='k', linewidth=0.75);
 ```
 

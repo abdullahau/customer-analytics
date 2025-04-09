@@ -5,8 +5,8 @@ date: last-modified
 format:
     html:
         theme: cosmo
-        css: quarto-style/style.css        
-        highlight-style: atom-one        
+        css: quarto-style/style.css
+        highlight-style: atom-one
         mainfont: Palatino
         fontcolor: black
         monobackgroundcolor: white
@@ -24,7 +24,7 @@ format:
         format-links: false
         embed-resources: true
         anchor-sections: true
-        code-links:   
+        code-links:
         -   text: GitHub Repo
             icon: github
             href: https://github.com/abdullahau/customer-analytics/
@@ -36,17 +36,34 @@ format:
             url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
 ---
 
-This model presented in this notebook is a direct implementation of *Daniel M. McCarthy, Peter S. Fader and Bruce G. S. Hardie*'s 2016 paper [*Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data*](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093)
+### Source
+
+This model presented in this notebook is a direct implementation of *Daniel M. McCarthy, Peter S. Fader and Bruce G. S. Hardie*'s 2016 paper [*Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data*](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093).
+
+I will also implement the models proposed by *Gupta, Sunil, Donald R. Lehmann, and Jennifer Ames Stuart* in their 2004 paper [*Valuing Customers*](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=459595), and *Schulze, Christian, Bernd Skiera, and Thorsten Wiesel* in their 2012 paper [*Linking Customer and Financial Metrics to Shareholder Value: The Leverage Effect in Customer-Based Valuation*](https://journals.sagepub.com/doi/abs/10.1509/jm.10.0280) as benchmarks.
+
+### Imports
+
+```{python}
+import pandas as pd
+import matplotlib.pyplot as plt
+
+%config InlineBackend.figure_formats = ['svg']
+```
 
 ## Introduction
 
-The relevance and popularity of subscription-based businesses—businesses whose customers pay a periodically recurring fee for access to a product or service—has grown considerably in recent years. Previously dominated by newspapers, magazines, and telecommunications companies, the subscription-based business model has made strong inroads into consumer software (Microsoft 365), food preparation (Blue Apron), health and beauty products (Dollar Shave Club), and a large array of subscription-based software-as-a-service (SaaS) enterprises in the B2B space, as businesses look to increase the predictability of their revenue streams.
+The subscription-based business model—where customers pay recurring fees for ongoing access to a product or service—has seen significant growth beyond its traditional domains of media and telecom. Today, it underpins a wide range of consumer and B2B offerings, including SaaS (e.g., Microsoft 365), meal kits (e.g., Blue Apron), and consumer goods (e.g., Dollar Shave Club). A key driver of this model’s appeal is the predictability of revenue streams.
 
-The increased popularity of subscription-based businesses has brought with it an increase in the public disclosure of data on (but not limited to) **customer churn**, **customer/subscriber acquisition costs**, **average revenue per user**, and **customer lifetime value** (CLV). The price of a company’s stock reflects and incorporates investors’ beliefs regarding the future cash flows the company will generate. For the subscription-based businesses, the primary source of future cash flows is customers. Therefore, customer data is important to investors and is being used by analysts as they make their recommendations. Analyst reports strongly emphasize customer data in general (and the size of the total subscriber base over time in particular) when justifying their investment recommendations. 
+As subscription businesses scale, they increasingly disclose customer-related metrics such as **churn**, **acquisition cost** (CAC), **average revenue per user** (ARPU), and **customer lifetime value** (CLV). These metrics are critical for understanding a firm’s future cash flows—especially since, in subscription settings, customer behavior largely drives economic value. Equity analysts and investors now routinely incorporate this data into valuation models, with subscriber base growth often serving as a key signal.
 
-My objective in this notebook is to implement the framework (and its models) presented in the 2016 paper [Valuing Subscription-Based Businesses Using Publicly Disclosed Customer Data](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093). At the heart of this framework are the models of the firm’s **acquisition** and **retention processes** that accommodate factors such as *customer heterogeneity*, *duration dependence*, *seasonality*, and *changes in population size*. We will will estimating the parameters of the underlying model of customer behavior using only publicly disclosed customer data. We explicitly account for the fact that publicly reported data are typically *aggregated* (temporally and across customers) and suffer from *missingness* (i.e., the reported data are not available for all periods).
+In this notebook, I implement the framework (and its models) from [McCarthy, Fader, and Bruce (2016)](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=2701093), which estimates firm value using only publicly disclosed customer data. Central to this framework are models of the firm's **acquisition** and **retention processes**, which accommodate factors such as *customer heterogeneity*, *duration dependence*, *seasonality*, and *changes in population size*.
 
-I start off this notebook by discussing the principles of customer-based corporate valuation, first presenting the basic concepts of firm valuation and then highlighting the nature of the customer data typically released by subscription-based businesses. I will then present the model of customer behavior for such settings, presenting models for customer *acquisition*, *retention*, and *spend*. We then fit this model to two real public companies (Dish Network, Ticker: DISH and Sirius XM, Ticker: SIRI) with publicly available economic data. After demonstrating the validity of the proposed model, I will run valuations of the firms, and explore other insights that can be derived using the model.
+We explicitly account for the fact that publicly reported data are typically *aggregated* (temporally and across customers) and suffer from *missingness* (i.e., the reported data are not available for all periods). 
+
+I begin by reviewing the principles of customer-based corporate valuation and the nature of the data available from subscription firms. I then introduce models for acquisition, retention, and spending behavior, and estimate their parameters using historical data from two publicly traded firms: Dish Network (DISH) and Sirius XM (SIRI).
+
+Once validated, the model is used to generate forward-looking estimates of customer behavior, firm-level revenue, and ultimately, equity value. I also highlight additional strategic insights that emerge from the estimated parameters and model outputs.
 
 ## The Logic of Customer-Based Corporate Valuation
 
@@ -54,7 +71,7 @@ I start off this notebook by discussing the principles of customer-based corpora
 
 The framework summarized here is a discounted cash flow (DCF) model, which is the de-facto industry standard way in which operating assets are valued within the financial community. At the heart of any such valuation exercise is the estimation of period-by-period FCF, central to which are estimates of period-by-period revenue.
 
-Shareholder value at time $T$:
+Denoting the value of the firm at time $T$ by $\text{SHV}_T$ (for shareholder value), we have
 
 $$
 \text{SHV}_T = \text{OA} + \text{NOA}_T - \text{ND}_T
@@ -81,12 +98,39 @@ $$
 
 ### A Data Structure for Subscription-Based Businesses
 
-```{python}
-import pandas as pd
-import matplotlib.pyplot as plt
+![](references/num_customer_matrix.png){fig-align="center" width="350"}
 
-%config InlineBackend.figure_formats = ['svg']
-```
+
+- $R(m)$ -> Monthly revenue
+- $m = 1$ -> first month of commercial operations
+- $C(m, m’)$ -> number of customers acquired by the firm in month $m$ who are still active in month $m’$
+- $A(m) = C(m, m’)$ -> number of customers acquired each month by the firm
+- $L(m)$ -> number of customers “lost” each month
+- $L(m)$ = 0 if m = 0, else $C(., m-1) - [C(., m) - C(m,m)]$
+	- eg. $L(3) = C(., 2) - [C(., 3) - C(3,3)]$
+$$
+L(m) = 
+	\begin{cases}
+		0 &\quad m =1 \\
+		C(., m-1) - [C(., m) - C(m,m)]&\quad m = 2,3,4, \ldots
+	\end{cases}
+$$
+- *Aggregate* churn rate = $L(m)/C(.,m-1)$
+- $ARPU(m)$ -> Average revenue per subscriber in a given month
+- $ARPU(m) = R(m) \big/ \frac{C(.,m-1) + C(.,m)}{2}$
+	- (The denominator is the average number of customers the firm has during month $m$.)
+- $q$ quarter is a temporal aggregation of the true underlying process.
+- $q = 1$ is equivalent to $m=\{1,2,3\}$.
+- $\text{END}_q = C(., 3q)$
+- $\text{ADD}_q = A(3q-2) + A(3q-1) + A(3q)$
+- $\text{LOSS}_q = L(3q-2) + L(3q-1) + L(3q)$
+- $REV_q = R(3q-2) + R(3q-1) + R(3q)$
+- Objective: generate long-run projections of $R(m)$ and $A(M)$ using parameters estimated from $\text{ADD}$, $\text{LOSS}$, $\text{END}$ and $\text{REV}$ numbers
+- Account for **missing data**:
+	- **Left-censoring** - Disclosure records of paying customers does not start from the beginning of commercial operations.
+	- Some measures are reported for some period of time (e.g., $\text{END}$) before being complemented by other measures (e.g., $\text{ADD}$ and $\text{LOSS}$).
+- Account for **aggregation** (quarterly reports to monthly figures)
+	- Publicly disclosed customer data is typically reported quarterly with the associated unit of time being the quarter, whereas the firm is operating on a finer time interval (which, for the purposes of our analysis, we assume to be the month).
 
 -  [US Census Bureau’s Housing Vacancies and Homeownership CPS/HVS](https://www.census.gov/housing/hvs/data/histtabs.html) 
 -  [Quarterly Estimates of the Housing Inventory](https://www.census.gov/housing/hvs/data/histtab8.xlsx):

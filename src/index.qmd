@@ -78,31 +78,21 @@ Github Page: [https://github.com/abdullahau/customer-analytics](https://github.c
 Required Packages:
 
 ```
+numpy
+pandas
+polars
+matplotlib
+altair
+arviz
+scipy
+statsmodels
+scikit-learn
+scikit-optimize
+Lifetimes
+great-tables
+ipykernel
 quarto
 stan
 bridgestan
-xarray
-arviz
-altair
-great-tables
-ipykernel
-ipython
-ipywidgets
-jupyterlab
-Lifetimes
-quarto
-marimo
-matplotlib
-narwhals
-numpy
-pandas
-plotly
-polars
-scikit-learn
-scikit-optimize
-scipy
-statsmodels
-vegafusion
-jinja2
 ```
 

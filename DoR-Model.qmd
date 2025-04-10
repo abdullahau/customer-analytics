@@ -95,7 +95,7 @@ We load this dataset into python. We see that there are a total of 857 transacti
 ```{python}
 kiwi_lf = pl.scan_csv(
     source="data/kiwibubbles/kiwibubbles_tran.csv",
-    has_header=False,
+    has_header=True,
     separator=",",
     schema={
         'ID': pl.UInt16,

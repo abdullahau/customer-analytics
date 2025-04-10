@@ -2,12 +2,12 @@
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
 
 <meta charset="utf-8">
-<meta name="generator" content="quarto-1.6.42">
+<meta name="generator" content="quarto-1.6.43">
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Abdullah Mahmood">
-<meta name="dcterms.date" content="2025-03-27">
+<meta name="dcterms.date" content="2025-04-10">
 
 <title>Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution</title>
 <style>
@@ -3312,7 +3312,7 @@ bottom: -1.25;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">March 27, 2025</p>
+      <p class="date">April 10, 2025</p>
     </div>
   </div>
   
@@ -3344,7 +3344,7 @@ bottom: -1.25;
 <li><a href="https://www.brucehardie.com/notes/026/">Notes on the CDNOW Master Data Set</a></li>
 </ul>
 <p>The objective here is to incorporate an easily implementable model of buyer behavior capable of generating a medium-term forecast of aggregate purchasing by a cohort of customers. Aggregate-level forecasts are a critical input to any attempt to value a customer base, and serve as a diagnostic to help gauge the effectiveness of various short-term marketing programs (e.g., the provision of a baseline sales estimate against which the performance of a promotion can be evaluated).</p>
-<p>First, we discuss the background to the modeling exercise and present the <a href="@sec-import_data">dataset</a> on which this work is based. We then develop the <a href="@sec-sec-model_development">stochastic model</a> of buyer behavior which is used to generate forecasts of future CD purchasing. This is followed by the empirical analysis where we examine the fit of the proposed model and its forecasting ability.</p>
+<p>First, we discuss the background to the modeling exercise and present the <a href="#sec-import_data">dataset</a> on which this work is based. We then develop the <a href="#sec-model_development">stochastic model</a> of buyer behavior which is used to generate forecasts of future CD purchasing. This is followed by the empirical analysis where we examine the fit of the proposed model and its forecasting ability.</p>
 <p>Note to user interested in using this model:</p>
 <ol type="1">
 <li>The data being modeled are counts of relatively homogeneous units (e.g., CDs). This model must not be used to model dollar sales or counts of products that are not very similar (e.g., the number of products purchased at Amazon.com where the units include such disparate items as books, electronic equipment, lawn furniture, and so on).</li>
@@ -3356,7 +3356,7 @@ bottom: -1.25;
 <h2 data-number="2" class="anchored" data-anchor-id="imports"><span class="header-section-number">2</span> Imports</h2>
 <section id="import-packages" class="level3" data-number="2.1">
 <h3 data-number="2.1" class="anchored" data-anchor-id="import-packages"><span class="header-section-number">2.1</span> Import Packages</h3>
-<div id="a8d9b4ab" class="cell" data-execution_count="1">
+<div id="72daee8f" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
@@ -3372,7 +3372,7 @@ bottom: -1.25;
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> IPython.display <span class="im">import</span> display_markdown</span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>alt.renderers.enable(<span class="st">&quot;html&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="1">
+<div class="cell-output cell-output-display" data-execution_count="26">
 <pre><code>RendererRegistry.enable(&#39;html&#39;)</code></pre>
 </div>
 </div>
@@ -3380,7 +3380,7 @@ bottom: -1.25;
 <section id="sec-import_data" class="level3" data-number="2.2">
 <h3 data-number="2.2" class="anchored" data-anchor-id="sec-import_data"><span class="header-section-number">2.2</span> Import Transaction Data</h3>
 <p>For the purposes of this work, we focus on a <strong>single cohort of new customers</strong> who made their first purchase at the CDNOW website in the first quarter of 1997. We have data covering their <strong>initial (“trial”)</strong> and <strong>subsequent (“repeat”) purchases</strong> for the three month period (1/97 - 3/97) during which over 23,000 individuals purchased nearly 70,000 units (CDs). We are interested in <strong>forecasting the future (repeat) purchasing of these customers</strong> using a model calibrated with these quarter 1 data.</p>
-<div id="a6617ba3" class="cell" data-execution_count="2">
+<div id="aeee651e" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>CDNOW_master <span class="op">=</span> (</span>
@@ -3487,7 +3487,7 @@ white-space: pre-wrap;
 <section id="create-number-of-units-purchased-by-week-of-purchase-summary" class="level3" data-number="2.3">
 <h3 data-number="2.3" class="anchored" data-anchor-id="create-number-of-units-purchased-by-week-of-purchase-summary"><span class="header-section-number">2.3</span> Create Number of Units Purchased by Week of Purchase Summary</h3>
 <p>For the cohort of customers who first purchased at the CDNOW website in the first quarter of 1997, we choose to work with the summary of total purchasing as presented in the last table below (<code>TableOne</code>). This gives the distribution of the number of units purchased for each of the twelve weeks, along with details of total purchasing (<code>weeklysales</code>) and the number of new customers (triers) in each week (<code>weeklytriers</code>).</p>
-<div id="84fa5dea" class="cell" data-execution_count="3">
+<div id="ea4cab18" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the total number of CDs purchased each week?</span></span>
@@ -3505,25 +3505,25 @@ white-space: pre-wrap;
 <span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>    .line_prop(<span class="st">&#39;Total Weekly Sales&#39;</span>)</span>
 <span id="cb4-14"><a href="#cb4-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="3">
+<div class="cell-output cell-output-display" data-execution_count="28">
 
 <style>
-#altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb.vega-embed {
+#altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb.vega-embed details,
-#altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb.vega-embed details summary {
+#altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4.vega-embed details,
+#altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb"></div>
+<div id="altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb") {
-      outputDiv = document.getElementById("altair-viz-ff3dbb8f4fa442d98d4b171f73c8a1eb");
+    if (outputDiv.id !== "altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4") {
+      outputDiv = document.getElementById("altair-viz-c5c9dec61aa142e9aaac3d89577aa8e4");
     }
 
     const paths = {
@@ -3575,7 +3575,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="86ffc3f7" class="cell" data-execution_count="4">
+<div id="3bede265" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># How many people made their first-ever (“trial”) purchase each week?</span></span>
@@ -3589,7 +3589,7 @@ position: relative;
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="0de329f7" class="cell" data-execution_count="5">
+<div id="bef6eac3" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the total number of CDs purchased by triers in their trial week?</span></span>
@@ -3604,7 +3604,7 @@ position: relative;
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="1651ccae" class="cell" data-execution_count="6">
+<div id="fe24f671" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the weekly total sales split between &quot;trial&quot; and &quot;repeat&quot;?</span></span>
@@ -3632,7 +3632,7 @@ position: relative;
 <span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="d34a82ba" class="cell" data-execution_count="7">
+<div id="73870c4c" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>dist_table <span class="op">=</span> (</span>
@@ -3680,52 +3680,52 @@ position: relative;
 <span id="cb8-43"><a href="#cb8-43" aria-hidden="true" tabindex="-1"></a>    .opt_stylize()</span>
 <span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="7">
-<div id="shmnmsoelf" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div class="cell-output cell-output-display" data-execution_count="32">
+<div id="iivjcpnsph" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#shmnmsoelf table {
+#iivjcpnsph table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#shmnmsoelf thead, tbody, tfoot, tr, td, th { border-style: none; }
+#iivjcpnsph thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#shmnmsoelf p { margin: 0; padding: 0; }
-#shmnmsoelf .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#shmnmsoelf .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#shmnmsoelf .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#shmnmsoelf .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#shmnmsoelf .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#shmnmsoelf .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#shmnmsoelf .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#shmnmsoelf .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#shmnmsoelf .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#shmnmsoelf .gt_column_spanner_outer:first-child { padding-left: 0; }
-#shmnmsoelf .gt_column_spanner_outer:last-child { padding-right: 0; }
-#shmnmsoelf .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#shmnmsoelf .gt_spanner_row { border-bottom-style: hidden; }
-#shmnmsoelf .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#shmnmsoelf .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
-#shmnmsoelf .gt_from_md> :first-child { margin-top: 0; }
-#shmnmsoelf .gt_from_md> :last-child { margin-bottom: 0; }
-#shmnmsoelf .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
-#shmnmsoelf .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
-#shmnmsoelf .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#shmnmsoelf .gt_row_group_first td { border-top-width: 2px; }
-#shmnmsoelf .gt_row_group_first th { border-top-width: 2px; }
-#shmnmsoelf .gt_striped { background-color: #F4F4F4; }
-#shmnmsoelf .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#shmnmsoelf .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#shmnmsoelf .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#shmnmsoelf .gt_left { text-align: left; }
-#shmnmsoelf .gt_center { text-align: center; }
-#shmnmsoelf .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#shmnmsoelf .gt_font_normal { font-weight: normal; }
-#shmnmsoelf .gt_font_bold { font-weight: bold; }
-#shmnmsoelf .gt_font_italic { font-style: italic; }
-#shmnmsoelf .gt_super { font-size: 65%; }
-#shmnmsoelf .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#shmnmsoelf .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#iivjcpnsph p { margin: 0; padding: 0; }
+#iivjcpnsph .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#iivjcpnsph .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#iivjcpnsph .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#iivjcpnsph .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#iivjcpnsph .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#iivjcpnsph .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#iivjcpnsph .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#iivjcpnsph .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#iivjcpnsph .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#iivjcpnsph .gt_column_spanner_outer:first-child { padding-left: 0; }
+#iivjcpnsph .gt_column_spanner_outer:last-child { padding-right: 0; }
+#iivjcpnsph .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#iivjcpnsph .gt_spanner_row { border-bottom-style: hidden; }
+#iivjcpnsph .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#iivjcpnsph .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
+#iivjcpnsph .gt_from_md> :first-child { margin-top: 0; }
+#iivjcpnsph .gt_from_md> :last-child { margin-bottom: 0; }
+#iivjcpnsph .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
+#iivjcpnsph .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
+#iivjcpnsph .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#iivjcpnsph .gt_row_group_first td { border-top-width: 2px; }
+#iivjcpnsph .gt_row_group_first th { border-top-width: 2px; }
+#iivjcpnsph .gt_striped { background-color: #F4F4F4; }
+#iivjcpnsph .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#iivjcpnsph .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#iivjcpnsph .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#iivjcpnsph .gt_left { text-align: left; }
+#iivjcpnsph .gt_center { text-align: center; }
+#iivjcpnsph .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#iivjcpnsph .gt_font_normal { font-weight: normal; }
+#iivjcpnsph .gt_font_bold { font-weight: bold; }
+#iivjcpnsph .gt_font_italic { font-style: italic; }
+#iivjcpnsph .gt_super { font-size: 65%; }
+#iivjcpnsph .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#iivjcpnsph .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
@@ -3952,7 +3952,7 @@ P(X_3 = x) &amp;= \frac{1822}{1574 + 1642 + 1822} \times P(T_{3} = x) \\
 \end{align*}
 \]</span></p>
 <p>where the weights are determined by the number of triers in weeks 1-3.</p>
-<div id="ee17cf07" class="cell" data-execution_count="8">
+<div id="e1d39f5f" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Week 2 </span></span>
@@ -4108,7 +4108,7 @@ P(T_{w} = x) &amp;= \begin{cases}
 LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1x}\right)\ln\left[1-\sum^{9}_{x=1}P(T_{1}=x)\right]
 \]</span></p>
 <p>Where <span class="math inline">\(n_{1}\)</span> is the total number of triers in week 1 (1574) and <span class="math inline">\(n_{1x}\)</span> is the number of people making <span class="math inline">\(x\)</span> purchases in week 1.</p>
-<div id="f7535e79" class="cell" data-execution_count="9">
+<div id="52635b5c" class="cell" data-execution_count="9">
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> trial_parameters(n1x, guess<span class="op">=</span>[<span class="dv">1</span>,<span class="dv">1</span>]):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
@@ -4126,7 +4126,7 @@ LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1
 <span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(log_likelihood, guess, bounds<span class="op">=</span>[(<span class="dv">0</span>, np.inf), (<span class="dv">0</span>, np.inf)])</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="352e3454" class="cell" data-execution_count="10">
+<div id="1fd55b12" class="cell" data-execution_count="10">
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>n1x <span class="op">=</span> TableOne[<span class="st">&#39;1&#39;</span>].to_numpy()</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> trial_parameters(n1x)</span>
@@ -4154,7 +4154,7 @@ E(n_{1x})=1574\times P(T_{1}=x)
 <p><span class="math display">\[
 \chi^{2}=\sum^{10+}_{x=1}\frac{\left[n_{1x}-E(n_{1x})\right]^{2}}{E(n_{1x})}
 \]</span></p>
-<div id="d5e53370" class="cell" data-execution_count="11">
+<div id="3e288c0f" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>p_t_1x <span class="op">=</span> np.zeros(n1x.shape)</span>
@@ -4187,7 +4187,7 @@ E(n_{1x})=1574\times P(T_{1}=x)
 </div>
 </div>
 <p>As the value of the sample test statistic is less than the critical value, we conclude that the shifted beta-geometric distribution adequately fits the data.</p>
-<div id="d24333cf" class="cell" data-execution_count="12">
+<div id="9005ce46" class="cell" data-execution_count="12">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>w1_trial_df <span class="op">=</span> pl.DataFrame({<span class="st">&#39;Number of Units Purchased&#39;</span>:np.arange(<span class="dv">1</span>,<span class="dv">11</span>), <span class="st">&#39;Observed&#39;</span>: n1x[<span class="dv">1</span>:], <span class="st">&#39;Expected&#39;</span>: E_n1x[<span class="dv">1</span>:]})</span>
@@ -4200,25 +4200,25 @@ E(n_{1x})=1574\times P(T_{1}=x)
 <span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    xOffset<span class="op">=</span><span class="st">&#39;Legend:N&#39;</span></span>
 <span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>).line_prop(<span class="st">&#39;Fit of Week 1 Trial Model&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="12">
+<div class="cell-output cell-output-display" data-execution_count="37">
 
 <style>
-#altair-viz-6944f2e8d2214f659d09b37a24e1eb41.vega-embed {
+#altair-viz-0983ec578320459db863099ab0fe5fae.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-6944f2e8d2214f659d09b37a24e1eb41.vega-embed details,
-#altair-viz-6944f2e8d2214f659d09b37a24e1eb41.vega-embed details summary {
+#altair-viz-0983ec578320459db863099ab0fe5fae.vega-embed details,
+#altair-viz-0983ec578320459db863099ab0fe5fae.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-6944f2e8d2214f659d09b37a24e1eb41"></div>
+<div id="altair-viz-0983ec578320459db863099ab0fe5fae"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-6944f2e8d2214f659d09b37a24e1eb41") {
-      outputDiv = document.getElementById("altair-viz-6944f2e8d2214f659d09b37a24e1eb41");
+    if (outputDiv.id !== "altair-viz-0983ec578320459db863099ab0fe5fae") {
+      outputDiv = document.getElementById("altair-viz-0983ec578320459db863099ab0fe5fae");
     }
 
     const paths = {
@@ -4312,7 +4312,7 @@ P(R = x \mid \text{possible repeat buyer}) =
 <p>The probability of a “possible repeat buyer” making 10+ purchases is simply <span class="math inline">\(1 - \sum^{9}_{x=0} P(R=x)\)</span>.</p>
 <p>As the sample data are in the form of a table documenting the number of people purchasing <span class="math inline">\(0, 1, \ldots , 9, 10+\)</span> units (CDs) for each of the 12 weeks, we need to create a table that gives us <span class="math inline">\(P(X_w = x), x = 0, 1, \ldots , 9, 10+\)</span> and <span class="math inline">\(w = 1, 2, \ldots 12\)</span>, given values of the six model parameters <span class="math inline">\((\alpha_T, \beta_T, \alpha_R, \beta_R, \gamma, \delta)\)</span>.</p>
 <p>We see that <span class="math inline">\(P(X_w = x)\)</span> is simply a weighted average of the week-of-trial-specific probabilities of purchasing <span class="math inline">\(x\)</span> units in week <span class="math inline">\(w\)</span>. As an intermediate step, we build twelve tables that give us the probability of purchasing <span class="math inline">\(x\)</span> units in week <span class="math inline">\(w\)</span>, one for each trial week. These will then be aggregated and the log-likelihood created.</p>
-<div id="e5346248" class="cell" data-execution_count="13">
+<div id="223ae50c" class="cell" data-execution_count="13">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bg_parameters(distMAT, weeks, units_range, incr_triers, guesses<span class="op">=</span>[<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="dv">0</span>]):</span>
 <span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
@@ -4353,7 +4353,7 @@ P(R = x \mid \text{possible repeat buyer}) =
 <span id="cb15-38"><a href="#cb15-38" aria-hidden="true" tabindex="-1"></a>    bnds <span class="op">=</span> [(<span class="fl">1e-5</span>, np.inf) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(guesses)<span class="op">-</span><span class="dv">1</span>)] <span class="op">+</span> [(<span class="op">-</span>np.inf, np.inf)]</span>
 <span id="cb15-39"><a href="#cb15-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(log_likelihood, guesses, bounds<span class="op">=</span>bnds)   </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<div id="60756b8b" class="cell" data-execution_count="14">
+<div id="cfd9b683" class="cell" data-execution_count="14">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>distMAT <span class="op">=</span> TableOne.to_numpy()</span>
 <span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>trial_weeks <span class="op">=</span> np.array(TableOne.columns[<span class="dv">1</span>:], dtype<span class="op">=</span>np.int32)</span>
 <span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>units_range <span class="op">=</span> np.arange(distMAT.shape[<span class="dv">0</span>])</span>
@@ -4402,7 +4402,7 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 \chi^2 = \sum_{x=1}^{10+} \frac{\left[ n_{1x} - E(n_{1x}) \right]^2}{E(n_{1x})}
 + \sum_{w=2}^{12} \sum_{x=0}^{10+} \frac{\left[ n_{wx} - E(n_{wx}) \right]^2}{E(n_{wx})}.
 \]</span></p>
-<div id="dc69a553" class="cell" data-execution_count="15">
+<div id="2e30b771" class="cell" data-execution_count="15">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Weekly P(possible repeat buyer)</span></span>
@@ -4442,7 +4442,7 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 <span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>critical_value <span class="op">=</span> chi2.ppf(<span class="fl">0.95</span>, df<span class="op">=</span>df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="1170902b" class="cell" data-execution_count="16">
+<div id="4a8025f1" class="cell" data-execution_count="16">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>e_distTable <span class="op">=</span> (</span>
@@ -4459,52 +4459,52 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 <span id="cb18-12"><a href="#cb18-12" aria-hidden="true" tabindex="-1"></a>    .opt_stylize()</span>
 <span id="cb18-13"><a href="#cb18-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="16">
-<div id="vfrnzvmdfz" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div class="cell-output cell-output-display" data-execution_count="41">
+<div id="ckodiwqyxt" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#vfrnzvmdfz table {
+#ckodiwqyxt table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#vfrnzvmdfz thead, tbody, tfoot, tr, td, th { border-style: none; }
+#ckodiwqyxt thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#vfrnzvmdfz p { margin: 0; padding: 0; }
-#vfrnzvmdfz .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#vfrnzvmdfz .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#vfrnzvmdfz .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#vfrnzvmdfz .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#vfrnzvmdfz .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#vfrnzvmdfz .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#vfrnzvmdfz .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#vfrnzvmdfz .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#vfrnzvmdfz .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#vfrnzvmdfz .gt_column_spanner_outer:first-child { padding-left: 0; }
-#vfrnzvmdfz .gt_column_spanner_outer:last-child { padding-right: 0; }
-#vfrnzvmdfz .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#vfrnzvmdfz .gt_spanner_row { border-bottom-style: hidden; }
-#vfrnzvmdfz .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#vfrnzvmdfz .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
-#vfrnzvmdfz .gt_from_md> :first-child { margin-top: 0; }
-#vfrnzvmdfz .gt_from_md> :last-child { margin-bottom: 0; }
-#vfrnzvmdfz .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
-#vfrnzvmdfz .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
-#vfrnzvmdfz .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#vfrnzvmdfz .gt_row_group_first td { border-top-width: 2px; }
-#vfrnzvmdfz .gt_row_group_first th { border-top-width: 2px; }
-#vfrnzvmdfz .gt_striped { background-color: #F4F4F4; }
-#vfrnzvmdfz .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#vfrnzvmdfz .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#vfrnzvmdfz .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#vfrnzvmdfz .gt_left { text-align: left; }
-#vfrnzvmdfz .gt_center { text-align: center; }
-#vfrnzvmdfz .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#vfrnzvmdfz .gt_font_normal { font-weight: normal; }
-#vfrnzvmdfz .gt_font_bold { font-weight: bold; }
-#vfrnzvmdfz .gt_font_italic { font-style: italic; }
-#vfrnzvmdfz .gt_super { font-size: 65%; }
-#vfrnzvmdfz .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#vfrnzvmdfz .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#ckodiwqyxt p { margin: 0; padding: 0; }
+#ckodiwqyxt .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#ckodiwqyxt .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#ckodiwqyxt .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#ckodiwqyxt .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#ckodiwqyxt .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#ckodiwqyxt .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#ckodiwqyxt .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#ckodiwqyxt .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#ckodiwqyxt .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#ckodiwqyxt .gt_column_spanner_outer:first-child { padding-left: 0; }
+#ckodiwqyxt .gt_column_spanner_outer:last-child { padding-right: 0; }
+#ckodiwqyxt .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#ckodiwqyxt .gt_spanner_row { border-bottom-style: hidden; }
+#ckodiwqyxt .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#ckodiwqyxt .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
+#ckodiwqyxt .gt_from_md> :first-child { margin-top: 0; }
+#ckodiwqyxt .gt_from_md> :last-child { margin-bottom: 0; }
+#ckodiwqyxt .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
+#ckodiwqyxt .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
+#ckodiwqyxt .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#ckodiwqyxt .gt_row_group_first td { border-top-width: 2px; }
+#ckodiwqyxt .gt_row_group_first th { border-top-width: 2px; }
+#ckodiwqyxt .gt_striped { background-color: #F4F4F4; }
+#ckodiwqyxt .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#ckodiwqyxt .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#ckodiwqyxt .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#ckodiwqyxt .gt_left { text-align: left; }
+#ckodiwqyxt .gt_center { text-align: center; }
+#ckodiwqyxt .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#ckodiwqyxt .gt_font_normal { font-weight: normal; }
+#ckodiwqyxt .gt_font_bold { font-weight: bold; }
+#ckodiwqyxt .gt_font_italic { font-style: italic; }
+#ckodiwqyxt .gt_super { font-size: 65%; }
+#ckodiwqyxt .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#ckodiwqyxt .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-postprocess="true" data-quarto-disable-processing="false" data-quarto-bootstrap="false">
@@ -4708,7 +4708,7 @@ tr { background-color: transparent; }
         
 </div>
 </div>
-<div id="5d918463" class="cell" data-execution_count="17">
+<div id="3da288f9" class="cell" data-execution_count="17">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>display_markdown(<span class="ss">f&#39;&#39;&#39;$</span><span class="ch">\\</span><span class="ss">chi^</span><span class="ch">{{</span><span class="ss">2</span><span class="ch">}}</span><span class="ss">$ = </span><span class="sc">{</span>chi_square<span class="sc">:0.4f}</span></span>
@@ -4741,7 +4741,7 @@ E(T_w) = \frac{\alpha_T + \beta_T - 1}{\alpha_T - 1}
 <p><span class="math display">\[
 E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 \]</span></p>
-<div id="1fcfc91a" class="cell" data-execution_count="18">
+<div id="5516af9a" class="cell" data-execution_count="18">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>full_weeks <span class="op">=</span> np.arange(<span class="dv">52</span>) <span class="op">+</span> <span class="dv">1</span></span>
@@ -4759,7 +4759,7 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <span id="cb20-13"><a href="#cb20-13" aria-hidden="true" tabindex="-1"></a>e_weekly_sales <span class="op">=</span> np.<span class="bu">sum</span>(incr_triers <span class="op">*</span> mean_weekly_unit_purchases, axis<span class="op">=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="9f996653" class="cell" data-execution_count="19">
+<div id="45c88872" class="cell" data-execution_count="19">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Without SciPy&#39;s Toeplitz Constructor</span></span>
@@ -4776,7 +4776,7 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a>e_weekly_sales <span class="op">=</span> np.<span class="bu">sum</span>(incr_triers <span class="op">*</span> mean_weekly_unit_purchases, axis<span class="op">=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
 </div>
-<div id="fd313a92" class="cell" data-execution_count="20">
+<div id="44cfbe48" class="cell" data-execution_count="20">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>e_total_sales <span class="op">=</span> e_weekly_sales[:<span class="dv">12</span>]</span>
@@ -4805,25 +4805,25 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <span id="cb22-24"><a href="#cb22-24" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb22-25"><a href="#cb22-25" aria-hidden="true" tabindex="-1"></a>layered_line_prop(chart<span class="op">=</span>chart, title<span class="op">=</span><span class="st">&quot;Model Fit: Trial/Repeat Decomposition&quot;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="20">
+<div class="cell-output cell-output-display" data-execution_count="45">
 
 <style>
-#altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0.vega-embed {
+#altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0.vega-embed details,
-#altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0.vega-embed details summary {
+#altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef.vega-embed details,
+#altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0"></div>
+<div id="altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0") {
-      outputDiv = document.getElementById("altair-viz-ef59ee0bd12f42fd9f515b3bddaf42b0");
+    if (outputDiv.id !== "altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef") {
+      outputDiv = document.getElementById("altair-viz-ab3a1e4a6cd1439fa0ab5895c6e842ef");
     }
 
     const paths = {
@@ -4875,7 +4875,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="ab990523" class="cell" data-execution_count="21">
+<div id="3b5d7d2c" class="cell" data-execution_count="21">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>e_total_sales <span class="op">=</span> e_weekly_sales</span>
@@ -4901,25 +4901,25 @@ position: relative;
 <span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>layered_line_prop(chart, <span class="st">&#39;Forecast Weekly Repeat Sales&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="21">
+<div class="cell-output cell-output-display" data-execution_count="46">
 
 <style>
-#altair-viz-63ad7d946e9e4432ac992547179ba8f6.vega-embed {
+#altair-viz-cf7616242488431dbe9045d09c1844bb.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-63ad7d946e9e4432ac992547179ba8f6.vega-embed details,
-#altair-viz-63ad7d946e9e4432ac992547179ba8f6.vega-embed details summary {
+#altair-viz-cf7616242488431dbe9045d09c1844bb.vega-embed details,
+#altair-viz-cf7616242488431dbe9045d09c1844bb.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-63ad7d946e9e4432ac992547179ba8f6"></div>
+<div id="altair-viz-cf7616242488431dbe9045d09c1844bb"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-63ad7d946e9e4432ac992547179ba8f6") {
-      outputDiv = document.getElementById("altair-viz-63ad7d946e9e4432ac992547179ba8f6");
+    if (outputDiv.id !== "altair-viz-cf7616242488431dbe9045d09c1844bb") {
+      outputDiv = document.getElementById("altair-viz-cf7616242488431dbe9045d09c1844bb");
     }
 
     const paths = {
@@ -4971,7 +4971,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="fd380cee" class="cell" data-execution_count="22">
+<div id="963c3afc" class="cell" data-execution_count="22">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>e_cum_repeat_sales_df <span class="op">=</span> (</span>
@@ -5000,25 +5000,25 @@ position: relative;
 <span id="cb24-24"><a href="#cb24-24" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb24-25"><a href="#cb24-25" aria-hidden="true" tabindex="-1"></a>layered_line_prop(chart, <span class="st">&#39;Cumulative Repeat Sales Forecast&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="22">
+<div class="cell-output cell-output-display" data-execution_count="47">
 
 <style>
-#altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad.vega-embed {
+#altair-viz-bc5aa68eac9940349f7df6783ca3c6fb.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad.vega-embed details,
-#altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad.vega-embed details summary {
+#altair-viz-bc5aa68eac9940349f7df6783ca3c6fb.vega-embed details,
+#altair-viz-bc5aa68eac9940349f7df6783ca3c6fb.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad"></div>
+<div id="altair-viz-bc5aa68eac9940349f7df6783ca3c6fb"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad") {
-      outputDiv = document.getElementById("altair-viz-187b6ec7e24d4caa8b4ba455dfbf6bad");
+    if (outputDiv.id !== "altair-viz-bc5aa68eac9940349f7df6783ca3c6fb") {
+      outputDiv = document.getElementById("altair-viz-bc5aa68eac9940349f7df6783ca3c6fb");
     }
 
     const paths = {
@@ -5070,7 +5070,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="04a1881c" class="cell" data-execution_count="23">
+<div id="6e6fbd0b" class="cell" data-execution_count="23">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>full_weeks <span class="op">=</span> np.arange(<span class="dv">78</span>) <span class="op">+</span> <span class="dv">1</span></span>
@@ -5112,25 +5112,25 @@ position: relative;
 <span id="cb25-37"><a href="#cb25-37" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb25-38"><a href="#cb25-38" aria-hidden="true" tabindex="-1"></a>layered_line_prop(chart, <span class="st">&#39;Forecast Weekly Repeat Sales&#39;</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="23">
+<div class="cell-output cell-output-display" data-execution_count="48">
 
 <style>
-#altair-viz-3d10e405f5514f5092c961ff336d8253.vega-embed {
+#altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-3d10e405f5514f5092c961ff336d8253.vega-embed details,
-#altair-viz-3d10e405f5514f5092c961ff336d8253.vega-embed details summary {
+#altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb.vega-embed details,
+#altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-3d10e405f5514f5092c961ff336d8253"></div>
+<div id="altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-3d10e405f5514f5092c961ff336d8253") {
-      outputDiv = document.getElementById("altair-viz-3d10e405f5514f5092c961ff336d8253");
+    if (outputDiv.id !== "altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb") {
+      outputDiv = document.getElementById("altair-viz-5b5ab84b16b941bfbaffaafbdb4522cb");
     }
 
     const paths = {
@@ -5182,7 +5182,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="fcec7110" class="cell" data-execution_count="24">
+<div id="6dab9356" class="cell" data-execution_count="24">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>qt <span class="op">=</span> np.linspace(beta.ppf(<span class="dv">0</span>, w1_alpha_T, w1_beta_T), beta.ppf(<span class="dv">1</span>, w1_alpha_T, w1_beta_T), <span class="dv">300</span>)</span>
@@ -5221,7 +5221,7 @@ position: relative;
 <p>Mean = 0.490, Variance = 0.017</p>
 </div>
 </div>
-<div id="bb790c9a" class="cell" data-execution_count="25">
+<div id="123bc3c5" class="cell" data-execution_count="25">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>qt_dist <span class="op">=</span> pl.DataFrame({<span class="st">&#39;qT&#39;</span>: qt, <span class="st">&#39;Week 1 PDF&#39;</span>: y_w1, <span class="st">&#39;All 12 Week PDF&#39;</span>: y_w12})</span>
@@ -5239,25 +5239,25 @@ position: relative;
 <span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>        ).configure_view(stroke<span class="op">=</span><span class="va">None</span>).configure_axisY(grid<span class="op">=</span><span class="va">False</span>).configure_axisX(grid<span class="op">=</span><span class="va">False</span>)         </span>
 <span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </details>
-<div class="cell-output cell-output-display" data-execution_count="25">
+<div class="cell-output cell-output-display" data-execution_count="50">
 
 <style>
-#altair-viz-e9b7433ce75e4e909fa7e1751288c92c.vega-embed {
+#altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-e9b7433ce75e4e909fa7e1751288c92c.vega-embed details,
-#altair-viz-e9b7433ce75e4e909fa7e1751288c92c.vega-embed details summary {
+#altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb.vega-embed details,
+#altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-e9b7433ce75e4e909fa7e1751288c92c"></div>
+<div id="altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-e9b7433ce75e4e909fa7e1751288c92c") {
-      outputDiv = document.getElementById("altair-viz-e9b7433ce75e4e909fa7e1751288c92c");
+    if (outputDiv.id !== "altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb") {
+      outputDiv = document.getElementById("altair-viz-b71c46c5e60a4fe39f0fa14ea80611cb");
     }
 
     const paths = {

@@ -31,17 +31,31 @@ format:
 
 ### Models
 
+#### Acquisition Models:
+
 - [Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/DoR-Model)
 - [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric)
+
+#### Retention Models:
+
 - [Beta-Geometric (BG) Model](https://abdullahau.github.io/customer-analytics/Beta-Geometric-Model)
+- [Beta-discrete-Weibull (BdW) Model](https://abdullahau.github.io/customer-analytics/BdW-Model)
+- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/subscription-retention-model)
+
+#### Purchasing Models:
+
 - [NBD Model Variants - Overview](https://abdullahau.github.io/customer-analytics/NBD-Model)
 - [BG/NBD Model](https://abdullahau.github.io/customer-analytics/BG-NBD-Model)
 - [BG/NBD Model - Stan Implementation](https://abdullahau.github.io/customer-analytics/BG-NBD-Model-Stan)
 - [NBD/OTB Model - NBD with One-Time Buyers](https://abdullahau.github.io/customer-analytics/NBD-OTB-Model)
 - [BG/BB Model - Discrete-Time, Noncontractual Setting](https://abdullahau.github.io/customer-analytics/BG-BB-Model)
+
+#### Spend Models:
+
 - [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/gamma-gamma)
-- [Beta-discrete-Weibull (BdW) Model](https://abdullahau.github.io/customer-analytics/BdW-Model)
-- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/subscription-retention-model)
+
+#### Combined CLV Models:
+
 - [RFM and CLV: Using Iso-Value Curves for Customer Base Analysis](https://abdullahau.github.io/customer-analytics/RFM-and-CLV)
 
 ### Analaysis & Summaries

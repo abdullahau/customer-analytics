@@ -53,7 +53,7 @@ The model discussed here is applicable for the following two-dimensional classif
 
 The objective here is to incorporate an easily implementable model of buyer behavior capable of generating a medium-term forecast of aggregate purchasing by a cohort of customers. Aggregate-level forecasts are a critical input to any attempt to value a customer base, and serve as a diagnostic to help gauge the effectiveness of various short-term marketing programs (e.g., the provision of a baseline sales estimate against which the performance of a promotion can be evaluated).
 
-First, we discuss the background to the modeling exercise and present the [dataset](@sec-import_data) on which this work is based. We then develop the [stochastic model](@sec-sec-model_development) of buyer behavior which is used to generate forecasts of future CD purchasing. This is followed by the empirical analysis where we examine the fit of the proposed model and its forecasting ability.
+First, we discuss the background to the modeling exercise and present the [dataset](#sec-import_data) on which this work is based. We then develop the [stochastic model](#sec-model_development) of buyer behavior which is used to generate forecasts of future CD purchasing. This is followed by the empirical analysis where we examine the fit of the proposed model and its forecasting ability.
 
 Note to user interested in using this model:
 

@@ -1,0 +1,47 @@
+[project]
+name = "customer-analytics"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "altair>=6.2.2",
+    "arviz>=1.2.0",
+    "bridgestan>=2.9.0",
+    "great-tables>=0.22.0",
+    "ipykernel>=7.3.0",
+    "lifetimes>=0.11.3",
+    "matplotlib>=3.11.0",
+    "numpy>=2.5.1",
+    "pandas>=3.0.3",
+    "plotly>=6.9.0",
+    "polars>=1.42.1",
+    "quarto>=0.1.0",
+    "scipy>=1.18.0",
+    "statsmodels>=0.14.6",
+    "xarray>=2026.7.0",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+ignore = [
+    "F401",  # unused imports
+    # "I",     # import sorting (all isort rules)
+    "N999",  # Invalid module name
+    "RUF002",  # En dash / hyphen ignore
+    "RUF003", # En dash / hyphen ignore
+    "PLR0917",  # Too many positional arguments
+    "PLR0913", # Too many arguments
+    "FBT001", # Boolean-typed positional argument
+    "FBT002", # Boolean default positional argument
+    "N806", # Variable in function to be lowercase
+    "N803", # Argument name should be lowercase
+    "DOC", # Documentation errors
+    "TC003", # imports that are only used for type annotations, but aren't defined in a type-checking block
+]
+
+[tool.ty.environment]
+python = ".venv/bin/python3"
+python-version = "3.14"

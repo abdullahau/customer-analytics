@@ -72,27 +72,3 @@ format:
 ## Source Files
 
 Github Page: [https://github.com/abdullahau/customer-analytics](https://github.com/abdullahau/customer-analytics)
-
-## Build from Source
-
-Required Packages:
-
-```
-numpy
-pandas
-polars
-matplotlib
-altair
-arviz
-scipy
-statsmodels
-scikit-learn
-scikit-optimize
-Lifetimes
-great-tables
-ipykernel
-quarto
-stan
-bridgestan
-```
-

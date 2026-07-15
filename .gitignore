@@ -32,3 +32,6 @@ __pypackages__/
 .claude
 .claudeignore
 CLAUDE.md
+
+# Stan / Bridgestan
+*.so

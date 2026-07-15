@@ -16,6 +16,26 @@ warnings.filterwarnings("ignore", module="plotnine/..*")
 
 csp.utils.get_logger().setLevel(logging.ERROR)
 
+
+def _bootstrap_stan_paths() -> None:
+    """Point cmdstanpy/bridgestan at the local toolchains if not already set.
+
+    cmdstanpy reads ``$CMDSTAN`` and bridgestan reads ``$BRIDGESTAN`` lazily (at
+    compile time), so setting them here is enough. An existing env var always
+    wins; the defaults below (``~/cmdstan`` and ``~/cmdstan/bridgestan``) are only
+    applied when they actually exist on disk.
+    """
+    defaults = {
+        "CMDSTAN": os.path.expanduser("~/cmdstan"),
+        "BRIDGESTAN": os.path.expanduser("~/cmdstan/bridgestan"),
+    }
+    for var, path in defaults.items():
+        if not os.environ.get(var) and os.path.isdir(path):
+            os.environ[var] = path
+
+
+_bootstrap_stan_paths()
+
 __all__ = ["Stan", "BridgeStan", "StanQuap", "link", "precis"]
 
 

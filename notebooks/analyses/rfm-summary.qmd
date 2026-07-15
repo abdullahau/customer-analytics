@@ -72,7 +72,7 @@ unauthorized_resellers = (
     .collect()
 )
 
-CDNOW = CDNOW.filter(~pl.col("ID").is_in(unauthorized_resellers.select("ID")))
+CDNOW = CDNOW.join(unauthorized_resellers.lazy().select("ID"), on="ID", how="anti")
 ```
 
 ```{python}

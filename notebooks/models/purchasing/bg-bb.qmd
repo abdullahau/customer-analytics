@@ -657,7 +657,7 @@ def marginal_posterior(x, tx, p_theta, theta=False):
 def compute_mean(x, tx, theta=False):
     # Function for the marginal posterior distribution
     def posterior_func(p_theta):
-        return p_theta * marginal_posterior(x, tx, p_theta, theta=theta)
+        return p_theta * marginal_posterior(x, tx, p_theta, theta=theta).item()
 
     # Integrate over the range [0, 1] for p or theta
     mean, _ = quad(posterior_func, 0, 1)

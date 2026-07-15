@@ -40,7 +40,7 @@ Younger Eats is a fast-growing meal kit company, specializing in meals for young
 ```{python}
 #| vscode: {languageId: python}
 # Sales and marketing expenses
-snm_exp = pd.read_csv("data/CAC-data.csv")
+snm_exp = pd.read_csv("data/CAC-Data.csv")
 
 snm_exp['Total Sales and Marketing'] = (
     snm_exp.sum(axis=1) - 

@@ -29,6 +29,7 @@ class CDNOW(RFM):
 
         # Filter unauthorized resellers
         if remove_unauthorized:
+            assert self._data is not None  # set by super().__init__ above
             self._data = self.filter_unauthorized(self._data)
 
     def __select_data(self, master: bool = True) -> Union[pl.LazyFrame, pl.DataFrame]:
@@ -63,7 +64,7 @@ class CDNOW(RFM):
         return data
 
     def filter_unauthorized(
-        self, data: Union[pl.LazyFrame, pl.DataFrame], threshold: int = 4000
+        self, data: pl.LazyFrame, threshold: int = 4000
     ):
         "Remove unauthorized resellers with total repeat spend exceeding exceeding $4,000."
         unauthorized_resellers = (
@@ -73,4 +74,6 @@ class CDNOW(RFM):
             .filter(pl.col("Spend Scaled") > threshold * 100)
             .collect()
         )
-        return data.filter(~pl.col("ID").is_in(unauthorized_resellers.select("ID")))
+        return data.join(
+            unauthorized_resellers.lazy().select("ID"), on="ID", how="anti"
+        )

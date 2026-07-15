@@ -1402,19 +1402,9 @@ spend_range_alpha_buyers = spend_summary('Alpha', grocery_lf, 1).filter(
     (pl.col('spend') < 4)
 ).collect()
 
-res = one_time_alpha_buyers.with_columns(
-    contains=pl.col('panel_id').is_in(
-        spend_range_alpha_buyers.get_column('panel_id')
-    )
-).select('contains').sum().item()
-
-# res = (
-#     one_time_alpha_buyers.lazy()
-#     .join(spend_range_alpha_buyers.lazy(), on='panel_id', how='semi')
-#     .select(pl.len())
-#     .collect()
-#     .item()
-# )
+res = one_time_alpha_buyers.join(
+    spend_range_alpha_buyers, on='panel_id', how='semi'
+).height
 
 print(f'There were {one_time_alpha_buyers.count().item(0,'panel_id')} one-time buyers of Alpha brand in Year 1.')
 print(f'{res} of those one-time Alpha buyers spent between [$2, $4).')
@@ -1425,17 +1415,19 @@ print(f'the {res} one-time buyers represent {res / spend_range_alpha_buyers.coun
 **Validate**:
 
 ```{python}
-spend_range_alpha_buyers.filter(
-    pl.col('panel_id').is_in(one_time_alpha_buyers.get_column('panel_id'))
+spend_range_alpha_buyers.join(
+    one_time_alpha_buyers.select('panel_id'), on='panel_id', how='semi'
 ).select(pl.col('spend').sum()).item()
 ```
 
 ```{python}
 grocery_lf.filter(
     (pl.col('week') <= 52) &
-    (pl.col('panel_id').is_in(spend_range_alpha_buyers.get_column('panel_id'))) &
-    (pl.col('panel_id').is_in(one_time_alpha_buyers.get_column('panel_id'))) &
     (pl.col('brand') == 'Alpha')
+).join(
+    spend_range_alpha_buyers.lazy().select('panel_id'), on='panel_id', how='semi'
+).join(
+    one_time_alpha_buyers.lazy().select('panel_id'), on='panel_id', how='semi'
 ).with_columns(
     ((pl.col('units') * pl.col('price'))).alias('spend')
 ).select(pl.col('spend').sum()).collect().item()

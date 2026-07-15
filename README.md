@@ -62,3 +62,4 @@ What the analysis summarize:
 - [Ian Frankenburg](https://ian-frankenburg.com/)
 - [Theta Equity Partners](https://thetaclv.com/)
 - [PyMC - Marketing](https://www.pymc-marketing.io/en/stable/)
+- [lifetimes (python package)](https://github.com/CamDavidsonPilon/lifetimes)

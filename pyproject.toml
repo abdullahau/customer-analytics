@@ -1,7 +1,7 @@
 [project]
 name = "customer-analytics"
 version = "0.1.0"
-description = "Probability models for customer-base analysis — spanning contractual/noncontractual relationships and continuous/discrete transaction opportunities, built from counting, timing, and choice processes"
+description = "Probability models for customer-base analysis — counting, timing, and choice processes across contractual/noncontractual and continuous/discrete transaction opportunities — to project purchasing, retention, CLV, and customer-based firm value"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [

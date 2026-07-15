@@ -1100,7 +1100,7 @@ levels = np.sort(levels)
 print(levels)
 
 plt.figure(dpi=120)
-cs = plt.contour(gamma_grid, delta_grid, lls, levels=levels, linewidths=0.75, color="black")
+cs = plt.contour(gamma_grid, delta_grid, lls, levels=levels, linewidths=0.75, colors="black")
 plt.clabel(cs, fontsize=8)
 plt.xlabel('γ')
 plt.ylabel('δ')

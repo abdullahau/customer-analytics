@@ -5,10 +5,20 @@ format:
     number-sections: false
 ---
 
-A research library of **customer-base analytics** models — the "buy-till-you-die"
-(BTYD) / probability-modelling tradition of Fader, Hardie, and related work.
-Each page below is a self-contained essay mixing mathematical exposition with
-executable Python.
+A research library of **probability models for customer-base analysis** — the
+Fader–Hardie tradition of parsimonious stochastic models that treat observed
+buying as the outcome of latent behavioural characteristics, then use them to
+project future purchasing and customer lifetime value (CLV).
+
+The models are organised along **two dimensions of the firm–customer
+relationship** — whether it is *contractual* or *noncontractual* (i.e. whether
+customer churn is observed or must be inferred), and whether transaction
+opportunities are *continuous* or *discrete*. Within each setting, a model is
+assembled from three building blocks — **counting** (how many transactions),
+**timing** (when / how long a customer stays alive), and **choice** (whether /
+which / how much) — often integrated to jointly estimate the underlying
+parameters. Each page below is a self-contained essay mixing mathematical
+exposition with executable Python.
 
 ## Pages
 

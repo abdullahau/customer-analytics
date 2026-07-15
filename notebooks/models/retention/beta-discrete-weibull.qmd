@@ -1216,7 +1216,7 @@ def c_est(gamma, delta, year=year[:5], alive=alive_regular[:5]):
         )
 
     res = minimize(log_likelihood, x0=[0.1], bounds=[(0.01, np.inf)])
-    return res.x
+    return res.x[0]
 ```
 
 ```{python}
@@ -1232,7 +1232,7 @@ for i, mu in enumerate(mean_range):
         y,
         dashed_lines[i],
         linewidth=0.75,
-        label=f"Case {i + 1} ($\\phi$ = {pol})",
+        label=f"Case {i + 1} ($E(\\Theta)$ = {mu})",
     )
 plt.xlabel("$\\phi$")
 plt.ylabel("c")

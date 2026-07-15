@@ -1,7 +1,7 @@
 [project]
 name = "customer-analytics"
 version = "0.1.0"
-description = "A research library of customer-base (BTYD) analytics models and essays"
+description = "Probability models for customer-base analysis — spanning contractual/noncontractual relationships and continuous/discrete transaction opportunities, built from counting, timing, and choice processes"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -11,6 +11,7 @@ dependencies = [
     "cmdstanpy>=1.2.5",
     "great-tables>=0.22.0",
     "ipykernel>=7.3.0",
+    "ipywidgets>=8.1.8",
     "lifetimes>=0.11.3",
     "matplotlib>=3.11.0",
     "numpy>=2.5.1",
@@ -18,7 +19,9 @@ dependencies = [
     "plotly>=6.9.0",
     "polars>=1.42.1",
     "quarto>=0.1.0",
+    "scikit-learn>=1.9.0",
     "scipy>=1.18.0",
+    "seaborn>=0.13.2",
     "statsmodels>=0.14.6",
     "xarray>=2026.7.0",
 ]

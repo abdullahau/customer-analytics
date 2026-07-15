@@ -716,45 +716,42 @@ mcmc.summary()
 #### Model Trace Plot
 
 ```{python}
-axes = az.plot_trace(
-    data=inf_data,
-    compact=True,
-    kind="rank_bars",
-    backend_kwargs={"figsize": (12, 9), "layout": "constrained"},
+pc = az.plot_trace_dist(
+    inf_data, var_names=["r", "alpha", "a", "b", "phi_dropout", "kappa_dropout"], backend="matplotlib"
 )
-plt.gcf().suptitle("BG/NBD Model Trace", fontsize=18, fontweight="bold")
+fig = pc.viz["figure"].item()
+fig.set_size_inches(12, 9)
+fig.suptitle("BG/NBD Model Trace", fontsize=18, fontweight="bold")
 plt.tight_layout();
 ```
 
 #### Model Posterior Plot
 
 ```{python}
-fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharex=False, sharey=False)
-
-axes = axes.flatten()
+pc = az.plot_dist(
+    inf_data,
+    var_names=["r", "alpha", "a", "b"],
+    kind="kde",
+    point_estimate="mean",
+    backend="matplotlib",
+    col_wrap=2,
+)
 
 for i, var_name in enumerate(["r", "alpha", "a", "b"]):
-    ax = axes[i]
-    az.plot_posterior(
-        inf_data.posterior[var_name].values.flatten(),
-        color="C0",
-        point_estimate="mean",
-        ax=ax,
-        label="MCMC",
-    )
+    ax = pc.get_target(var_name, {})
     ax.axvline(
-        x=stan_model.opt_model.stan_variable(var_name),
+        stan_model.opt_model.stan_variable(var_name),
         color="C1",
         linestyle="--",
         label="Stan MAP",
     )
-    ax.axvline(x=lifetimes_params[i], color="C2", linestyle="--", label="Lifetimes")
-    ax.axvline(x=scipy_params[i], color="C3", linestyle="--", label="SciPy")
-    ax.legend(loc="upper right")
-    ax.set_title(var_name)
+    ax.axvline(lifetimes_params[i], color="C2", linestyle="--", label="Lifetimes")
+    ax.axvline(scipy_params[i], color="C3", linestyle="--", label="SciPy")
+    ax.legend(loc="upper right", fontsize=8)
 
-plt.gcf().suptitle("BG/NBD Model Parameters", fontsize=18, fontweight="bold")
-plt.tight_layout();
+fig = pc.viz["figure"].item()
+fig.set_size_inches(12, 9)
+fig.suptitle("BG/NBD Model Parameters", fontsize=18, fontweight="bold");
 ```
 
 The `r` and `alpha` purchase rate parameters are quite similar for all three models, but the `a` and `b` dropout parameters are better approximated with the `phi_dropout` and `kappa_dropout` parameters when fitted with MCMC.
@@ -884,7 +881,10 @@ prior_fit = stan_model.sample(data=data)
 ```
 
 ```{python}
-prior_samples = prior_fit.stan_variable("X_rep").astype(int)
+# Drop any non-finite draws (the heavy-tailed pareto(1,1) prior on
+# kappa_dropout occasionally yields a degenerate, all-NaN simulated draw).
+X_rep = prior_fit.stan_variable("X_rep")
+prior_samples = X_rep[np.isfinite(X_rep).all(axis=1)].astype(int)
 
 # Compute prior frequency distribution
 max_purch = 9
@@ -894,7 +894,7 @@ for i in range(prior_samples.shape[0]):
     prior_freq_counts[i] = counts[: max_purch + 1] / data["N"]
 
 mean_frequency = prior_freq_counts.mean(axis=0)
-hdi = az.hdi(prior_freq_counts, hdi_prob=0.89)
+hdi = az.hdi(prior_freq_counts.T, prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
 observed_frequency = observed_counts[: max_purch + 1] / data["N"]
@@ -933,10 +933,9 @@ Now, let's compute the probability of observing $x$ purchases in a time period o
 
 ```{python}
 max_purch = 7
-params = [
-    prior_fit.stan_variable(param).reshape(1, 1, -1)
-    for param in ["r", "alpha", "a", "b"]
-]
+prior_draws = {p: prior_fit.stan_variable(p) for p in ["r", "alpha", "a", "b"]}
+finite = np.all([np.isfinite(v) for v in prior_draws.values()], axis=0)
+params = [prior_draws[p][finite].reshape(1, 1, -1) for p in ["r", "alpha", "a", "b"]]
 
 T_unique, n_t = np.unique(T, return_counts=True)
 
@@ -951,7 +950,7 @@ frequency_counts = (
 )
 
 mean_frequency = np.nanmean(frequency_counts, axis=1)
-hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
+hdi = az.hdi(frequency_counts, prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
 observed_counts_cen = observed_counts[: max_purch + 1]
@@ -1085,7 +1084,8 @@ post_preds = stan_model.sample(data=data)
 
 ```{python}
 posterior = az.from_cmdstanpy(post_preds, posterior_predictive=["X_rep", "t_x_rep"])
-posterior_samples = post_preds.stan_variable("X_rep").astype(int)
+X_rep = post_preds.stan_variable("X_rep")
+posterior_samples = X_rep[np.isfinite(X_rep).all(axis=1)].astype(int)
 
 # Compute frequency distribution
 max_purch = 9
@@ -1096,7 +1096,7 @@ for i in range(posterior_samples.shape[0]):
 
 # Calculate mean and HDI
 mean_frequency = frequency_counts.mean(axis=0)
-hdi = az.hdi(frequency_counts, hdi_prob=0.89)
+hdi = az.hdi(frequency_counts.T, prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
 observed_frequency = observed_counts[: max_purch + 1] / data["N"]
@@ -1135,10 +1135,9 @@ Now, let's compute the probability of observing $x$ purchases in a time period o
 
 ```{python}
 max_purch = 7
-params = [
-    post_preds.stan_variable(param).reshape(1, 1, -1)
-    for param in ["r", "alpha", "a", "b"]
-]
+post_draws = {p: post_preds.stan_variable(p) for p in ["r", "alpha", "a", "b"]}
+finite = np.all([np.isfinite(v) for v in post_draws.values()], axis=0)
+params = [post_draws[p][finite].reshape(1, 1, -1) for p in ["r", "alpha", "a", "b"]]
 
 T_unique, n_t = np.unique(T, return_counts=True)
 
@@ -1153,7 +1152,7 @@ frequency_counts = (
 )
 
 mean_frequency = np.mean(frequency_counts, axis=1)
-hdi = az.hdi(frequency_counts.T, hdi_prob=0.89)
+hdi = az.hdi(frequency_counts, prob=0.89)
 
 observed_counts = np.bincount(p1x.flatten().astype(int), minlength=max_purch + 1)
 observed_counts_cen = observed_counts[: max_purch + 1]

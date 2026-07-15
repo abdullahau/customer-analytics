@@ -22,9 +22,13 @@ __pypackages__/
 # Editor
 .vscode
 
+# Quarto
 /.quarto/
 **/*.quarto_ipynb
+/notebooks/**/*.html
+/notebooks/**/*_files/
 
+# Claude
 .claude
 .claudeignore
 CLAUDE.md

@@ -1403,8 +1403,18 @@ spend_range_alpha_buyers = spend_summary('Alpha', grocery_lf, 1).filter(
 ).collect()
 
 res = one_time_alpha_buyers.with_columns(
-    contains=pl.col('panel_id').is_in(spend_range_alpha_buyers.select('panel_id'))
+    contains=pl.col('panel_id').is_in(
+        spend_range_alpha_buyers.get_column('panel_id')
+    )
 ).select('contains').sum().item()
+
+# res = (
+#     one_time_alpha_buyers.lazy()
+#     .join(spend_range_alpha_buyers.lazy(), on='panel_id', how='semi')
+#     .select(pl.len())
+#     .collect()
+#     .item()
+# )
 
 print(f'There were {one_time_alpha_buyers.count().item(0,'panel_id')} one-time buyers of Alpha brand in Year 1.')
 print(f'{res} of those one-time Alpha buyers spent between [$2, $4).')
@@ -1416,15 +1426,15 @@ print(f'the {res} one-time buyers represent {res / spend_range_alpha_buyers.coun
 
 ```{python}
 spend_range_alpha_buyers.filter(
-    pl.col('panel_id').is_in(one_time_alpha_buyers.select('panel_id'))
+    pl.col('panel_id').is_in(one_time_alpha_buyers.get_column('panel_id'))
 ).select(pl.col('spend').sum()).item()
 ```
 
 ```{python}
 grocery_lf.filter(
     (pl.col('week') <= 52) &
-    (pl.col('panel_id').is_in(spend_range_alpha_buyers.select('panel_id'))) &  # Assuming panel_id is the relevant column
-    (pl.col('panel_id').is_in(one_time_alpha_buyers.select('panel_id'))) &  # Same assumption
+    (pl.col('panel_id').is_in(spend_range_alpha_buyers.get_column('panel_id'))) &
+    (pl.col('panel_id').is_in(one_time_alpha_buyers.get_column('panel_id'))) &
     (pl.col('brand') == 'Alpha')
 ).with_columns(
     ((pl.col('units') * pl.col('price'))).alias('spend')
@@ -1785,11 +1795,11 @@ $$
 $$
 
 ::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
-<img src="/references/linear_interp1.png" width="200"/>
+![](/references/linear_interp1.png){width="200"}
 :::
 
 ::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
-<img src="/references/linear_interp.png" width="200"/>
+![](/references/linear_interp.png){width="200"}
 :::
 
 -   We see that 73.4% ($x_{0}$) of buyers accounted for 45.0% ($y_{0}$) of purchases, and that 82.1% ($x_{1}$) of buyers accounted for 57.5% ($y_{1}$) of purchases. Therefore, when $x$ = 80%, $y$ can be solved in the following way:

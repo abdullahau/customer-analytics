@@ -16,7 +16,7 @@ date: last-modified
 
 format:
   html:
-    theme: cosmo
+    theme: [cosmo, assets/quarto-style/custom.scss]
     css: assets/quarto-style/style.css
     highlight-style: atom-one
     mainfont: Palatino

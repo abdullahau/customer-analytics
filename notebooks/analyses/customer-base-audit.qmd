@@ -1,0 +1,13 @@
+---
+title: The Customer-Base Audit
+---
+
+## Imports
+
+```{python}
+import pandas as pd
+
+pd.read_csv("data/")
+```
+
+

@@ -1,0 +1,11 @@
+---
+title: A Dynamic Changepoint Model for New Product Sales Forecasting
+jupyter: python3
+---
+
+**Source**: [A Dynamic Changepoint Model for New Product Sales Forecasting](https://www.jstor.org/stable/30036656)
+
+```{python}
+import pandas as pd
+```
+

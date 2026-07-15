@@ -1,0 +1,45 @@
+project:
+  type: default
+  output-dir: docs
+  # Execute every document's code with the working directory set to the project
+  # root, so root-relative paths in code cells resolve regardless of where the
+  # .qmd lives in the tree (e.g. pd.read_csv("data/..."), stan_file="stan/src/...").
+  execute-dir: project
+  render:
+    - index.qmd
+    - notebooks/**/*.qmd
+
+# Shared document metadata — applied to every rendered document so individual
+# .qmd files only need to declare their own `title` (and the rare override).
+author: Abdullah Mahmood
+date: last-modified
+
+format:
+  html:
+    theme: cosmo
+    css: assets/quarto-style/style.css
+    highlight-style: atom-one
+    mainfont: Palatino
+    fontcolor: black
+    monobackgroundcolor: white
+    monofont: Menlo, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace
+    fontsize: 13pt
+    linestretch: 1.4
+    number-sections: true
+    number-depth: 5
+    toc: true
+    toc-location: right
+    toc-depth: 5
+    code-fold: true
+    code-copy: true
+    cap-location: bottom
+    format-links: false
+    embed-resources: true
+    anchor-sections: true
+    code-links:
+      - text: GitHub Repo
+        icon: github
+        href: https://github.com/abdullahau/customer-analytics/
+    html-math-method:
+      method: mathjax
+      url: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

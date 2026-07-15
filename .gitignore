@@ -21,3 +21,6 @@ __pypackages__/
 
 # Editor
 .vscode
+
+/.quarto/
+**/*.quarto_ipynb

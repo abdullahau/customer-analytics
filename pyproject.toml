@@ -1,13 +1,14 @@
 [project]
 name = "customer-analytics"
 version = "0.1.0"
-description = "Add your description here"
+description = "A research library of customer-base (BTYD) analytics models and essays"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "altair>=6.2.2",
     "arviz>=1.2.0",
     "bridgestan>=2.9.0",
+    "cmdstanpy>=1.2.5",
     "great-tables>=0.22.0",
     "ipykernel>=7.3.0",
     "lifetimes>=0.11.3",
@@ -21,6 +22,16 @@ dependencies = [
     "statsmodels>=0.14.6",
     "xarray>=2026.7.0",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The shared Python helpers live under lib/ but are imported as top-level
+# packages (`from utils import ...`, `from models import ...`). Installing the
+# project (uv sync, editable) puts them on sys.path regardless of CWD.
+[tool.hatch.build.targets.wheel]
+packages = ["lib/utils", "lib/models"]
 
 [tool.ruff]
 line-length = 88

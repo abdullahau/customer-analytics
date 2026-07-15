@@ -1,0 +1,65 @@
+---
+title: Customer-Base Analytics
+format:
+  html:
+    number-sections: false
+---
+
+A research library of **customer-base analytics** models — the "buy-till-you-die"
+(BTYD) / probability-modelling tradition of Fader, Hardie, and related work.
+Each page below is a self-contained essay mixing mathematical exposition with
+executable Python.
+
+## Pages
+
+### Models
+
+#### Acquisition & New-Product Forecasting
+
+- [Depth-of-Repeat Model — Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/depth-of-repeat)
+- [Sales Forecast — Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/finite-mixture-bg-sales-forecast)
+- [A Dynamic Changepoint Model for New Product Sales Forecasting](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/dynamic-changepoint-new-product)
+
+#### Retention (Contractual / Discrete-Time)
+
+- [Beta-Geometric (BG) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-geometric)
+- [Beta-discrete-Weibull (BdW) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-discrete-weibull)
+- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/subscription-retention)
+
+#### Repeat Purchasing (Noncontractual)
+
+- [NBD Model Variants — Overview](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-overview)
+- [BG/NBD Model](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd)
+- [BG/NBD Model — Stan Implementation](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd-stan)
+- [NBD/OTB Model — NBD with One-Time Buyers](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-otb)
+- [BG/BB Model — Discrete-Time, Noncontractual Setting](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-bb)
+- [Pareto/NBD Model (WIP)](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/pareto-nbd)
+
+#### Spend / Monetary Value
+
+- [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/notebooks/models/spend/gamma-gamma)
+
+#### Combined CLV
+
+- [RFM and CLV: Using Iso-Value Curves for Customer Base Analysis](https://abdullahau.github.io/customer-analytics/notebooks/models/clv/rfm-and-clv)
+
+### Customer-Base Auditing & Analyses
+
+- [The Customer-Base Audit](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-base-audit)
+- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-panel-data)
+- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-transaction-log)
+- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-acquisition-cost)
+- [RFM: Recency, Frequency, Monetary Value Summary](https://abdullahau.github.io/customer-analytics/notebooks/analyses/rfm-summary)
+- [Estimating Concentration in Champagne Purchasing](https://abdullahau.github.io/customer-analytics/notebooks/analyses/estimating-purchasing-concentration)
+
+### Customer-Based Corporate Valuation (CBCV)
+
+- [Customer-Based Corporate Valuation for Subscription-Based Businesses](https://abdullahau.github.io/customer-analytics/notebooks/valuation/cbcv-subscription-based)
+
+### Data Preparation
+
+- [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/notebooks/data-prep/cdnow-dataset)
+
+## Source Files
+
+GitHub repository: [https://github.com/abdullahau/customer-analytics](https://github.com/abdullahau/customer-analytics)

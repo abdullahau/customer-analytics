@@ -24,3 +24,7 @@ __pypackages__/
 
 /.quarto/
 **/*.quarto_ipynb
+
+.claude
+.claudeignore
+CLAUDE.md

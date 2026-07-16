@@ -114,7 +114,7 @@ More formally, the BG/NBD model is based on the following five assumptions (the 
 
 Consider a customer who had $x$ transactions in the period $(0, T]$ with the transactions occurring at $t_{1}, t_{2}, \ldots, t_{x}$ :
 
-![](/references/recency_frequency_timeline.jpg){fig-align="center" width="342"}
+![](/references/figures/recency_frequency_timeline.jpg){fig-align="center" width="342"}
 
 We derive the individual-level likelihood function in the following manner:
 

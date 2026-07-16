@@ -27,13 +27,13 @@ A consumer panel is formed by selecting a representative sample of individuals o
 
 For a given product category, we can construct a dataset that reports the timing of each purchase, along with details of the product purchased. A stylized representation of this is given in the figure (Purchase Histories: Total Category) below for a total of $n$ households, in which we consider an observation period starting with the launch of a new product and ending at time $t_{\text {end }}$. We let $\diamond$ denote a purchase of the new product and $\times$ denote the purchase of any other product in the category.
 
-![](/references/Depth-of-Repeat/Purchase Histories-Total Category.png){fig-align="center" width="550"}
+![](/references/tutorials/depth-of-repeat/Purchase Histories-Total Category.png){fig-align="center" width="550"}
 
 We see that HH 1 made three category purchases over the observation period but never purchased the new product. HH 2 made seven category purchases; the third category purchase represents a trial purchase of the new product, and no repeat purchasing activity was observed over the remainder of the observation period. HH 3 made a trial purchase of the new product and two repeat purchases. And so on.
 
 In many analysis situations, where we are focusing on a particular product, purchase records not associated with the focal product are removed to yield a simpler (and smaller) dataset. A stylized representation of this is given in the figure (Purchase Histories: New Product Only) below. As HH 1 never bought the new product, there is no explicit record of this household in the resulting dataset.
 
-![](/references/Depth-of-Repeat/Purchase Histories-New Product Only.png){fig-align="center" width="550"}
+![](/references/tutorials/depth-of-repeat/Purchase Histories-New Product Only.png){fig-align="center" width="550"}
 
 ## Imports
 

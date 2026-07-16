@@ -705,11 +705,11 @@ In order to analyse buyer behaviour in terms of transactions, we need to know th
 
 Result of the intermediate prep should produce a dataset that summarizes transaction 844 by panellist 3102016 as 1 occasion of Alpha brand purchase and 1 occasion of Delta brand purchase:
 
-![](/references/intermediate-data-prep.png){fig-align="center" width="734"}
+![](/references/figures/intermediate-data-prep.png){fig-align="center" width="734"}
 
 ### Panellist-Level Data Preparation
 
-![](/references/Consumer-Panel-Data-Relationship.png){fig-align="center" width="605"}
+![](/references/figures/Consumer-Panel-Data-Relationship.png){fig-align="center" width="605"}
 
 **One row per transaction**, with a binary indicator of whether or not each brand was purchased.
 
@@ -1787,11 +1787,11 @@ $$
 $$
 
 ::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
-![](/references/linear_interp1.png){width="200"}
+![](/references/figures/linear_interp1.png){width="200"}
 :::
 
 ::: {style="max-width:200px;margin-left: auto; margin-right: auto;"}
-![](/references/linear_interp.png){width="200"}
+![](/references/figures/linear_interp.png){width="200"}
 :::
 
 -   We see that 73.4% ($x_{0}$) of buyers accounted for 45.0% ($y_{0}$) of purchases, and that 82.1% ($x_{1}$) of buyers accounted for 57.5% ($y_{1}$) of purchases. Therefore, when $x$ = 80%, $y$ can be solved in the following way:

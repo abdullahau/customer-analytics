@@ -45,7 +45,7 @@ Consider a company with a subscription-based business model. 1000 customers are 
 -   How many customers will “survive” to Year 6, 7, . . . , 13? 
 -   What will the retention rates for this cohort look like for the next 8 years?
 
-![](/references/timeline.png){fig-align="center" width="550"}
+![](/references/figures/timeline.png){fig-align="center" width="550"}
 
 The **survivor function** $S(t)$ is the proportion of the cohort that continue as a customer beyond $t$.
 
@@ -691,7 +691,7 @@ plt.gca().spines[['right', 'top']].set_visible(False)
 
 **Visualizing Parameter Estimates**
 
-![](/references/visualize-parameter-estimate-1.png){fig-align="center" width="350"}
+![](/references/figures/visualize-parameter-estimate-1.png){fig-align="center" width="350"}
 
 - Consider the following story of customer behavior:
     1.  At the end of each period, an individual renews his contract with (constant and unobserved) probability $1−θ$.
@@ -711,7 +711,7 @@ $$
     \end{cases}
 $$
 
-![](/references/visualize-parameter-estimate-2.png){fig-align="center" width="350"}
+![](/references/figures/visualize-parameter-estimate-2.png){fig-align="center" width="350"}
 
 $$
 P(Θ=0.167)+P(Θ=0.500)+P(Θ=0.833)=1
@@ -742,7 +742,7 @@ $$
     \end{cases}
 $$
 
-![](/references/visualize-parameter-estimate-3.png){fig-align="center" width="350"}
+![](/references/figures/visualize-parameter-estimate-3.png){fig-align="center" width="350"}
 
 $$
 P(Θ = 0.05) + P(Θ = 0.15) + \cdots +P(Θ = 0.95) = 1
@@ -785,7 +785,7 @@ Here, $B(\alpha, \beta)$ is the beta function and not the beta distribution.
 
 In order to increase flexibility without sacrificing parsimony (unlike increasing the number of discrete segments), we let the number of sub-intervals go to infinity and represent the probabilities in terms of a simple continuous function $g(θ)$ defined over $(0, 1)$:
 
-![](/references/beta-distribution.png){fig-align="center" width="350"}
+![](/references/figures/beta-distribution.png){fig-align="center" width="350"}
 
 - The probability of getting a specific value of $θ$ is infinitesimally small.
 - Discrete $\rightarrow$ continuous $\Rightarrow\Sigma \rightarrow \int$
@@ -824,7 +824,7 @@ $$
 
 **Four General Shapes of the Beta Distribution**
 
-![](/references/four-beta-distributions.png){fig-align="center" width="350"}
+![](/references/figures/four-beta-distributions.png){fig-align="center" width="350"}
 
 ```{python}
 from scipy.stats import beta

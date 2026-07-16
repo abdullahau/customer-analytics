@@ -64,7 +64,7 @@ $$
 
 ### A Data Structure for Subscription-Based Businesses
 
-![](/references/num_customer_matrix.png){fig-align="center" width="350"}
+![](/references/figures/num_customer_matrix.png){fig-align="center" width="350"}
 
 
 - $R(m)$ -> Monthly revenue

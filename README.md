@@ -4,7 +4,7 @@ A research library of **probability models for customer-base analysis** — the 
 
 Each topic is a self-contained [Quarto](https://quarto.org) essay (mathematical exposition + executable Python) published to GitHub Pages: [**https://abdullahau.github.io/customer-analytics/**](https://abdullahau.github.io/customer-analytics/){.uri}
 
-> **New here?** Read [The big idea](#the-big-idea-probability-models-for-buyer-behavior) for the one-page mental model, skim [the taxonomy](#dimension-1--the-firmcustomer-relationship-2×2-taxonomy) to see how the models relate, then jump to [Getting started](#getting-started) to run the code. This is **not** a "buy-till-you-die (BTYD)"-only project — BTYD (Pareto/NBD, BG/NBD) is just **one corner** of the space covered here.
+> **New here?** Read [The big idea](#the-big-idea-probability-models-for-buyer-behavior) for the one-page mental model, skim [the taxonomy](#dimension-1--the-firmcustomer-relationship-2×2-taxonomy) to see how the models relate, then jump to [Getting started](#getting-started) to run the code.
 
 ------------------------------------------------------------------------
 
@@ -40,7 +40,7 @@ In **non-contractual** settings the modelling challenge is telling a dead custom
 Every model is assembled from — and usually **integrates** — three process types, each an individual-level model paired with a heterogeneity distribution:
 
 | Block | Question | Individual model → with heterogeneity |
-|------------------|------------------|-------------------------------------|
+|------------------|------------------|------------------------------------|
 | **Counting** | how many? | Poisson → **NBD** (gamma); Bernoulli → **beta-Binomial** (beta) |
 | **Timing** | when / how long alive? | exponential → **Pareto / exp-gamma**; geometric → **sBG**; Weibull → **Weibull-gamma / BdW** |
 | **Choice** | whether / which / how much? | Bernoulli/binomial (buy-vs-not, brand, one-time-buyer); spend → **Gamma-Gamma** |
@@ -69,7 +69,7 @@ The same handful of moves reappears in every essay:
 Rendered pages are linked from [`index.qmd`](index.qmd); sources live under [`notebooks/`](notebooks/), organized by purpose.
 
 | Essay (`notebooks/…`) | Taxonomy cell | Building blocks | The idea |
-|-----------------|-----------------|-----------------|----------------------|
+|-----------------|-----------------|-----------------|---------------------|
 | `models/purchasing/nbd-overview` | non-contractual, cont. | counting | Poisson buying + gamma heterogeneity; no death. Baseline for `E[X(t)]`. |
 | `models/purchasing/nbd-otb` | non-contractual, cont. | counting + choice | NBD plus a "one-time buyer" spike-at-zero segment. |
 | `models/purchasing/bg-nbd` (+ `-stan`) | non-contractual, cont. | counting + timing | Dropout *after a purchase* (beta-geometric). Easy MLE (even Excel). P(alive), `E[Y(t)｜x,tₓ,T]`. |
@@ -87,15 +87,29 @@ Rendered pages are linked from [`index.qmd`](index.qmd); sources live under [`no
 
 **Descriptive analyses** (`notebooks/analyses/`) — the customer-base audit and buyer-behavior summaries (RFM, purchasing concentration / Lorenz, CAC) that precede and motivate the models (see below). **Data prep** (`notebooks/data-prep/`) builds the CDNOW dataset used throughout.
 
-**Repeat purchasing — noncontractual** (`notebooks/models/purchasing/`) - **NBD overview** — the Poisson-gamma counting model; foundation for everything. - **NBD/OTB** — NBD with a "one-time buyer" (spike-at-zero) segment. - **BG/NBD** (+ a **Stan/Bayesian** version) — the easy-to-estimate alternative to Pareto/NBD; dropout modelled as beta-geometric after each purchase. - **Pareto/NBD** — the original "counting your customers" model (exponential-gamma dropout at any time). - **BG/BB** — the discrete-time analog (beta-Bernoulli buying + beta-geometric death), e.g. annual donation incidence.
+**Repeat purchasing — non-contractual** (`notebooks/models/purchasing/`) 
+- **NBD overview** — the Poisson-gamma counting model; foundation for everything. 
+- **NBD/OTB** — NBD with a "one-time buyer" (spike-at-zero) segment. 
+- **BG/NBD** (+ a **Stan/Bayesian** version) — the easy-to-estimate alternative to Pareto/NBD; dropout modeled as beta-geometric after each purchase. 
+- **Pareto/NBD** — the original "counting your customers" model (exponential-gamma dropout at any time). 
+- **BG/BB** — the discrete-time analog (beta-Bernoulli buying + beta-geometric death), e.g. annual donation incidence.
 
-**Retention — contractual, discrete-time** (`notebooks/models/retention/`) - **Beta-geometric (sBG)** — constant individual retention prob. + beta heterogeneity; explains why *aggregate* retention rises with tenure. Plus an interactive [marimo](https://marimo.io) app, `sBG-Model.py`. - **Beta-discrete-Weibull (BdW)** — generalises sBG to allow duration dependence. - **Subscription retention** — discrete-time contractual retention applied.
+**Retention — contractual, discrete-time** (`notebooks/models/retention/`) 
+- **Beta-geometric (sBG)** — constant individual retention prob. + beta heterogeneity; explains why *aggregate* retention rises with tenure. Plus an interactive [marimo](https://marimo.io) app, `sBG-Model.py`. 
+- **Beta-discrete-Weibull (BdW)** — generalizes sBG to allow duration dependence. 
+- **Subscription retention** — discrete-time contractual retention applied.
 
-**Acquisition & new-product forecasting** (`notebooks/models/acquisition/`) - **Depth-of-repeat** — decompose new-product sales into **trial** + **repeat** (by depth-of-repeat level). - **Finite-mixture BG sales forecast** — unit-sales forecasting via a beta-geometric finite mixture. - **Dynamic changepoint** — a multiple-event timing model whose buying-rate *changepoints* evolve as the product moves from "new" to "established" (Fader–Hardie–Huang; the "Kiwi Bubbles" test market).
+**Acquisition & new-product forecasting** (`notebooks/models/acquisition/`) 
+- **Depth-of-repeat** — decompose new-product sales into **trial** + **repeat** (by depth-of-repeat level). 
+- **Finite-mixture BG sales forecast** — unit-sales forecasting via a beta-geometric finite mixture. 
+- **Dynamic changepoint** — a multiple-event timing model whose buying-rate *changepoints* evolve as the product moves from "new" to "established" (Fader–Hardie–Huang; the "Kiwi Bubbles" test market).
 
-**Spend & CLV** (`notebooks/models/spend/`, `notebooks/models/clv/`) - **Gamma-Gamma** — monetary value / spend-per-transaction (with regression-to-the-mean). - **RFM & CLV** — iso-value curves linking recency/frequency/monetary to CLV.
+**Spend & CLV** (`notebooks/models/spend/`, `notebooks/models/clv/`) 
+- **Gamma-Gamma** — monetary value / spend-per-transaction (with regression-to-the-mean). 
+- **RFM & CLV** — iso-value curves linking recency/frequency/monetary to CLV.
 
-**Valuation** (`notebooks/valuation/`) — **CBCV** for subscription businesses (DISH / SiriusXM style): fit acquisition + retention + spend sub-models to publicly-disclosed customer data and roll them into firm value.
+**Valuation** (`notebooks/valuation/`) 
+— **CBCV** for subscription businesses (DISH / SiriusXM style): fit acquisition + retention + spend sub-models to publicly-disclosed customer data and roll them into firm value.
 
 ------------------------------------------------------------------------
 
@@ -171,7 +185,7 @@ A full render executes every notebook, including the Stan/Bayesian fits, so it i
 ### Repository structure (short)
 
 | Path | What |
-|----------------------|--------------------------------------------------|
+|-----------------------|-------------------------------------------------|
 | `notebooks/` | the essays — `analyses/`, `models/{acquisition,retention,purchasing,spend,clv}/`, `valuation/`, `data-prep/` |
 | `lib/utils`, `lib/models` | importable Python helpers (`from utils import …`) — RFM builder, data loaders, Stan/BridgeStan wrappers, plotting |
 | `stan/src`, `stan/implementations` | first-party Stan models; third-party reference implementations |

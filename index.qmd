@@ -6,69 +6,152 @@ format:
 ---
 
 A research library of **probability models for customer-base analysis** — the
-Fader–Hardie tradition of parsimonious stochastic models that treat observed
-buying as the outcome of latent behavioural characteristics, then use them to
-project future purchasing and customer lifetime value (CLV).
+Fader–Hardie tradition of parsimonious stochastic models that treat a customer's
+observed buying as the visible output of a latent behavioural process, and use it
+to project future purchasing, retention, and **customer lifetime value (CLV)**.
 
-The models are organised along **two dimensions of the firm–customer
-relationship** — whether it is *contractual* or *noncontractual* (i.e. whether
-customer churn is observed or must be inferred), and whether transaction
-opportunities are *continuous* or *discrete*. Within each setting, a model is
-assembled from three building blocks — **counting** (how many transactions),
-**timing** (when / how long a customer stays alive), and **choice** (whether /
-which / how much) — often integrated to jointly estimate the underlying
-parameters. Each page below is a self-contained essay mixing mathematical
-exposition with executable Python.
+Each page below is a self-contained essay mixing mathematical exposition with
+executable Python.
+
+## The big idea
+
+We only ever get a *foggy window* onto a customer's true tendencies: someone who
+bought twice last year is not necessarily a "two per year" buyer. So rather than
+extrapolating the observed numbers, we model the **latent process** that generated
+them, from two ingredients:
+
+1. **An individual-level model** for one customer's behaviour given latent traits
+   $\theta$ — Poisson (how many purchases), exponential/geometric (how long until
+   they lapse), Bernoulli (buy vs. not).
+2. **A mixing distribution** (gamma, beta, …) describing how $\theta$ is spread
+   across the customer base — i.e. **heterogeneity**.
+
+Together they give a **mixture model** for a randomly chosen customer; Bayes'
+theorem then turns any customer's observed history into forward-looking inferences
+— **P(alive), expected future transactions, residual CLV** — typically from nothing
+more than **RFM** (recency, frequency, monetary value), which are the *sufficient
+statistics* for these models. Formally $\text{past} = f(\theta)$ and
+$\text{future} = f(\theta)$, in contrast to the regression / data-mining
+$\text{future} = f(\text{past})$ approach.
+
+A recurring lesson: many "dynamics" people try to model — a slowing aggregate
+purchase rate, retention that *rises* with tenure — are **not** individual-level
+effects at all. They are **sorting effects** that fall out of heterogeneity, as
+low-$\theta$ customers survive longer and come to dominate the surviving
+population ("the ruse of heterogeneity"). They should not be "fixed" with ad-hoc
+time trends.
+
+## Dimension 1 — the firm–customer relationship
+
+Two questions classify any customer base and **determine which model is even
+admissible**: is churn *observed* (contractual) or must it be inferred
+(noncontractual)? And can transactions happen *any time* (continuous) or only at
+*fixed epochs* (discrete)? The contractual/noncontractual boundary is
+**fundamental — a model built for one side must never be applied to the other.**
+
+|                              | **Noncontractual** (churn latent) | **Contractual** (churn observed) |
+|------------------------------|-----------------------------------|----------------------------------|
+| **Continuous** (any time)    | grocery, hotel, mail-order → [NBD](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-overview), [NBD/OTB](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-otb), [BG/NBD](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd), [Pareto/NBD](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/pareto-nbd) | credit card, mobile, utilities → exponential-gamma, Weibull-gamma (see [CBCV](https://abdullahau.github.io/customer-analytics/notebooks/valuation/cbcv-subscription-based)) |
+| **Discrete** (fixed epochs)  | event attendance, charity drives → [BG/BB](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-bb) | subscriptions, insurance, gym → [sBG](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-geometric), [BdW](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-discrete-weibull) |
+
+In **noncontractual** settings the modelling challenge is telling a dead customer
+apart from one in a long hiatus ("silent attrition"). In **contractual** settings
+churn is known, so the focus shifts to **duration / retention** and projecting the
+survivor curve.
+
+## Dimension 2 — the building blocks
+
+Within each setting, a model is assembled from — and usually **integrates** —
+three process types, each an individual-level model paired with a heterogeneity
+distribution:
+
+| Block | Question | Individual model → with heterogeneity |
+|-------|----------|---------------------------------------|
+| **Counting** | how many? | Poisson → **NBD** (gamma); Bernoulli → **beta-Binomial** (beta) |
+| **Timing** | when / how long alive? | exponential → **Pareto / exp-gamma**; geometric → **sBG**; Weibull → **Weibull-gamma / BdW** |
+| **Choice** | whether / which / how much? | Bernoulli/binomial (buy-vs-not, brand, one-time-buyer); spend → **Gamma-Gamma** |
+
+**Counting + timing** gives a purchasing process *and* an alive/death process
+(Pareto/NBD, BG/NBD, BG/BB). **Counting + choice** gives brand purchasing and the
+NBD/OTB one-time-buyer split. **Counting + counting** gives purchase volume
+(# transactions × units/transaction). Layer a **spend sub-model** (Gamma-Gamma) on
+a purchasing model and you get **CLV = margin × revenue/transaction × DET**
+(discounted expected transactions). Roll **acquisition + retention + spend**
+together and you get firm-level **customer-based corporate valuation (CBCV)**.
+
+## The recurring math
+
+The same handful of moves reappears in nearly every essay:
+
+- **Mixture = individual model integrated over heterogeneity.** Every closed form
+  comes from $\int P(\text{data} \mid \theta)\, g(\theta)\, d\theta$: Poisson ×
+  gamma → NBD; geometric × beta → sBG; binomial × beta → beta-Binomial;
+  exponential × gamma → Pareto.
+- **Forward recursions** make the models spreadsheet-cheap. NBD:
+  $P(X=x) = \frac{r+x-1}{x(\alpha+1)} P(X=x-1)$ from $P(X=0) = (\frac{\alpha}{\alpha+1})^r$.
+  sBG: $P(T=t) = \frac{\beta+t-2}{\alpha+\beta+t-1} P(T=t-1)$ from $P(T=1) = \frac{\alpha}{\alpha+\beta}$.
+- **Estimation** by **maximum likelihood** on the frequency counts (often just
+  Excel Solver), or **Bayesian** (Stan / BridgeStan) for the `-stan` essays.
+- **Individual-level inference via Bayes.** The posterior
+  $g(\theta \mid \text{data}) \propto P(\text{data} \mid \theta) g(\theta)$ yields
+  P(alive), expected future transactions, and — for spend/response —
+  **regression-to-the-mean**: a precision-weighted blend of the customer's own
+  history and the population mean.
+- **Goodness of fit** via $\chi^2 = \sum (f_i - np_i)^2 / np_i$ against the
+  observed histogram.
 
 ## Pages
 
 ### Models
 
-#### Acquisition & New-Product Forecasting
+#### Repeat Purchasing (Noncontractual)
 
-- [Depth-of-Repeat Model — Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/depth-of-repeat)
-- [Sales Forecast — Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/finite-mixture-bg-sales-forecast)
-- [A Dynamic Changepoint Model for New Product Sales Forecasting](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/dynamic-changepoint-new-product)
+- [NBD Model Variants — Overview](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-overview) — Poisson buying + gamma heterogeneity, no death; the foundation for everything.
+- [BG/NBD Model](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd) — dropout *after a purchase* (beta-geometric); easy MLE, P(alive), $E[Y(t) \mid x, t_x, T]$.
+- [BG/NBD Model — Stan Implementation](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd-stan) — the same model fit Bayesianly via Stan/BridgeStan.
+- [NBD/OTB Model — NBD with One-Time Buyers](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-otb) — NBD plus a "one-time buyer" spike-at-zero segment.
+- [BG/BB Model — Discrete-Time, Noncontractual Setting](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-bb) — the discrete analog of Pareto/NBD (beta-Bernoulli buying + beta-geometric death); donation incidence.
+- [Pareto/NBD Model (WIP)](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/pareto-nbd) — dropout at *any* time (exponential-gamma); the original "counting your customers" model.
 
 #### Retention (Contractual / Discrete-Time)
 
-- [Beta-Geometric (BG) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-geometric)
-- [Beta-discrete-Weibull (BdW) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-discrete-weibull)
-- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/subscription-retention)
+- [Beta-Geometric (BG) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-geometric) — constant individual retention + beta heterogeneity; why *aggregate* retention rises with tenure.
+- [Beta-discrete-Weibull (BdW) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-discrete-weibull) — sBG generalised to allow duration dependence.
+- [Discrete-Time, Contractual Setting Retention Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/subscription-retention) — discrete-time contractual retention applied.
 
-#### Repeat Purchasing (Noncontractual)
+#### Acquisition & New-Product Forecasting
 
-- [NBD Model Variants — Overview](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-overview)
-- [BG/NBD Model](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd)
-- [BG/NBD Model — Stan Implementation](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-nbd-stan)
-- [NBD/OTB Model — NBD with One-Time Buyers](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/nbd-otb)
-- [BG/BB Model — Discrete-Time, Noncontractual Setting](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-bb)
-- [Pareto/NBD Model (WIP)](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/pareto-nbd)
+- [Depth-of-Repeat Model — Forecasting Aggregate Repeat-Buying](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/depth-of-repeat) — decompose new-product sales into **trial** $R(0)$ + **repeat** $R(J)$ by depth of repeat.
+- [Sales Forecast — Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/finite-mixture-bg-sales-forecast) — unit-sales forecasting via a beta-geometric finite mixture.
+- [A Dynamic Changepoint Model for New Product Sales Forecasting](https://abdullahau.github.io/customer-analytics/notebooks/models/acquisition/dynamic-changepoint-new-product) — buying-rate **changepoints** decay as a product moves "new" → "established" (Kiwi Bubbles).
 
 #### Spend / Monetary Value
 
-- [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/notebooks/models/spend/gamma-gamma)
+- [Gamma-Gamma Model of Monetary Value](https://abdullahau.github.io/customer-analytics/notebooks/models/spend/gamma-gamma) — spend per transaction, with regression-to-the-mean on $m_x$.
 
 #### Combined CLV
 
-- [RFM and CLV: Using Iso-Value Curves for Customer Base Analysis](https://abdullahau.github.io/customer-analytics/notebooks/models/clv/rfm-and-clv)
+- [RFM and CLV: Using Iso-Value Curves for Customer Base Analysis](https://abdullahau.github.io/customer-analytics/notebooks/models/clv/rfm-and-clv) — **CLV = margin × rev/txn × DET** (Pareto/NBD + gamma-gamma); iso-value curves across the recency/frequency plane.
 
 ### Customer-Base Auditing & Analyses
 
-- [The Customer-Base Audit](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-base-audit)
-- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-panel-data)
-- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-transaction-log)
-- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-acquisition-cost)
-- [RFM: Recency, Frequency, Monetary Value Summary](https://abdullahau.github.io/customer-analytics/notebooks/analyses/rfm-summary)
-- [Estimating Concentration in Champagne Purchasing](https://abdullahau.github.io/customer-analytics/notebooks/analyses/estimating-purchasing-concentration)
+Descriptive work that precedes and motivates the models — *describe* the customer
+base before fitting anything to it.
+
+- [The Customer-Base Audit](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-base-audit) — the full audit: growth, unit economics, retention, heterogeneity, cohorted sales (the "C3").
+- [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-panel-data) — penetration, buying rate, and the summaries panel data supports.
+- [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-transaction-log) — the same summaries from a raw transaction log.
+- [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-acquisition-cost) — CAC from marketing spend and acquisition counts.
+- [RFM: Recency, Frequency, Monetary Value Summary](https://abdullahau.github.io/customer-analytics/notebooks/analyses/rfm-summary) — building the $(x, t_x, T)$ sufficient statistics the models consume.
+- [Estimating Concentration in Champagne Purchasing](https://abdullahau.github.io/customer-analytics/notebooks/analyses/estimating-purchasing-concentration) — customer concentration and the Lorenz / "Pareto" chart.
 
 ### Customer-Based Corporate Valuation (CBCV)
 
-- [Customer-Based Corporate Valuation for Subscription-Based Businesses](https://abdullahau.github.io/customer-analytics/notebooks/valuation/cbcv-subscription-based)
+- [Customer-Based Corporate Valuation for Subscription-Based Businesses](https://abdullahau.github.io/customer-analytics/notebooks/valuation/cbcv-subscription-based) — roll acquisition (Weibull-gamma), retention (Weibull-gamma PH) and ARPU into a DCF → firm value; fit to public ADD/LOSS/END/REV (DISH, SiriusXM).
 
 ### Data Preparation
 
-- [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/notebooks/data-prep/cdnow-dataset)
+- [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/notebooks/data-prep/cdnow-dataset) — building the CDNOW dataset used throughout.
 
 ## Source Files
 

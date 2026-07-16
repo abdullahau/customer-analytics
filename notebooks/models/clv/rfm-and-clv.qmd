@@ -64,51 +64,50 @@ plot_data = (
     .fill_null(0)
 )
 
-Y = np.arange(39) + 1
-X = np.arange(8)
-Z = plot_data[:, 1:].to_numpy().T / 100
-Z = np.where(X != 0, Z, 0)
+X = np.arange(39) + 1                    # recency
+Y = np.arange(8)                         # frequency
+Z = plot_data[:, 1:].to_numpy().T / 100  # spend  
+Z[:, 0] = 0
+```
 
+```{python}
 # 3D Plot
 fig, ax = plt.subplots(figsize=(10, 7), dpi=100, subplot_kw={"projection": "3d"})
 
-for i in range(8):
+for Yi in range(8):
     ax.fill_between(
-        i, Y, Z[:, i], i, Y, 0, facecolors="white", edgecolor="black", linewidth=0.5
+        X, Yi, Z[:, Yi], X, Yi, 0, facecolors="white", edgecolor="black", linewidth=0.5
     )
 
-ax.set_xlabel("Frequency ($x$)")
-ax.set_ylabel("Recency ($t_{x}$)")
+ax.set_xlabel("Recency ($t_{x}$)")
+ax.set_ylabel("Frequency ($x$)")
 ax.zaxis.set_rotate_label(False)
 ax.set_zlabel("Average Total Spend\nin Weeks 40–78 ($)", rotation=92)
-ax.zaxis.labelpad = 7
-ax.view_init(elev=25, azim=-40, roll=0)
+ax.zaxis.labelpad = 8
 
-ax.set_xlim(7, 0)
-ax.set_ylim(0, 40)
-ax.set_zlim(-5, 400)
+ax.view_init(elev=25, azim=-135, roll=0)
+ax.set_xlim(0, 40)     # recency on x
+ax.set_ylim(0, 7)      # frequency on y
+ax.set_zlim(-5, 400)   # spend on z
 
-ax.grid(True, linestyle=":", color="lightgray")
+for a in (ax.xaxis, ax.yaxis, ax.zaxis):
+    a.pane.fill = False
+    a._axinfo["grid"].update(linestyle=(0, (1, 5)), color="gray")
+ax.grid(True)
 
-ax.xaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.yaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.zaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
+ax.set_box_aspect(None, zoom=0.82)
+ax.set_yticks(Y, labels=[str(i) if i < 7 else "7+" for i in range(8)])
 
-ax.xaxis.pane.fill = False
-ax.yaxis.pane.fill = False
-ax.zaxis.pane.fill = False
-
-ax.set_box_aspect(None, zoom=0.84)
-ax.zaxis._axinfo["juggled"] = (1, 2, 0)
-plt.xticks(X, labels=[str(i) if i < 7 else "7+" for i in range(8)])
 plt.suptitle(
     "Average Total Spend in Weeks 40–78 by Recency and\nFrequency in Weeks 1–39", y=0.86
 )
 plt.show();
+```
 
+```{python}
 # Contour Plot
 plt.figure(figsize=(7, 6), dpi=100)
-cs = plt.contour(Y, X, Z.T, levels=[50, 100, 200, 300], linewidths=0.75, colors="black")
+cs = plt.contour(X, Y, Z.T, levels=[50, 100, 200, 300], linewidths=0.75, colors="black")
 plt.clabel(cs, fontsize=8)
 plt.xlabel("Recency ($t_{x}$)")
 plt.ylabel("Frequency ($x$)")
@@ -311,7 +310,7 @@ def paretonbd_pmf(f_x, t, r, alpha, s, beta_param):
 def paretonbd_E_X_t(t, r, alpha, s, beta_param):
     """
     E[X(t) | r, alpha, s, beta], the expected number of transactions in a time period of length t
-    central to computing the e thxpected transaction volume fore whole customer base over time
+    central to computing the expected transaction volume fore whole customer base over time
     """
     return (
         r
@@ -925,48 +924,48 @@ An annual discount rate of $(100 × d)$% is equivalent to a continuously compoun
 ## Creating and Analyzing Iso-value Curves
 
 ```{python}
-t_x_range = np.arange(79).reshape(-1, 1)
-x_range = np.arange(15)
+t_x_range = np.arange(79).reshape(-1, 1) # Recency
+x_range = np.arange(15)                  # Frequency
 T_constant = (2 * 273 - 1) / 7
-discount_rate = 0.15  # annual discount rate
-delta = np.log(1 + discount_rate) / 52  # continuously compounded rate
+discount_rate = 0.15                     # annual discount rate
+delta = np.log(1 + discount_rate) / 52   # continuously compounded rate
 
 DET_Z = DET(
     x_range, t_x_range, T_constant, delta, r_pareto, alpha_pareto, s, beta_param
 )
 DET_Z = np.where(x_range != 0, DET_Z, 0)
+```
 
+```{python}
 # 3D “waterfall” plot
-fig, ax = plt.subplots(figsize=(6, 6), dpi=200, subplot_kw={"projection": "3d"})
+fig, ax = plt.subplots(figsize=(6, 6), dpi=100, subplot_kw={"projection": "3d"})
 
 ax.plot_wireframe(
-    x_range, t_x_range, DET_Z, rstride=0, cstride=1, color="black", linewidth=0.75
+    t_x_range, x_range, DET_Z, rstride=0, cstride=1, color="black", linewidth=0.75
 )
-ax.set_xlabel("Frequency ($x$)")
-ax.set_ylabel("Recency ($t_{x}$)")
+ax.set_xlabel("Recency ($t_{x}$)")
+ax.set_ylabel("Frequency ($x$)")
 ax.zaxis.set_rotate_label(False)
 ax.set_zlabel("DET", rotation=92)
-ax.set_xlim(14, 0)
-ax.set_ylim(0, 80)
+
+ax.view_init(elev=25, azim=-135, roll=0)
+ax.set_xlim(0, 80)
+ax.set_ylim(0, 14)
 ax.set_zlim(-0.5, 40)
 
-ax.view_init(elev=27, azim=-44, roll=0)
+for a in (ax.xaxis, ax.yaxis, ax.zaxis):
+    a.pane.fill = False
+    a._axinfo["grid"].update(linestyle=(0, (1, 5)), color="gray")
+ax.grid(True)
 
-ax.grid(True, linestyle=":", color="lightgray")
+ax.set_box_aspect(None, zoom=0.82)
 
-ax.xaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.yaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.zaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-
-ax.xaxis.pane.fill = False
-ax.yaxis.pane.fill = False
-ax.zaxis.pane.fill = False
-
-ax.set_box_aspect(None, zoom=0.85)
-ax.zaxis._axinfo["juggled"] = (1, 2, 0)
 plt.suptitle("DET as a function of Recency & Frequency", y=0.90)
 plt.tight_layout()
 plt.show();
+```
+
+```{python}
 # Iso-Value Representation of DET
 contours = plt.contour(
     t_x_range.flatten(),
@@ -1024,7 +1023,7 @@ cm = 0.3  # gross contribution margin
 zbar_list = [20, 50]
 
 # 3D “waterfall” plot
-fig, ax = plt.subplots(1, 2, figsize=(10, 8), dpi=200, subplot_kw={"projection": "3d"})
+fig, ax = plt.subplots(1, 2, figsize=(10, 8), dpi=50, subplot_kw={"projection": "3d"})
 for i, sub in enumerate(ax):
     CLV_Z = CLV(
         cm,
@@ -1043,38 +1042,36 @@ for i, sub in enumerate(ax):
     )
     CLV_Z = np.where(x_range != 0, CLV_Z, 0)
     sub.plot_wireframe(
-        x_range, t_x_range, CLV_Z, rstride=0, cstride=1, color="black", linewidth=0.75
+        t_x_range, x_range, CLV_Z, rstride=0, cstride=1, color="black", linewidth=0.75
     )
-    sub.set_xlabel("Frequency ($x$)")
-    sub.set_ylabel("Recency ($t_{x}$)")
+    sub.set_xlabel("Recency ($t_{x}$)")
+    sub.set_ylabel("Frequency ($x$)")
     sub.zaxis.set_rotate_label(False)
     sub.set_zlabel("DET", rotation=92)
     sub.set_title(r"$\bar{{z}}$ = " + f"{zbar_list[i]}", y=0.95)
-    sub.set_xlim(14, 0)
-    sub.set_ylim(0, 80)
+    sub.set_xlim(0, 80)
+    sub.set_ylim(0, 14)
     sub.set_zlim(-0.5, 600)
 
-    sub.view_init(elev=27, azim=-44, roll=0)
-    sub.grid(True, linestyle=":", color="lightgray")
-    sub.xaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-    sub.yaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-    sub.zaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-
-    sub.xaxis.pane.fill = False
-    sub.yaxis.pane.fill = False
-    sub.zaxis.pane.fill = False
+    sub.view_init(elev=25, azim=-135, roll=0)
+    for a in (sub.xaxis, sub.yaxis, sub.zaxis):
+        a.pane.fill = False
+        a._axinfo["grid"].update(linestyle=(0, (1, 5)), color="gray")
+    sub.grid(True)
 
     sub.set_box_aspect(None, zoom=0.85)
-    sub.zaxis._axinfo["juggled"] = (1, 2, 0)
 
 plt.suptitle(
     "CLV as a Function of Recency and Frequency for Average Transaction Values of \\$20 and \\$50",
     y=0.79,
 )
 plt.tight_layout()
-plt.show()
+plt.show();
+```
+
+```{python}
 # Iso-Value Representation of DET
-fig, ax = plt.subplots(1, 2, figsize=(10, 5.5), dpi=200)
+fig, ax = plt.subplots(1, 2, figsize=(10, 5.5), dpi=50)
 for i, sub in enumerate(ax):
     CLV_Z = CLV(
         cm,
@@ -1128,45 +1125,45 @@ plot_data = (
     .fill_null(0)
 )
 
-Y = np.arange(78)
-X = np.arange(20)
+X = np.arange(78)
+Y = np.arange(20)
 Z = plot_data[:, 1:].to_numpy().T
+```
 
+```{python}
 # 3D Plot
 fig, ax = plt.subplots(figsize=(15, 7), dpi=100, subplot_kw={"projection": "3d"})
-for i in range(1, 21):
+for Yi in range(1, 21):
     ax.fill_between(
-        i, Y, Z[:, i - 1], i, Y, 0, facecolors="white", edgecolor="black", linewidth=0.5
+        X, Yi, Z[:, Yi - 1], X, Yi, 0, facecolors="white", edgecolor="black", linewidth=0.5
     )
 
-ax.set_xlabel("Frequency ($x$)")
-ax.set_ylabel("Recency ($t_{x}$)")
+ax.set_xlabel("Recency ($t_{x}$)")
+ax.set_ylabel("Frequency ($x$)")
 ax.zaxis.set_rotate_label(False)
 ax.set_zlabel("Number of Customers", rotation=92)
-ax.view_init(elev=22, azim=120, roll=0)
+ax.view_init(elev=25, azim=40, roll=0)
 
-ax.set_xlim(19, 0)
-ax.set_ylim(0, 80)
+ax.set_xlim(80, 0)
+ax.set_ylim(19, 0)
 ax.set_zlim(-5, 200)
 
-ax.grid(True, linestyle=":", color="lightgray")
+for a in (ax.xaxis, ax.yaxis, ax.zaxis):
+    a.pane.fill = False
+    a._axinfo["grid"].update(linestyle=(0, (1, 5)), color="gray")
+ax.grid(True)
 
-ax.xaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.yaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-ax.zaxis._axinfo["grid"].update({"linestyle": (0, (1, 5)), "color": "gray"})
-
-ax.xaxis.pane.fill = False
-ax.yaxis.pane.fill = False
-ax.zaxis.pane.fill = False
+ax.invert_xaxis()
+ax.invert_yaxis()
 
 custom_ticks = np.arange(0, 21, 5)
 custom_labels = [str(i) if i < 20 else "20+" for i in custom_ticks]
 
 ax.set_box_aspect(None, zoom=0.84)
-ax.zaxis._axinfo["juggled"] = (1, 2, 0)
-ax.set_xticks(custom_ticks)
-ax.set_xticklabels(custom_labels)
-ax.set_yticks(np.arange(0, 81, 20))
+
+ax.set_yticks(custom_ticks)
+ax.set_yticklabels(custom_labels)
+ax.set_xticks(np.arange(0, 81, 20))
 plt.suptitle(
     "Distribution Of Repeating Customers In The 78-week\nRecency/frequency Space",
     y=0.86,

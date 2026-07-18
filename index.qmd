@@ -113,6 +113,10 @@ The same handful of moves reappears in nearly every essay:
 - [BG/BB Model — Discrete-Time, Noncontractual Setting](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/bg-bb) — the discrete analog of Pareto/NBD (beta-Bernoulli buying + beta-geometric death); donation incidence.
 - [Pareto/NBD Model (WIP)](https://abdullahau.github.io/customer-analytics/notebooks/models/purchasing/pareto-nbd) — dropout at *any* time (exponential-gamma); the original "counting your customers" model.
 
+#### Brand Choice (Category-Wide, Multi-Brand)
+
+- [NBD-Dirichlet Model of Consumer Buying Behavior](https://abdullahau.github.io/customer-analytics/notebooks/models/brand-choice/nbd-dirichlet) — the Ehrenberg–Bass model of a whole category: NBD category incidence × Dirichlet-multinomial brand choice. Brand performance measures as interpretative norms; **Double Jeopardy** and the **Duplication of Purchase Law** fall out as predictions. Reproduces the 1984 toothpaste example.
+
 #### Retention (Contractual / Discrete-Time)
 
 - [Beta-Geometric (BG) Model](https://abdullahau.github.io/customer-analytics/notebooks/models/retention/beta-geometric) — constant individual retention + beta heterogeneity; why *aggregate* retention rises with tenure.

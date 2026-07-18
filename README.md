@@ -155,15 +155,21 @@ All of it sits in [`references/papers/brand-choice/`](references/papers/brand-ch
 | **[`Repeat-Buying — reading notes`](references/papers/brand-choice/repeat-buying-summary.md)** | chapter-by-chapter reading notes: the formulae, estimators, empirical laws and documented failure boundaries |
 | **[`Data Reduction — reading notes`](references/papers/brand-choice/data-reduction-summary.md)** | reading notes on the method: empirical generalisation, layout rules, the regression critique |
 
-A third-party Python port of the R `NBDdirichlet` package is in
-[`references/implementations/NBDdirichlet-main/`](references/implementations/NBDdirichlet-main/)
-(MIT; derived from Feiming Chen's R package). It is a useful reference but **not yet
-verified** — its `S` estimate disagrees with both the R package and the 1984 paper on
-the paper's own toothpaste example, and `Appendix C` of *Repeat-Buying* is the
-authority to check it against.
+Feiming Chen's R package `NBDdirichlet` (v1.4) is the reference implementation, in
+[`references/implementations/NBDdirichlet/`](references/implementations/NBDdirichlet/).
+A third-party Python port sits alongside it in `NBDdirichlet-main/` — **it has a bug**:
+its `S`-pooling implements only the 1.5 × IQR outlier fence and omits the package's
+second test (drop anything above the boxplot's upper notch). On the toothpaste example
+that fence removes nothing, so the port reports `S = 1.55` where R gives `S = 1.30`,
+with knock-on errors of ~0.05 in every purchase-rate figure. Diagnosed and corrected in
+the essay below.
 
-Still to be created: `lib/models/Dirichlet.py`, the essays under
-`notebooks/models/brand-choice/`, and the toothpaste worked example under `data/`.
+**Implemented:** [`notebooks/models/brand-choice/nbd-dirichlet.qmd`](notebooks/models/brand-choice/nbd-dirichlet.qmd)
+— the model built from scratch in NumPy/pandas, reproducing all four `summary.dirichlet`
+tables to an exact match against a live R session.
+
+Still to be created: `lib/models/Dirichlet.py`, an observed-side
+`analyses/brand-performance-measures` essay, and the toothpaste data under `data/`.
 
 ## The model catalogue
 

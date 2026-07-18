@@ -369,23 +369,43 @@ $$
 Share-weighting gives more influence to large brands, whose penetrations are estimated
 from bigger sub-samples and are therefore more reliable.
 
-The R package operationalises "discrepant" with a **two-part boxplot rule**, and it is
-worth implementing faithfully because the second part is easy to miss and materially
-changes the answer:
+The R package operationalises "discrepant" with a **two-part boxplot rule**:
 
 1. the usual 1.5 × IQR fence, and
 2. anything above the **upper notch**, $\text{median} + 1.58 \times \text{IQR}/\sqrt{n}$.
 
-Both use R's *hinge* definition of the quartiles (Tukey's `fivenum`), which differs
-from `np.percentile`. For a faithful port we reproduce `fivenum` directly.
+Worth knowing if you are porting this: **neither test appears in the package source.**
+Its entire outlier step is four lines that call `boxplot()` and read two fields off the
+result —
+
+```r
+bp <- boxplot(Sall, plot=F)
+outlier  <- bp$out                    # 1.5 x IQR fence
+outlier2 <- Sall[Sall > bp$conf[2]]   # above the upper notch
+```
+
+— so the actual arithmetic lives three packages away, in
+`grDevices::boxplot.stats`, which computes the fence and
+$\text{conf} = \text{median} \pm 1.58\,\text{IQR}/\sqrt{n}$ from quartiles supplied by
+`stats::fivenum`. Reading `dirichlet.R` alone does not tell you what the rule is.
+
+`fivenum` uses Tukey's **hinges** rather than interpolated quartiles, so it is not
+`np.percentile`. We reproduce it directly below. (On this particular data the two
+definitions happen to flag the same three brands, so `np.percentile` would give the
+same $S$ here — but the hinge version is what the package actually does, and there is
+no reason to expect the agreement to hold on other data.)
 
 ```{python}
 #| code-fold: false
 def fivenum(x):
-    """Tukey's five-number summary as R's stats::fivenum computes it.
+    """Tukey's five-number summary, a direct port of R's stats::fivenum:
 
-    Uses hinges, not linearly-interpolated quartiles, so results match R's
-    boxplot.stats() exactly.
+        n4 <- floor((n + 3)/2)/2
+        d  <- c(1, n4, (n + 1)/2, n + 1 - n4, n)
+        0.5 * (x[floor(d)] + x[ceiling(d)])
+
+    Uses hinges, not linearly-interpolated quartiles, so the values feeding the
+    fence and the notch match R's boxplot.stats() exactly.
     """
     x = np.sort(np.asarray(x, dtype=float))
     n = len(x)

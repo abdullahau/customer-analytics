@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.class
+nbd_env/
+
+# Distribution / packaging
+.history/
+.Python
+.mypy_cache/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.documentation/

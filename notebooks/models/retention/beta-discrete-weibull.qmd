@@ -1,5 +1,9 @@
 ---
 title: Beta-discrete-Weibull (BdW) Model
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/retention/beta-discrete-weibull.qmd
 ---
 
 **Source**:

@@ -1,5 +1,9 @@
 ---
 title: "RFM and CLV: Using Iso-Value Curves for Customer Base Analysis"
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/clv/rfm-and-clv.qmd
 ---
 
 **Sources**:

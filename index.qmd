@@ -3,6 +3,10 @@ title: Customer-Base Analytics
 format:
   html:
     number-sections: false
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/index.qmd
 ---
 
 A research library of **probability models for customer-base analysis** — the

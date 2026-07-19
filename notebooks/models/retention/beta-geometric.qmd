@@ -1,5 +1,9 @@
 ---
 title: Beta-Geometric (BG) Model
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/retention/beta-geometric.qmd
 ---
 
 The beta-geometric (BG) distribution is a robust simple model for characterizing and forecasting the length of a customer's relationship with a firm in a contractual setting.

@@ -1,5 +1,9 @@
 ---
 title: Discrete-Time, Contractual Setting Retention Model
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/retention/subscription-retention.qmd
 ---
 
 ## Imports

@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Abdullah Mahmood">
-<meta name="dcterms.date" content="2026-07-15">
+<meta name="dcterms.date" content="2026-07-19">
 
 <title>Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution</title>
 <style>
@@ -2420,7 +2420,7 @@ bottom: -1.25;
   </ul></li>
   <li><a href="#sales-forecast" id="toc-sales-forecast" class="nav-link" data-scroll-target="#sales-forecast"><span class="header-section-number">4</span> Sales Forecast</a></li>
   </ul>
-<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li></ul></div></nav>
+<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/acquisition/finite-mixture-bg-sales-forecast.qmd"><i class="bi bi-file-code"></i>View source</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
@@ -2443,7 +2443,7 @@ bottom: -1.25;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 15, 2026</p>
+      <p class="date">July 19, 2026</p>
     </div>
   </div>
   
@@ -2487,7 +2487,7 @@ bottom: -1.25;
 <h2 data-number="2" class="anchored" data-anchor-id="imports"><span class="header-section-number">2</span> Imports</h2>
 <section id="import-packages" class="level3" data-number="2.1">
 <h3 data-number="2.1" class="anchored" data-anchor-id="import-packages"><span class="header-section-number">2.1</span> Import Packages</h3>
-<div id="7dafb588" class="cell" data-execution_count="1">
+<div id="ba403810" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
@@ -2511,7 +2511,7 @@ bottom: -1.25;
 <section id="sec-import_data" class="level3" data-number="2.2">
 <h3 data-number="2.2" class="anchored" data-anchor-id="sec-import_data"><span class="header-section-number">2.2</span> Import Transaction Data</h3>
 <p>For the purposes of this work, we focus on a <strong>single cohort of new customers</strong> who made their first purchase at the CDNOW website in the first quarter of 1997. We have data covering their <strong>initial (“trial”)</strong> and <strong>subsequent (“repeat”) purchases</strong> for the three month period (1/97 - 3/97) during which over 23,000 individuals purchased nearly 70,000 units (CDs). We are interested in <strong>forecasting the future (repeat) purchasing of these customers</strong> using a model calibrated with these quarter 1 data.</p>
-<div id="5d528119" class="cell" data-execution_count="2">
+<div id="07ab9a15" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>CDNOW_master <span class="op">=</span> (</span>
@@ -2618,7 +2618,7 @@ white-space: pre-wrap;
 <section id="create-number-of-units-purchased-by-week-of-purchase-summary" class="level3" data-number="2.3">
 <h3 data-number="2.3" class="anchored" data-anchor-id="create-number-of-units-purchased-by-week-of-purchase-summary"><span class="header-section-number">2.3</span> Create Number of Units Purchased by Week of Purchase Summary</h3>
 <p>For the cohort of customers who first purchased at the CDNOW website in the first quarter of 1997, we choose to work with the summary of total purchasing as presented in the last table below (<code>TableOne</code>). This gives the distribution of the number of units purchased for each of the twelve weeks, along with details of total purchasing (<code>weeklysales</code>) and the number of new customers (triers) in each week (<code>weeklytriers</code>).</p>
-<div id="20b6f314" class="cell" data-execution_count="3">
+<div id="76c8d72d" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the total number of CDs purchased each week?</span></span>
@@ -2639,22 +2639,22 @@ white-space: pre-wrap;
 <div class="cell-output cell-output-display" data-execution_count="3">
 
 <style>
-#altair-viz-77e6d210bc80432ab5037aa4b6339c8b.vega-embed {
+#altair-viz-f9dc087b153a48de9e93ea5e15c243fb.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-77e6d210bc80432ab5037aa4b6339c8b.vega-embed details,
-#altair-viz-77e6d210bc80432ab5037aa4b6339c8b.vega-embed details summary {
+#altair-viz-f9dc087b153a48de9e93ea5e15c243fb.vega-embed details,
+#altair-viz-f9dc087b153a48de9e93ea5e15c243fb.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-77e6d210bc80432ab5037aa4b6339c8b"></div>
+<div id="altair-viz-f9dc087b153a48de9e93ea5e15c243fb"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-77e6d210bc80432ab5037aa4b6339c8b") {
-      outputDiv = document.getElementById("altair-viz-77e6d210bc80432ab5037aa4b6339c8b");
+    if (outputDiv.id !== "altair-viz-f9dc087b153a48de9e93ea5e15c243fb") {
+      outputDiv = document.getElementById("altair-viz-f9dc087b153a48de9e93ea5e15c243fb");
     }
 
     const paths = {
@@ -2706,7 +2706,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="56f141c5" class="cell" data-execution_count="4">
+<div id="c5d64d05" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># How many people made their first-ever (“trial”) purchase each week?</span></span>
@@ -2720,7 +2720,7 @@ position: relative;
 <span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="3e431ff8" class="cell" data-execution_count="5">
+<div id="801950fd" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the total number of CDs purchased by triers in their trial week?</span></span>
@@ -2735,7 +2735,7 @@ position: relative;
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="214429ea" class="cell" data-execution_count="6">
+<div id="c7bc78b7" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What is the weekly total sales split between &quot;trial&quot; and &quot;repeat&quot;?</span></span>
@@ -2763,7 +2763,7 @@ position: relative;
 <span id="cb7-23"><a href="#cb7-23" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="e151bfb0" class="cell" data-execution_count="7">
+<div id="47c965ba" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>dist_table <span class="op">=</span> (</span>
@@ -2812,61 +2812,61 @@ position: relative;
 <span id="cb8-44"><a href="#cb8-44" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display" data-execution_count="7">
-<div id="bhmlpbizpi" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="yitryijvlz" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#bhmlpbizpi table {
+#yitryijvlz table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#bhmlpbizpi thead, tbody, tfoot, tr, td, th { border-style: none; }
+#yitryijvlz thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#bhmlpbizpi p { margin: 0; padding: 0; }
-#bhmlpbizpi .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#bhmlpbizpi .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#bhmlpbizpi .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#bhmlpbizpi .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#bhmlpbizpi .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#bhmlpbizpi .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#bhmlpbizpi .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#bhmlpbizpi .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#bhmlpbizpi .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#bhmlpbizpi .gt_column_spanner_outer:first-child { padding-left: 0; }
-#bhmlpbizpi .gt_column_spanner_outer:last-child { padding-right: 0; }
-#bhmlpbizpi .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#bhmlpbizpi .gt_spanner_row { border-bottom-style: hidden; }
-#bhmlpbizpi .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#bhmlpbizpi .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
-#bhmlpbizpi .gt_from_md> :first-child { margin-top: 0; }
-#bhmlpbizpi .gt_from_md> :last-child { margin-bottom: 0; }
-#bhmlpbizpi .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
-#bhmlpbizpi .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
-#bhmlpbizpi .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#bhmlpbizpi .gt_row_group_first td { border-top-width: 2px; }
-#bhmlpbizpi .gt_row_group_first th { border-top-width: 2px; }
-#bhmlpbizpi .gt_striped { color: #333333; background-color: #F4F4F4; }
-#bhmlpbizpi .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#bhmlpbizpi .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#bhmlpbizpi .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
-#bhmlpbizpi .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#bhmlpbizpi .gt_grand_summary_row { color: #333333; background-color: #89D3FE; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#bhmlpbizpi .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
-#bhmlpbizpi .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
-#bhmlpbizpi .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#bhmlpbizpi .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#bhmlpbizpi .gt_left { text-align: left; }
-#bhmlpbizpi .gt_center { text-align: center; }
-#bhmlpbizpi .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#bhmlpbizpi .gt_font_normal { font-weight: normal; }
-#bhmlpbizpi .gt_font_bold { font-weight: bold; }
-#bhmlpbizpi .gt_font_italic { font-style: italic; }
-#bhmlpbizpi .gt_super { font-size: 65%; }
-#bhmlpbizpi .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#bhmlpbizpi .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
-#bhmlpbizpi .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#bhmlpbizpi .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#bhmlpbizpi .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#bhmlpbizpi .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#yitryijvlz p { margin: 0; padding: 0; }
+#yitryijvlz .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#yitryijvlz .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#yitryijvlz .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#yitryijvlz .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#yitryijvlz .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#yitryijvlz .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#yitryijvlz .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#yitryijvlz .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#yitryijvlz .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#yitryijvlz .gt_column_spanner_outer:first-child { padding-left: 0; }
+#yitryijvlz .gt_column_spanner_outer:last-child { padding-right: 0; }
+#yitryijvlz .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#yitryijvlz .gt_spanner_row { border-bottom-style: hidden; }
+#yitryijvlz .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#yitryijvlz .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
+#yitryijvlz .gt_from_md> :first-child { margin-top: 0; }
+#yitryijvlz .gt_from_md> :last-child { margin-bottom: 0; }
+#yitryijvlz .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
+#yitryijvlz .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
+#yitryijvlz .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#yitryijvlz .gt_row_group_first td { border-top-width: 2px; }
+#yitryijvlz .gt_row_group_first th { border-top-width: 2px; }
+#yitryijvlz .gt_striped { color: #333333; background-color: #F4F4F4; }
+#yitryijvlz .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#yitryijvlz .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#yitryijvlz .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
+#yitryijvlz .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#yitryijvlz .gt_grand_summary_row { color: #333333; background-color: #89D3FE; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#yitryijvlz .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+#yitryijvlz .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+#yitryijvlz .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#yitryijvlz .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#yitryijvlz .gt_left { text-align: left; }
+#yitryijvlz .gt_center { text-align: center; }
+#yitryijvlz .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#yitryijvlz .gt_font_normal { font-weight: normal; }
+#yitryijvlz .gt_font_bold { font-weight: bold; }
+#yitryijvlz .gt_font_italic { font-style: italic; }
+#yitryijvlz .gt_super { font-size: 65%; }
+#yitryijvlz .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#yitryijvlz .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
+#yitryijvlz .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#yitryijvlz .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#yitryijvlz .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#yitryijvlz .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-bootstrap="false">
@@ -3092,7 +3092,7 @@ P(X_3 = x) &amp;= \frac{1822}{1574 + 1642 + 1822} \times P(T_{3} = x) \\
 \end{align*}
 \]</span></p>
 <p>where the weights are determined by the number of triers in weeks 1-3.</p>
-<div id="06832d1a" class="cell" data-execution_count="8">
+<div id="ed84d1e2" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Week 2 </span></span>
@@ -3248,7 +3248,7 @@ P(T_{w} = x) &amp;= \begin{cases}
 LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1x}\right)\ln\left[1-\sum^{9}_{x=1}P(T_{1}=x)\right]
 \]</span></p>
 <p>Where <span class="math inline">\(n_{1}\)</span> is the total number of triers in week 1 (1574) and <span class="math inline">\(n_{1x}\)</span> is the number of people making <span class="math inline">\(x\)</span> purchases in week 1.</p>
-<div id="a8014849" class="cell" data-execution_count="9">
+<div id="57582835" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> trial_parameters(n1x, guess<span class="op">=</span>[<span class="dv">1</span>,<span class="dv">1</span>]):</span>
 <span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
@@ -3266,7 +3266,7 @@ LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1
 <span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(log_likelihood, guess, bounds<span class="op">=</span>[(<span class="dv">0</span>, np.inf), (<span class="dv">0</span>, np.inf)])</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="36414414" class="cell" data-execution_count="10">
+<div id="d1261b94" class="cell" data-execution_count="10">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>n1x <span class="op">=</span> TableOne[<span class="st">&#39;1&#39;</span>].to_numpy()</span>
 <span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> trial_parameters(n1x)</span>
@@ -3280,7 +3280,7 @@ LL=\sum^{9}_{x=1}n_{1x}\ln\left[P(T_{1}=x)\right]+\left(n_{1}-\sum^{9}_{x=1}n_{1
 <span id="cb12-11"><a href="#cb12-11" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb12-12"><a href="#cb12-12" aria-hidden="true" tabindex="-1"></a><span class="ss">Log-Likelihood = </span><span class="sc">{</span><span class="op">-</span>ll<span class="sc">:0.4f}</span><span class="ss">&#39;&#39;&#39;</span>, raw<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_523843/3558546267.py:14: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_392279/3558546267.py:14: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   return -np.sum(np.log(p_t_1x, where=p_t_1x != 0) * n1x)</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -3298,7 +3298,7 @@ E(n_{1x})=1574\times P(T_{1}=x)
 <p><span class="math display">\[
 \chi^{2}=\sum^{10+}_{x=1}\frac{\left[n_{1x}-E(n_{1x})\right]^{2}}{E(n_{1x})}
 \]</span></p>
-<div id="625ae76b" class="cell" data-execution_count="11">
+<div id="7fd517bf" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>p_t_1x <span class="op">=</span> np.zeros(n1x.shape)</span>
@@ -3324,7 +3324,7 @@ E(n_{1x})=1574\times P(T_{1}=x)
 <span id="cb14-21"><a href="#cb14-21" aria-hidden="true" tabindex="-1"></a><span class="ss">Critical Value = </span><span class="sc">{</span>critical_value<span class="sc">:0.4f}</span><span class="ss">&#39;&#39;&#39;</span>, raw<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_523843/631659531.py:10: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_392279/631659531.py:10: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   chi_square = np.sum(np.divide((n1x - E_n1x)**2, E_n1x, where=E_n1x != 0))</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -3335,7 +3335,7 @@ E(n_{1x})=1574\times P(T_{1}=x)
 </div>
 </div>
 <p>As the value of the sample test statistic is less than the critical value, we conclude that the shifted beta-geometric distribution adequately fits the data.</p>
-<div id="d1e7eec5" class="cell" data-execution_count="12">
+<div id="20f72055" class="cell" data-execution_count="12">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>w1_trial_df <span class="op">=</span> pl.DataFrame({<span class="st">&#39;Number of Units Purchased&#39;</span>:np.arange(<span class="dv">1</span>,<span class="dv">11</span>), <span class="st">&#39;Observed&#39;</span>: n1x[<span class="dv">1</span>:], <span class="st">&#39;Expected&#39;</span>: E_n1x[<span class="dv">1</span>:]})</span>
@@ -3351,22 +3351,22 @@ E(n_{1x})=1574\times P(T_{1}=x)
 <div class="cell-output cell-output-display" data-execution_count="12">
 
 <style>
-#altair-viz-b6499128af1945c0837e03f31e8969b2.vega-embed {
+#altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-b6499128af1945c0837e03f31e8969b2.vega-embed details,
-#altair-viz-b6499128af1945c0837e03f31e8969b2.vega-embed details summary {
+#altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd.vega-embed details,
+#altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-b6499128af1945c0837e03f31e8969b2"></div>
+<div id="altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-b6499128af1945c0837e03f31e8969b2") {
-      outputDiv = document.getElementById("altair-viz-b6499128af1945c0837e03f31e8969b2");
+    if (outputDiv.id !== "altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd") {
+      outputDiv = document.getElementById("altair-viz-51b933ae2e4245b0bffd50f5d1f7e2fd");
     }
 
     const paths = {
@@ -3460,7 +3460,7 @@ P(R = x \mid \text{possible repeat buyer}) =
 <p>The probability of a “possible repeat buyer” making 10+ purchases is simply <span class="math inline">\(1 - \sum^{9}_{x=0} P(R=x)\)</span>.</p>
 <p>As the sample data are in the form of a table documenting the number of people purchasing <span class="math inline">\(0, 1, \ldots , 9, 10+\)</span> units (CDs) for each of the 12 weeks, we need to create a table that gives us <span class="math inline">\(P(X_w = x), x = 0, 1, \ldots , 9, 10+\)</span> and <span class="math inline">\(w = 1, 2, \ldots 12\)</span>, given values of the six model parameters <span class="math inline">\((\alpha_T, \beta_T, \alpha_R, \beta_R, \gamma, \delta)\)</span>.</p>
 <p>We see that <span class="math inline">\(P(X_w = x)\)</span> is simply a weighted average of the week-of-trial-specific probabilities of purchasing <span class="math inline">\(x\)</span> units in week <span class="math inline">\(w\)</span>. As an intermediate step, we build twelve tables that give us the probability of purchasing <span class="math inline">\(x\)</span> units in week <span class="math inline">\(w\)</span>, one for each trial week. These will then be aggregated and the log-likelihood created.</p>
-<div id="57994389" class="cell" data-execution_count="13">
+<div id="71f682c9" class="cell" data-execution_count="13">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bg_parameters(distMAT, weeks, units_range, incr_triers, guesses<span class="op">=</span>[<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="fl">0.01</span>,<span class="dv">0</span>]):</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    </span>
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
@@ -3501,7 +3501,7 @@ P(R = x \mid \text{possible repeat buyer}) =
 <span id="cb17-38"><a href="#cb17-38" aria-hidden="true" tabindex="-1"></a>    bnds <span class="op">=</span> [(<span class="fl">1e-5</span>, np.inf) <span class="cf">for</span> _ <span class="kw">in</span> <span class="bu">range</span>(<span class="bu">len</span>(guesses)<span class="op">-</span><span class="dv">1</span>)] <span class="op">+</span> [(<span class="op">-</span>np.inf, np.inf)]</span>
 <span id="cb17-39"><a href="#cb17-39" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> minimize(log_likelihood, guesses, bounds<span class="op">=</span>bnds)   </span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="329d97fe" class="cell" data-execution_count="14">
+<div id="d88e1172" class="cell" data-execution_count="14">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>distMAT <span class="op">=</span> TableOne.to_numpy()</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>trial_weeks <span class="op">=</span> np.array(TableOne.columns[<span class="dv">1</span>:], dtype<span class="op">=</span>np.int32)</span>
 <span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>units_range <span class="op">=</span> np.arange(distMAT.shape[<span class="dv">0</span>])</span>
@@ -3530,7 +3530,7 @@ P(R = x \mid \text{possible repeat buyer}) =
 <span id="cb18-26"><a href="#cb18-26" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb18-27"><a href="#cb18-27" aria-hidden="true" tabindex="-1"></a><span class="ss">Log-Likelihood = </span><span class="sc">{</span><span class="op">-</span>ll<span class="sc">:0.6f}</span><span class="ss">&#39;&#39;&#39;</span>, raw<span class="op">=</span><span class="va">True</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_523843/3142562625.py:33: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_392279/3142562625.py:33: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   ll_components = distMAT[:,1:] * np.log(weight_probs, where=weight_probs &gt; 0)</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -3554,7 +3554,7 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 \chi^2 = \sum_{x=1}^{10+} \frac{\left[ n_{1x} - E(n_{1x}) \right]^2}{E(n_{1x})}
 + \sum_{w=2}^{12} \sum_{x=0}^{10+} \frac{\left[ n_{wx} - E(n_{wx}) \right]^2}{E(n_{wx})}.
 \]</span></p>
-<div id="7bbba462" class="cell" data-execution_count="15">
+<div id="9853618c" class="cell" data-execution_count="15">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Weekly P(possible repeat buyer)</span></span>
@@ -3594,13 +3594,13 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 <span id="cb20-35"><a href="#cb20-35" aria-hidden="true" tabindex="-1"></a>critical_value <span class="op">=</span> chi2.ppf(<span class="fl">0.95</span>, df<span class="op">=</span>df)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_523843/3279025856.py:26: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_392279/3279025856.py:26: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   ll_components = distMAT[:,1:] * np.log(weight_probs, where=weight_probs != 0)
-/tmp/ipykernel_523843/3279025856.py:33: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+/tmp/ipykernel_392279/3279025856.py:33: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   chi_square = np.sum(np.divide((distMAT[:,1:] - e_distMAT)**2, e_distMAT, where=distMAT[:,1:]!=0))</code></pre>
 </div>
 </div>
-<div id="ae43ac82" class="cell" data-execution_count="16">
+<div id="0bfa049d" class="cell" data-execution_count="16">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>e_distTable <span class="op">=</span> (</span>
@@ -3618,61 +3618,61 @@ E(n_{wx})=P(X_{w}=x) \times \sum^w_{i=1}n_{i}
 <span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display" data-execution_count="16">
-<div id="nerlfygtde" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="zryvwoparz" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#nerlfygtde table {
+#zryvwoparz table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#nerlfygtde thead, tbody, tfoot, tr, td, th { border-style: none; }
+#zryvwoparz thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#nerlfygtde p { margin: 0; padding: 0; }
-#nerlfygtde .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#nerlfygtde .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#nerlfygtde .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#nerlfygtde .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#nerlfygtde .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#nerlfygtde .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#nerlfygtde .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#nerlfygtde .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#nerlfygtde .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#nerlfygtde .gt_column_spanner_outer:first-child { padding-left: 0; }
-#nerlfygtde .gt_column_spanner_outer:last-child { padding-right: 0; }
-#nerlfygtde .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#nerlfygtde .gt_spanner_row { border-bottom-style: hidden; }
-#nerlfygtde .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#nerlfygtde .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
-#nerlfygtde .gt_from_md> :first-child { margin-top: 0; }
-#nerlfygtde .gt_from_md> :last-child { margin-bottom: 0; }
-#nerlfygtde .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
-#nerlfygtde .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
-#nerlfygtde .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#nerlfygtde .gt_row_group_first td { border-top-width: 2px; }
-#nerlfygtde .gt_row_group_first th { border-top-width: 2px; }
-#nerlfygtde .gt_striped { color: #333333; background-color: #F4F4F4; }
-#nerlfygtde .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
-#nerlfygtde .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#nerlfygtde .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
-#nerlfygtde .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#nerlfygtde .gt_grand_summary_row { color: #333333; background-color: #89D3FE; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#nerlfygtde .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
-#nerlfygtde .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
-#nerlfygtde .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#nerlfygtde .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#nerlfygtde .gt_left { text-align: left; }
-#nerlfygtde .gt_center { text-align: center; }
-#nerlfygtde .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#nerlfygtde .gt_font_normal { font-weight: normal; }
-#nerlfygtde .gt_font_bold { font-weight: bold; }
-#nerlfygtde .gt_font_italic { font-style: italic; }
-#nerlfygtde .gt_super { font-size: 65%; }
-#nerlfygtde .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#nerlfygtde .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
-#nerlfygtde .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#nerlfygtde .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#nerlfygtde .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#nerlfygtde .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#zryvwoparz p { margin: 0; padding: 0; }
+#zryvwoparz .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #004D80; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #004D80; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#zryvwoparz .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#zryvwoparz .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#zryvwoparz .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#zryvwoparz .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#zryvwoparz .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#zryvwoparz .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#zryvwoparz .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#zryvwoparz .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#zryvwoparz .gt_column_spanner_outer:first-child { padding-left: 0; }
+#zryvwoparz .gt_column_spanner_outer:last-child { padding-right: 0; }
+#zryvwoparz .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#zryvwoparz .gt_spanner_row { border-bottom-style: hidden; }
+#zryvwoparz .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#zryvwoparz .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; vertical-align: middle; }
+#zryvwoparz .gt_from_md> :first-child { margin-top: 0; }
+#zryvwoparz .gt_from_md> :last-child { margin-bottom: 0; }
+#zryvwoparz .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: none; border-top-width: 1px; border-top-color: #89D3FE; border-left-style: none; border-left-width: 1px; border-left-color: #89D3FE; border-right-style: none; border-right-width: 1px; border-right-color: #89D3FE; vertical-align: middle; overflow-x: hidden; }
+#zryvwoparz .gt_stub { color: #FFFFFF; background-color: #0076BA; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #0076BA; padding-left: 5px; padding-right: 5px; }
+#zryvwoparz .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#zryvwoparz .gt_row_group_first td { border-top-width: 2px; }
+#zryvwoparz .gt_row_group_first th { border-top-width: 2px; }
+#zryvwoparz .gt_striped { color: #333333; background-color: #F4F4F4; }
+#zryvwoparz .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #0076BA; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #0076BA; }
+#zryvwoparz .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#zryvwoparz .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
+#zryvwoparz .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#zryvwoparz .gt_grand_summary_row { color: #333333; background-color: #89D3FE; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#zryvwoparz .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+#zryvwoparz .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+#zryvwoparz .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#zryvwoparz .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#zryvwoparz .gt_left { text-align: left; }
+#zryvwoparz .gt_center { text-align: center; }
+#zryvwoparz .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#zryvwoparz .gt_font_normal { font-weight: normal; }
+#zryvwoparz .gt_font_bold { font-weight: bold; }
+#zryvwoparz .gt_font_italic { font-style: italic; }
+#zryvwoparz .gt_super { font-size: 65%; }
+#zryvwoparz .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#zryvwoparz .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
+#zryvwoparz .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#zryvwoparz .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#zryvwoparz .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#zryvwoparz .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-bootstrap="false">
@@ -3875,7 +3875,7 @@ tr { background-color: transparent; }
 </div>
 </div>
 </div>
-<div id="97fafdf5" class="cell" data-execution_count="17">
+<div id="8684fd80" class="cell" data-execution_count="17">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>display_markdown(<span class="ss">f&#39;&#39;&#39;$</span><span class="ch">\\</span><span class="ss">chi^</span><span class="ch">{{</span><span class="ss">2</span><span class="ch">}}</span><span class="ss">$ = </span><span class="sc">{</span>chi_square<span class="sc">:0.4f}</span></span>
@@ -3908,7 +3908,7 @@ E(T_w) = \frac{\alpha_T + \beta_T - 1}{\alpha_T - 1}
 <p><span class="math display">\[
 E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 \]</span></p>
-<div id="9f49b682" class="cell" data-execution_count="18">
+<div id="d4e15a2f" class="cell" data-execution_count="18">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>full_weeks <span class="op">=</span> np.arange(<span class="dv">52</span>) <span class="op">+</span> <span class="dv">1</span></span>
@@ -3926,7 +3926,7 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>e_weekly_sales <span class="op">=</span> np.<span class="bu">sum</span>(incr_triers <span class="op">*</span> mean_weekly_unit_purchases, axis<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="3a135bed" class="cell" data-execution_count="19">
+<div id="b8b47389" class="cell" data-execution_count="19">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Without SciPy&#39;s Toeplitz Constructor</span></span>
@@ -3943,7 +3943,7 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>e_weekly_sales <span class="op">=</span> np.<span class="bu">sum</span>(incr_triers <span class="op">*</span> mean_weekly_unit_purchases, axis<span class="op">=</span><span class="dv">1</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="a2c77347" class="cell" data-execution_count="20">
+<div id="1aa0c5d0" class="cell" data-execution_count="20">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>e_total_sales <span class="op">=</span> e_weekly_sales[:<span class="dv">12</span>]</span>
@@ -3975,22 +3975,22 @@ E(R_{w\mid i}) = \gamma (w - i)^\delta \frac{\beta_R}{\alpha_R - 1}
 <div class="cell-output cell-output-display" data-execution_count="20">
 
 <style>
-#altair-viz-566b7044aa6b4a6da281c782d75b9f50.vega-embed {
+#altair-viz-390ce983f2254367be80f0c35d14ee96.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-566b7044aa6b4a6da281c782d75b9f50.vega-embed details,
-#altair-viz-566b7044aa6b4a6da281c782d75b9f50.vega-embed details summary {
+#altair-viz-390ce983f2254367be80f0c35d14ee96.vega-embed details,
+#altair-viz-390ce983f2254367be80f0c35d14ee96.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-566b7044aa6b4a6da281c782d75b9f50"></div>
+<div id="altair-viz-390ce983f2254367be80f0c35d14ee96"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-566b7044aa6b4a6da281c782d75b9f50") {
-      outputDiv = document.getElementById("altair-viz-566b7044aa6b4a6da281c782d75b9f50");
+    if (outputDiv.id !== "altair-viz-390ce983f2254367be80f0c35d14ee96") {
+      outputDiv = document.getElementById("altair-viz-390ce983f2254367be80f0c35d14ee96");
     }
 
     const paths = {
@@ -4038,11 +4038,11 @@ position: relative;
         .catch(showError)
         .then(() => displayChart(vegaEmbed));
     }
-  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-897c3ea68b53de873d5f91226255a353"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {"field": "Estimated Sales", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0]}, "field": "Week", "scale": {"domain": [0, 12]}, "type": "quantitative"}, "y": {"field": "Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-4d52420ec3178d7ca3feb4de1c8108ea"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "Actual Sales", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0]}, "field": "Week", "scale": {"domain": [0, 12]}, "type": "quantitative"}, "y": {"field": "Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Model Fit: Trial/Repeat Decomposition", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-897c3ea68b53de873d5f91226255a353": [{"Week": 1, "Estimated Sales": "Total Sales", "Sales": 3490.6568354767164}, {"Week": 2, "Estimated Sales": "Total Sales", "Sales": 3907.393218785465}, {"Week": 3, "Estimated Sales": "Total Sales", "Sales": 4535.3800876896785}, {"Week": 4, "Estimated Sales": "Total Sales", "Sales": 4994.488909958025}, {"Week": 5, "Estimated Sales": "Total Sales", "Sales": 5754.744788704674}, {"Week": 6, "Estimated Sales": "Total Sales", "Sales": 6078.720558078094}, {"Week": 7, "Estimated Sales": "Total Sales", "Sales": 5931.578670227618}, {"Week": 8, "Estimated Sales": "Total Sales", "Sales": 6146.751265080293}, {"Week": 9, "Estimated Sales": "Total Sales", "Sales": 6699.8449527457105}, {"Week": 10, "Estimated Sales": "Total Sales", "Sales": 6837.589826549571}, {"Week": 11, "Estimated Sales": "Total Sales", "Sales": 6748.460859843364}, {"Week": 12, "Estimated Sales": "Total Sales", "Sales": 6365.132669764798}, {"Week": 1, "Estimated Sales": "Trial Sales", "Sales": 3490.6568354767164}, {"Week": 2, "Estimated Sales": "Trial Sales", "Sales": 3641.460307403284}, {"Week": 3, "Estimated Sales": "Trial Sales", "Sales": 4040.645968385373}, {"Week": 4, "Estimated Sales": "Trial Sales", "Sales": 4266.851176275224}, {"Week": 5, "Estimated Sales": "Trial Sales", "Sales": 4799.098724251344}, {"Week": 6, "Estimated Sales": "Trial Sales", "Sales": 4872.28276209806}, {"Week": 7, "Estimated Sales": "Trial Sales", "Sales": 4488.62098793194}, {"Week": 8, "Estimated Sales": "Trial Sales", "Sales": 4510.797969097613}, {"Week": 9, "Estimated Sales": "Trial Sales", "Sales": 4874.500460214627}, {"Week": 10, "Estimated Sales": "Trial Sales", "Sales": 4801.3164223679105}, {"Week": 11, "Estimated Sales": "Trial Sales", "Sales": 4517.451063447314}, {"Week": 12, "Estimated Sales": "Trial Sales", "Sales": 3967.461930538657}, {"Week": 1, "Estimated Sales": "Repeat Sales", "Sales": 0.0}, {"Week": 2, "Estimated Sales": "Repeat Sales", "Sales": 265.9329113821809}, {"Week": 3, "Estimated Sales": "Repeat Sales", "Sales": 494.7341193043053}, {"Week": 4, "Estimated Sales": "Repeat Sales", "Sales": 727.6377336828009}, {"Week": 5, "Estimated Sales": "Repeat Sales", "Sales": 955.6460644533299}, {"Week": 6, "Estimated Sales": "Repeat Sales", "Sales": 1206.437795980034}, {"Week": 7, "Estimated Sales": "Repeat Sales", "Sales": 1442.9576822956778}, {"Week": 8, "Estimated Sales": "Repeat Sales", "Sales": 1635.9532959826802}, {"Week": 9, "Estimated Sales": "Repeat Sales", "Sales": 1825.3444925310832}, {"Week": 10, "Estimated Sales": "Repeat Sales", "Sales": 2036.2734041816602}, {"Week": 11, "Estimated Sales": "Repeat Sales", "Sales": 2231.0097963960507}, {"Week": 12, "Estimated Sales": "Repeat Sales", "Sales": 2397.6707392261414}], "data-4d52420ec3178d7ca3feb4de1c8108ea": [{"Week": 12, "Actual Sales": "Total Sales", "Sales": 6781}, {"Week": 6, "Actual Sales": "Total Sales", "Sales": 6456}, {"Week": 9, "Actual Sales": "Total Sales", "Sales": 6757}, {"Week": 3, "Actual Sales": "Total Sales", "Sales": 4512}, {"Week": 4, "Actual Sales": "Total Sales", "Sales": 5054}, {"Week": 1, "Actual Sales": "Total Sales", "Sales": 3627}, {"Week": 10, "Actual Sales": "Total Sales", "Sales": 6848}, {"Week": 7, "Actual Sales": "Total Sales", "Sales": 5906}, {"Week": 8, "Actual Sales": "Total Sales", "Sales": 6077}, {"Week": 5, "Actual Sales": "Total Sales", "Sales": 5843}, {"Week": 2, "Actual Sales": "Total Sales", "Sales": 3857}, {"Week": 11, "Actual Sales": "Total Sales", "Sales": 6770}, {"Week": 12, "Actual Sales": "Trial Sales", "Sales": 4261}, {"Week": 6, "Actual Sales": "Trial Sales", "Sales": 5019}, {"Week": 9, "Actual Sales": "Trial Sales", "Sales": 4896}, {"Week": 3, "Actual Sales": "Trial Sales", "Sales": 4015}, {"Week": 4, "Actual Sales": "Trial Sales", "Sales": 4347}, {"Week": 1, "Actual Sales": "Trial Sales", "Sales": 3627}, {"Week": 10, "Actual Sales": "Trial Sales", "Sales": 4795}, {"Week": 7, "Actual Sales": "Trial Sales", "Sales": 4457}, {"Week": 8, "Actual Sales": "Trial Sales", "Sales": 4501}, {"Week": 5, "Actual Sales": "Trial Sales", "Sales": 4867}, {"Week": 2, "Actual Sales": "Trial Sales", "Sales": 3630}, {"Week": 11, "Actual Sales": "Trial Sales", "Sales": 4450}, {"Week": 12, "Actual Sales": "Repeat Sales", "Sales": 2520}, {"Week": 6, "Actual Sales": "Repeat Sales", "Sales": 1437}, {"Week": 9, "Actual Sales": "Repeat Sales", "Sales": 1861}, {"Week": 3, "Actual Sales": "Repeat Sales", "Sales": 497}, {"Week": 4, "Actual Sales": "Repeat Sales", "Sales": 707}, {"Week": 1, "Actual Sales": "Repeat Sales", "Sales": 0}, {"Week": 10, "Actual Sales": "Repeat Sales", "Sales": 2053}, {"Week": 7, "Actual Sales": "Repeat Sales", "Sales": 1449}, {"Week": 8, "Actual Sales": "Repeat Sales", "Sales": 1576}, {"Week": 5, "Actual Sales": "Repeat Sales", "Sales": 976}, {"Week": 2, "Actual Sales": "Repeat Sales", "Sales": 227}, {"Week": 11, "Actual Sales": "Repeat Sales", "Sales": 2320}]}}, {"mode": "vega-lite"});
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-897c3ea68b53de873d5f91226255a353"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {"field": "Estimated Sales", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0]}, "field": "Week", "scale": {"domain": [0, 12]}, "type": "quantitative"}, "y": {"field": "Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-516fcd55643491c76f5916bfa905c840"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {"field": "Actual Sales", "type": "nominal"}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0]}, "field": "Week", "scale": {"domain": [0, 12]}, "type": "quantitative"}, "y": {"field": "Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Model Fit: Trial/Repeat Decomposition", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-897c3ea68b53de873d5f91226255a353": [{"Week": 1, "Estimated Sales": "Total Sales", "Sales": 3490.6568354767164}, {"Week": 2, "Estimated Sales": "Total Sales", "Sales": 3907.393218785465}, {"Week": 3, "Estimated Sales": "Total Sales", "Sales": 4535.3800876896785}, {"Week": 4, "Estimated Sales": "Total Sales", "Sales": 4994.488909958025}, {"Week": 5, "Estimated Sales": "Total Sales", "Sales": 5754.744788704674}, {"Week": 6, "Estimated Sales": "Total Sales", "Sales": 6078.720558078094}, {"Week": 7, "Estimated Sales": "Total Sales", "Sales": 5931.578670227618}, {"Week": 8, "Estimated Sales": "Total Sales", "Sales": 6146.751265080293}, {"Week": 9, "Estimated Sales": "Total Sales", "Sales": 6699.8449527457105}, {"Week": 10, "Estimated Sales": "Total Sales", "Sales": 6837.589826549571}, {"Week": 11, "Estimated Sales": "Total Sales", "Sales": 6748.460859843364}, {"Week": 12, "Estimated Sales": "Total Sales", "Sales": 6365.132669764798}, {"Week": 1, "Estimated Sales": "Trial Sales", "Sales": 3490.6568354767164}, {"Week": 2, "Estimated Sales": "Trial Sales", "Sales": 3641.460307403284}, {"Week": 3, "Estimated Sales": "Trial Sales", "Sales": 4040.645968385373}, {"Week": 4, "Estimated Sales": "Trial Sales", "Sales": 4266.851176275224}, {"Week": 5, "Estimated Sales": "Trial Sales", "Sales": 4799.098724251344}, {"Week": 6, "Estimated Sales": "Trial Sales", "Sales": 4872.28276209806}, {"Week": 7, "Estimated Sales": "Trial Sales", "Sales": 4488.62098793194}, {"Week": 8, "Estimated Sales": "Trial Sales", "Sales": 4510.797969097613}, {"Week": 9, "Estimated Sales": "Trial Sales", "Sales": 4874.500460214627}, {"Week": 10, "Estimated Sales": "Trial Sales", "Sales": 4801.3164223679105}, {"Week": 11, "Estimated Sales": "Trial Sales", "Sales": 4517.451063447314}, {"Week": 12, "Estimated Sales": "Trial Sales", "Sales": 3967.461930538657}, {"Week": 1, "Estimated Sales": "Repeat Sales", "Sales": 0.0}, {"Week": 2, "Estimated Sales": "Repeat Sales", "Sales": 265.9329113821809}, {"Week": 3, "Estimated Sales": "Repeat Sales", "Sales": 494.7341193043053}, {"Week": 4, "Estimated Sales": "Repeat Sales", "Sales": 727.6377336828009}, {"Week": 5, "Estimated Sales": "Repeat Sales", "Sales": 955.6460644533299}, {"Week": 6, "Estimated Sales": "Repeat Sales", "Sales": 1206.437795980034}, {"Week": 7, "Estimated Sales": "Repeat Sales", "Sales": 1442.9576822956778}, {"Week": 8, "Estimated Sales": "Repeat Sales", "Sales": 1635.9532959826802}, {"Week": 9, "Estimated Sales": "Repeat Sales", "Sales": 1825.3444925310832}, {"Week": 10, "Estimated Sales": "Repeat Sales", "Sales": 2036.2734041816602}, {"Week": 11, "Estimated Sales": "Repeat Sales", "Sales": 2231.0097963960507}, {"Week": 12, "Estimated Sales": "Repeat Sales", "Sales": 2397.6707392261414}], "data-516fcd55643491c76f5916bfa905c840": [{"Week": 12, "Actual Sales": "Total Sales", "Sales": 6781}, {"Week": 3, "Actual Sales": "Total Sales", "Sales": 4512}, {"Week": 9, "Actual Sales": "Total Sales", "Sales": 6757}, {"Week": 6, "Actual Sales": "Total Sales", "Sales": 6456}, {"Week": 1, "Actual Sales": "Total Sales", "Sales": 3627}, {"Week": 4, "Actual Sales": "Total Sales", "Sales": 5054}, {"Week": 10, "Actual Sales": "Total Sales", "Sales": 6848}, {"Week": 7, "Actual Sales": "Total Sales", "Sales": 5906}, {"Week": 2, "Actual Sales": "Total Sales", "Sales": 3857}, {"Week": 11, "Actual Sales": "Total Sales", "Sales": 6770}, {"Week": 8, "Actual Sales": "Total Sales", "Sales": 6077}, {"Week": 5, "Actual Sales": "Total Sales", "Sales": 5843}, {"Week": 12, "Actual Sales": "Trial Sales", "Sales": 4261}, {"Week": 3, "Actual Sales": "Trial Sales", "Sales": 4015}, {"Week": 9, "Actual Sales": "Trial Sales", "Sales": 4896}, {"Week": 6, "Actual Sales": "Trial Sales", "Sales": 5019}, {"Week": 1, "Actual Sales": "Trial Sales", "Sales": 3627}, {"Week": 4, "Actual Sales": "Trial Sales", "Sales": 4347}, {"Week": 10, "Actual Sales": "Trial Sales", "Sales": 4795}, {"Week": 7, "Actual Sales": "Trial Sales", "Sales": 4457}, {"Week": 2, "Actual Sales": "Trial Sales", "Sales": 3630}, {"Week": 11, "Actual Sales": "Trial Sales", "Sales": 4450}, {"Week": 8, "Actual Sales": "Trial Sales", "Sales": 4501}, {"Week": 5, "Actual Sales": "Trial Sales", "Sales": 4867}, {"Week": 12, "Actual Sales": "Repeat Sales", "Sales": 2520}, {"Week": 3, "Actual Sales": "Repeat Sales", "Sales": 497}, {"Week": 9, "Actual Sales": "Repeat Sales", "Sales": 1861}, {"Week": 6, "Actual Sales": "Repeat Sales", "Sales": 1437}, {"Week": 1, "Actual Sales": "Repeat Sales", "Sales": 0}, {"Week": 4, "Actual Sales": "Repeat Sales", "Sales": 707}, {"Week": 10, "Actual Sales": "Repeat Sales", "Sales": 2053}, {"Week": 7, "Actual Sales": "Repeat Sales", "Sales": 1449}, {"Week": 2, "Actual Sales": "Repeat Sales", "Sales": 227}, {"Week": 11, "Actual Sales": "Repeat Sales", "Sales": 2320}, {"Week": 8, "Actual Sales": "Repeat Sales", "Sales": 1576}, {"Week": 5, "Actual Sales": "Repeat Sales", "Sales": 976}]}}, {"mode": "vega-lite"});
 </script>
 </div>
 </div>
-<div id="ce3089ef" class="cell" data-execution_count="21">
+<div id="6cc68bb4" class="cell" data-execution_count="21">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>e_total_sales <span class="op">=</span> e_weekly_sales</span>
@@ -4071,22 +4071,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="21">
 
 <style>
-#altair-viz-d0c2e8bdc9b94c41be429687e24c2d93.vega-embed {
+#altair-viz-555275ae2b67486dbb66bfcd3d47a292.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-d0c2e8bdc9b94c41be429687e24c2d93.vega-embed details,
-#altair-viz-d0c2e8bdc9b94c41be429687e24c2d93.vega-embed details summary {
+#altair-viz-555275ae2b67486dbb66bfcd3d47a292.vega-embed details,
+#altair-viz-555275ae2b67486dbb66bfcd3d47a292.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-d0c2e8bdc9b94c41be429687e24c2d93"></div>
+<div id="altair-viz-555275ae2b67486dbb66bfcd3d47a292"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-d0c2e8bdc9b94c41be429687e24c2d93") {
-      outputDiv = document.getElementById("altair-viz-d0c2e8bdc9b94c41be429687e24c2d93");
+    if (outputDiv.id !== "altair-viz-555275ae2b67486dbb66bfcd3d47a292") {
+      outputDiv = document.getElementById("altair-viz-555275ae2b67486dbb66bfcd3d47a292");
     }
 
     const paths = {
@@ -4134,11 +4134,11 @@ position: relative;
         .catch(showError)
         .then(() => displayChart(vegaEmbed));
     }
-  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-00270cc0809c9e4434399da718cf3af9"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0]}, "field": "Week", "scale": {"domain": [0, 52]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-6c7d23ac05af6cd95f066cf190a20345"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0]}, "field": "Week", "scale": {"domain": [0, 52]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Forecast Weekly Repeat Sales", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-00270cc0809c9e4434399da718cf3af9": [{"Week": 1, "Repeat Sales": 0.0}, {"Week": 2, "Repeat Sales": 265.9329113821809}, {"Week": 3, "Repeat Sales": 494.7341193043053}, {"Week": 4, "Repeat Sales": 727.6377336828009}, {"Week": 5, "Repeat Sales": 955.6460644533299}, {"Week": 6, "Repeat Sales": 1206.437795980034}, {"Week": 7, "Repeat Sales": 1442.9576822956778}, {"Week": 8, "Repeat Sales": 1635.9532959826802}, {"Week": 9, "Repeat Sales": 1825.3444925310832}, {"Week": 10, "Repeat Sales": 2036.2734041816602}, {"Week": 11, "Repeat Sales": 2231.0097963960507}, {"Week": 12, "Repeat Sales": 2397.6707392261414}, {"Week": 13, "Repeat Sales": 2520.8546966345602}, {"Week": 14, "Repeat Sales": 2346.5958484432463}, {"Week": 15, "Repeat Sales": 2228.4142600713244}, {"Week": 16, "Repeat Sales": 2137.282504234453}, {"Week": 17, "Repeat Sales": 2062.7952394349877}, {"Week": 18, "Repeat Sales": 1999.772418466948}, {"Week": 19, "Repeat Sales": 1945.1909973825047}, {"Week": 20, "Repeat Sales": 1897.1090619307793}, {"Week": 21, "Repeat Sales": 1854.195590893073}, {"Week": 22, "Repeat Sales": 1815.4943253612594}, {"Week": 23, "Repeat Sales": 1780.2931764996595}, {"Week": 24, "Repeat Sales": 1748.0466534897664}, {"Week": 25, "Repeat Sales": 1718.3271718849533}, {"Week": 26, "Repeat Sales": 1690.7931154356913}, {"Week": 27, "Repeat Sales": 1665.1671199387583}, {"Week": 28, "Repeat Sales": 1641.2208580867923}, {"Week": 29, "Repeat Sales": 1618.7641048491596}, {"Week": 30, "Repeat Sales": 1597.636705730673}, {"Week": 31, "Repeat Sales": 1577.7025643012473}, {"Week": 32, "Repeat Sales": 1558.8450657744556}, {"Week": 33, "Repeat Sales": 1540.9635419232452}, {"Week": 34, "Repeat Sales": 1523.9705042450162}, {"Week": 35, "Repeat Sales": 1507.7894526999498}, {"Week": 36, "Repeat Sales": 1492.3531216794017}, {"Week": 37, "Repeat Sales": 1477.6020622951376}, {"Week": 38, "Repeat Sales": 1463.4834863278393}, {"Week": 39, "Repeat Sales": 1449.9503158724854}, {"Week": 40, "Repeat Sales": 1436.9603962340173}, {"Week": 41, "Repeat Sales": 1424.4758395262104}, {"Week": 42, "Repeat Sales": 1412.4624737661754}, {"Week": 43, "Repeat Sales": 1400.8893777597668}, {"Week": 44, "Repeat Sales": 1389.7284862419508}, {"Week": 45, "Repeat Sales": 1378.954252924883}, {"Week": 46, "Repeat Sales": 1368.5433615673248}, {"Week": 47, "Repeat Sales": 1358.4744770942186}, {"Week": 48, "Repeat Sales": 1348.7280302973293}, {"Week": 49, "Repeat Sales": 1339.2860308347201}, {"Week": 50, "Repeat Sales": 1330.1319041909621}, {"Week": 51, "Repeat Sales": 1321.2503490159907}, {"Week": 52, "Repeat Sales": 1312.6272118695629}], "data-6c7d23ac05af6cd95f066cf190a20345": [{"Week": 18, "Repeat Sales": 1800}, {"Week": 42, "Repeat Sales": 1296}, {"Week": 30, "Repeat Sales": 3050}, {"Week": 45, "Repeat Sales": 2592}, {"Week": 39, "Repeat Sales": 1272}, {"Week": 48, "Repeat Sales": 1731}, {"Week": 6, "Repeat Sales": 1437}, {"Week": 51, "Repeat Sales": 1069}, {"Week": 21, "Repeat Sales": 1400}, {"Week": 12, "Repeat Sales": 2520}, {"Week": 27, "Repeat Sales": 1402}, {"Week": 24, "Repeat Sales": 1619}, {"Week": 9, "Repeat Sales": 1861}, {"Week": 36, "Repeat Sales": 1112}, {"Week": 33, "Repeat Sales": 1367}, {"Week": 3, "Repeat Sales": 497}, {"Week": 15, "Repeat Sales": 2210}, {"Week": 25, "Repeat Sales": 2038}, {"Week": 49, "Repeat Sales": 1856}, {"Week": 22, "Repeat Sales": 1543}, {"Week": 1, "Repeat Sales": 0}, {"Week": 4, "Repeat Sales": 707}, {"Week": 19, "Repeat Sales": 1701}, {"Week": 13, "Repeat Sales": 2381}, {"Week": 7, "Repeat Sales": 1449}, {"Week": 34, "Repeat Sales": 1197}, {"Week": 16, "Repeat Sales": 2297}, {"Week": 46, "Repeat Sales": 1726}, {"Week": 40, "Repeat Sales": 1157}, {"Week": 28, "Repeat Sales": 1186}, {"Week": 37, "Repeat Sales": 1532}, {"Week": 31, "Repeat Sales": 2233}, {"Week": 52, "Repeat Sales": 942}, {"Week": 10, "Repeat Sales": 2053}, {"Week": 43, "Repeat Sales": 1718}, {"Week": 11, "Repeat Sales": 2320}, {"Week": 32, "Repeat Sales": 1095}, {"Week": 2, "Repeat Sales": 227}, {"Week": 8, "Repeat Sales": 1576}, {"Week": 23, "Repeat Sales": 1427}, {"Week": 29, "Repeat Sales": 1398}, {"Week": 26, "Repeat Sales": 1738}, {"Week": 17, "Repeat Sales": 2039}, {"Week": 5, "Repeat Sales": 976}, {"Week": 14, "Repeat Sales": 2575}, {"Week": 20, "Repeat Sales": 1801}, {"Week": 44, "Repeat Sales": 1454}, {"Week": 47, "Repeat Sales": 1464}, {"Week": 41, "Repeat Sales": 1456}, {"Week": 38, "Repeat Sales": 1456}, {"Week": 50, "Repeat Sales": 1868}, {"Week": 35, "Repeat Sales": 1155}]}}, {"mode": "vega-lite"});
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-00270cc0809c9e4434399da718cf3af9"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0]}, "field": "Week", "scale": {"domain": [0, 52]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-16696fcfd1d82937aff9f7116b4f663a"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0]}, "field": "Week", "scale": {"domain": [0, 52]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Forecast Weekly Repeat Sales", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-00270cc0809c9e4434399da718cf3af9": [{"Week": 1, "Repeat Sales": 0.0}, {"Week": 2, "Repeat Sales": 265.9329113821809}, {"Week": 3, "Repeat Sales": 494.7341193043053}, {"Week": 4, "Repeat Sales": 727.6377336828009}, {"Week": 5, "Repeat Sales": 955.6460644533299}, {"Week": 6, "Repeat Sales": 1206.437795980034}, {"Week": 7, "Repeat Sales": 1442.9576822956778}, {"Week": 8, "Repeat Sales": 1635.9532959826802}, {"Week": 9, "Repeat Sales": 1825.3444925310832}, {"Week": 10, "Repeat Sales": 2036.2734041816602}, {"Week": 11, "Repeat Sales": 2231.0097963960507}, {"Week": 12, "Repeat Sales": 2397.6707392261414}, {"Week": 13, "Repeat Sales": 2520.8546966345602}, {"Week": 14, "Repeat Sales": 2346.5958484432463}, {"Week": 15, "Repeat Sales": 2228.4142600713244}, {"Week": 16, "Repeat Sales": 2137.282504234453}, {"Week": 17, "Repeat Sales": 2062.7952394349877}, {"Week": 18, "Repeat Sales": 1999.772418466948}, {"Week": 19, "Repeat Sales": 1945.1909973825047}, {"Week": 20, "Repeat Sales": 1897.1090619307793}, {"Week": 21, "Repeat Sales": 1854.195590893073}, {"Week": 22, "Repeat Sales": 1815.4943253612594}, {"Week": 23, "Repeat Sales": 1780.2931764996595}, {"Week": 24, "Repeat Sales": 1748.0466534897664}, {"Week": 25, "Repeat Sales": 1718.3271718849533}, {"Week": 26, "Repeat Sales": 1690.7931154356913}, {"Week": 27, "Repeat Sales": 1665.1671199387583}, {"Week": 28, "Repeat Sales": 1641.2208580867923}, {"Week": 29, "Repeat Sales": 1618.7641048491596}, {"Week": 30, "Repeat Sales": 1597.636705730673}, {"Week": 31, "Repeat Sales": 1577.7025643012473}, {"Week": 32, "Repeat Sales": 1558.8450657744556}, {"Week": 33, "Repeat Sales": 1540.9635419232452}, {"Week": 34, "Repeat Sales": 1523.9705042450162}, {"Week": 35, "Repeat Sales": 1507.7894526999498}, {"Week": 36, "Repeat Sales": 1492.3531216794017}, {"Week": 37, "Repeat Sales": 1477.6020622951376}, {"Week": 38, "Repeat Sales": 1463.4834863278393}, {"Week": 39, "Repeat Sales": 1449.9503158724854}, {"Week": 40, "Repeat Sales": 1436.9603962340173}, {"Week": 41, "Repeat Sales": 1424.4758395262104}, {"Week": 42, "Repeat Sales": 1412.4624737661754}, {"Week": 43, "Repeat Sales": 1400.8893777597668}, {"Week": 44, "Repeat Sales": 1389.7284862419508}, {"Week": 45, "Repeat Sales": 1378.954252924883}, {"Week": 46, "Repeat Sales": 1368.5433615673248}, {"Week": 47, "Repeat Sales": 1358.4744770942186}, {"Week": 48, "Repeat Sales": 1348.7280302973293}, {"Week": 49, "Repeat Sales": 1339.2860308347201}, {"Week": 50, "Repeat Sales": 1330.1319041909621}, {"Week": 51, "Repeat Sales": 1321.2503490159907}, {"Week": 52, "Repeat Sales": 1312.6272118695629}], "data-16696fcfd1d82937aff9f7116b4f663a": [{"Week": 33, "Repeat Sales": 1367}, {"Week": 39, "Repeat Sales": 1272}, {"Week": 30, "Repeat Sales": 3050}, {"Week": 45, "Repeat Sales": 2592}, {"Week": 42, "Repeat Sales": 1296}, {"Week": 9, "Repeat Sales": 1861}, {"Week": 48, "Repeat Sales": 1731}, {"Week": 12, "Repeat Sales": 2520}, {"Week": 15, "Repeat Sales": 2210}, {"Week": 51, "Repeat Sales": 1069}, {"Week": 21, "Repeat Sales": 1400}, {"Week": 27, "Repeat Sales": 1402}, {"Week": 18, "Repeat Sales": 1800}, {"Week": 24, "Repeat Sales": 1619}, {"Week": 3, "Repeat Sales": 497}, {"Week": 6, "Repeat Sales": 1437}, {"Week": 36, "Repeat Sales": 1112}, {"Week": 31, "Repeat Sales": 2233}, {"Week": 1, "Repeat Sales": 0}, {"Week": 37, "Repeat Sales": 1532}, {"Week": 7, "Repeat Sales": 1449}, {"Week": 40, "Repeat Sales": 1157}, {"Week": 34, "Repeat Sales": 1197}, {"Week": 46, "Repeat Sales": 1726}, {"Week": 16, "Repeat Sales": 2297}, {"Week": 13, "Repeat Sales": 2381}, {"Week": 52, "Repeat Sales": 942}, {"Week": 22, "Repeat Sales": 1543}, {"Week": 4, "Repeat Sales": 707}, {"Week": 10, "Repeat Sales": 2053}, {"Week": 25, "Repeat Sales": 2038}, {"Week": 43, "Repeat Sales": 1718}, {"Week": 28, "Repeat Sales": 1186}, {"Week": 19, "Repeat Sales": 1701}, {"Week": 49, "Repeat Sales": 1856}, {"Week": 29, "Repeat Sales": 1398}, {"Week": 26, "Repeat Sales": 1738}, {"Week": 32, "Repeat Sales": 1095}, {"Week": 14, "Repeat Sales": 2575}, {"Week": 8, "Repeat Sales": 1576}, {"Week": 20, "Repeat Sales": 1801}, {"Week": 23, "Repeat Sales": 1427}, {"Week": 5, "Repeat Sales": 976}, {"Week": 11, "Repeat Sales": 2320}, {"Week": 17, "Repeat Sales": 2039}, {"Week": 2, "Repeat Sales": 227}, {"Week": 41, "Repeat Sales": 1456}, {"Week": 44, "Repeat Sales": 1454}, {"Week": 47, "Repeat Sales": 1464}, {"Week": 50, "Repeat Sales": 1868}, {"Week": 35, "Repeat Sales": 1155}, {"Week": 38, "Repeat Sales": 1456}]}}, {"mode": "vega-lite"});
 </script>
 </div>
 </div>
-<div id="54a5a706" class="cell" data-execution_count="22">
+<div id="75874211" class="cell" data-execution_count="22">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>e_cum_repeat_sales_df <span class="op">=</span> (</span>
@@ -4170,22 +4170,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="22">
 
 <style>
-#altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b.vega-embed {
+#altair-viz-d59be9f95eee42f69d60ffdc92655238.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b.vega-embed details,
-#altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b.vega-embed details summary {
+#altair-viz-d59be9f95eee42f69d60ffdc92655238.vega-embed details,
+#altair-viz-d59be9f95eee42f69d60ffdc92655238.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b"></div>
+<div id="altair-viz-d59be9f95eee42f69d60ffdc92655238"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b") {
-      outputDiv = document.getElementById("altair-viz-ade94d70e3d74a70ab2ce6a2ac2c914b");
+    if (outputDiv.id !== "altair-viz-d59be9f95eee42f69d60ffdc92655238") {
+      outputDiv = document.getElementById("altair-viz-d59be9f95eee42f69d60ffdc92655238");
     }
 
     const paths = {
@@ -4237,7 +4237,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="62d98b24" class="cell" data-execution_count="23">
+<div id="fca39b3f" class="cell" data-execution_count="23">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>full_weeks <span class="op">=</span> np.arange(<span class="dv">78</span>) <span class="op">+</span> <span class="dv">1</span></span>
@@ -4282,22 +4282,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="23">
 
 <style>
-#altair-viz-3769a9a48ed14dc2b41b6786b38efd40.vega-embed {
+#altair-viz-f857133ba9224520829acb4cbdf16f7a.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-3769a9a48ed14dc2b41b6786b38efd40.vega-embed details,
-#altair-viz-3769a9a48ed14dc2b41b6786b38efd40.vega-embed details summary {
+#altair-viz-f857133ba9224520829acb4cbdf16f7a.vega-embed details,
+#altair-viz-f857133ba9224520829acb4cbdf16f7a.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-3769a9a48ed14dc2b41b6786b38efd40"></div>
+<div id="altair-viz-f857133ba9224520829acb4cbdf16f7a"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-3769a9a48ed14dc2b41b6786b38efd40") {
-      outputDiv = document.getElementById("altair-viz-3769a9a48ed14dc2b41b6786b38efd40");
+    if (outputDiv.id !== "altair-viz-f857133ba9224520829acb4cbdf16f7a") {
+      outputDiv = document.getElementById("altair-viz-f857133ba9224520829acb4cbdf16f7a");
     }
 
     const paths = {
@@ -4345,11 +4345,11 @@ position: relative;
         .catch(showError)
         .then(() => displayChart(vegaEmbed));
     }
-  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-3cdc8e66b306e491b9c48ea4993b1894"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0, 56.0, 60.0, 64.0, 68.0, 72.0, 76.0]}, "field": "Week", "scale": {"domain": [0, 78]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-c53bea8406c1c5f0de94d165d0219402"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0, 56.0, 60.0, 64.0, 68.0, 72.0, 76.0]}, "field": "Week", "scale": {"domain": [0, 78]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Forecast Weekly Repeat Sales", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-3cdc8e66b306e491b9c48ea4993b1894": [{"Week": 1, "Repeat Sales": 0.0}, {"Week": 2, "Repeat Sales": 265.9329113821809}, {"Week": 3, "Repeat Sales": 494.7341193043053}, {"Week": 4, "Repeat Sales": 727.6377336828009}, {"Week": 5, "Repeat Sales": 955.6460644533299}, {"Week": 6, "Repeat Sales": 1206.437795980034}, {"Week": 7, "Repeat Sales": 1442.9576822956778}, {"Week": 8, "Repeat Sales": 1635.9532959826802}, {"Week": 9, "Repeat Sales": 1825.3444925310832}, {"Week": 10, "Repeat Sales": 2036.2734041816602}, {"Week": 11, "Repeat Sales": 2231.0097963960507}, {"Week": 12, "Repeat Sales": 2397.6707392261414}, {"Week": 13, "Repeat Sales": 2520.8546966345602}, {"Week": 14, "Repeat Sales": 2346.5958484432463}, {"Week": 15, "Repeat Sales": 2228.4142600713244}, {"Week": 16, "Repeat Sales": 2137.282504234453}, {"Week": 17, "Repeat Sales": 2062.7952394349877}, {"Week": 18, "Repeat Sales": 1999.772418466948}, {"Week": 19, "Repeat Sales": 1945.1909973825047}, {"Week": 20, "Repeat Sales": 1897.1090619307793}, {"Week": 21, "Repeat Sales": 1854.195590893073}, {"Week": 22, "Repeat Sales": 1815.4943253612594}, {"Week": 23, "Repeat Sales": 1780.2931764996595}, {"Week": 24, "Repeat Sales": 1748.0466534897664}, {"Week": 25, "Repeat Sales": 1718.3271718849533}, {"Week": 26, "Repeat Sales": 1690.7931154356913}, {"Week": 27, "Repeat Sales": 1665.1671199387583}, {"Week": 28, "Repeat Sales": 1641.2208580867923}, {"Week": 29, "Repeat Sales": 1618.7641048491596}, {"Week": 30, "Repeat Sales": 1597.636705730673}, {"Week": 31, "Repeat Sales": 1577.7025643012473}, {"Week": 32, "Repeat Sales": 1558.8450657744556}, {"Week": 33, "Repeat Sales": 1540.9635419232452}, {"Week": 34, "Repeat Sales": 1523.9705042450162}, {"Week": 35, "Repeat Sales": 1507.7894526999498}, {"Week": 36, "Repeat Sales": 1492.3531216794017}, {"Week": 37, "Repeat Sales": 1477.6020622951376}, {"Week": 38, "Repeat Sales": 1463.4834863278393}, {"Week": 39, "Repeat Sales": 1449.9503158724854}, {"Week": 40, "Repeat Sales": 1436.9603962340173}, {"Week": 41, "Repeat Sales": 1424.4758395262104}, {"Week": 42, "Repeat Sales": 1412.4624737661754}, {"Week": 43, "Repeat Sales": 1400.8893777597668}, {"Week": 44, "Repeat Sales": 1389.7284862419508}, {"Week": 45, "Repeat Sales": 1378.954252924883}, {"Week": 46, "Repeat Sales": 1368.5433615673248}, {"Week": 47, "Repeat Sales": 1358.4744770942186}, {"Week": 48, "Repeat Sales": 1348.7280302973293}, {"Week": 49, "Repeat Sales": 1339.2860308347201}, {"Week": 50, "Repeat Sales": 1330.1319041909621}, {"Week": 51, "Repeat Sales": 1321.2503490159907}, {"Week": 52, "Repeat Sales": 1312.6272118695629}, {"Week": 53, "Repeat Sales": 1304.2493768917452}, {"Week": 54, "Repeat Sales": 1296.1046683219047}, {"Week": 55, "Repeat Sales": 1288.1817641179077}, {"Week": 56, "Repeat Sales": 1280.4701191981924}, {"Week": 57, "Repeat Sales": 1272.9598970533739}, {"Week": 58, "Repeat Sales": 1265.6419086601047}, {"Week": 59, "Repeat Sales": 1258.5075577850641}, {"Week": 60, "Repeat Sales": 1251.5487918968652}, {"Week": 61, "Repeat Sales": 1244.7580580129036}, {"Week": 62, "Repeat Sales": 1238.1282629003001}, {"Week": 63, "Repeat Sales": 1231.6527371281363}, {"Week": 64, "Repeat Sales": 1225.3252025344318}, {"Week": 65, "Repeat Sales": 1219.1397427278453}, {"Week": 66, "Repeat Sales": 1213.0907762923607}, {"Week": 67, "Repeat Sales": 1207.1730324046541}, {"Week": 68, "Repeat Sales": 1201.381528609457}, {"Week": 69, "Repeat Sales": 1195.7115505289655}, {"Week": 70, "Repeat Sales": 1190.158633308893}, {"Week": 71, "Repeat Sales": 1184.718544626823}, {"Week": 72, "Repeat Sales": 1179.3872691085062}, {"Week": 73, "Repeat Sales": 1174.1609940152139}, {"Week": 74, "Repeat Sales": 1169.0360960804612}, {"Week": 75, "Repeat Sales": 1164.00912938776}, {"Week": 76, "Repeat Sales": 1159.0768141927358}, {"Week": 77, "Repeat Sales": 1154.2360266032233}, {"Week": 78, "Repeat Sales": 1149.483789039993}], "data-c53bea8406c1c5f0de94d165d0219402": [{"Week": 39, "Repeat Sales": 1272}, {"Week": 57, "Repeat Sales": 1114}, {"Week": 27, "Repeat Sales": 1402}, {"Week": 12, "Repeat Sales": 2520}, {"Week": 60, "Repeat Sales": 1202}, {"Week": 30, "Repeat Sales": 3050}, {"Week": 63, "Repeat Sales": 1591}, {"Week": 42, "Repeat Sales": 1296}, {"Week": 33, "Repeat Sales": 1367}, {"Week": 51, "Repeat Sales": 1069}, {"Week": 72, "Repeat Sales": 1117}, {"Week": 69, "Repeat Sales": 1022}, {"Week": 66, "Repeat Sales": 1090}, {"Week": 54, "Repeat Sales": 1142}, {"Week": 3, "Repeat Sales": 497}, {"Week": 15, "Repeat Sales": 2210}, {"Week": 6, "Repeat Sales": 1437}, {"Week": 36, "Repeat Sales": 1112}, {"Week": 9, "Repeat Sales": 1861}, {"Week": 48, "Repeat Sales": 1731}, {"Week": 75, "Repeat Sales": 1383}, {"Week": 24, "Repeat Sales": 1619}, {"Week": 21, "Repeat Sales": 1400}, {"Week": 78, "Repeat Sales": 929}, {"Week": 45, "Repeat Sales": 2592}, {"Week": 18, "Repeat Sales": 1800}, {"Week": 7, "Repeat Sales": 1449}, {"Week": 40, "Repeat Sales": 1157}, {"Week": 25, "Repeat Sales": 2038}, {"Week": 58, "Repeat Sales": 1294}, {"Week": 55, "Repeat Sales": 1287}, {"Week": 1, "Repeat Sales": 0}, {"Week": 4, "Repeat Sales": 707}, {"Week": 46, "Repeat Sales": 1726}, {"Week": 37, "Repeat Sales": 1532}, {"Week": 61, "Repeat Sales": 1885}, {"Week": 13, "Repeat Sales": 2381}, {"Week": 31, "Repeat Sales": 2233}, {"Week": 10, "Repeat Sales": 2053}, {"Week": 28, "Repeat Sales": 1186}, {"Week": 49, "Repeat Sales": 1856}, {"Week": 52, "Repeat Sales": 942}, {"Week": 64, "Repeat Sales": 1756}, {"Week": 43, "Repeat Sales": 1718}, {"Week": 34, "Repeat Sales": 1197}, {"Week": 22, "Repeat Sales": 1543}, {"Week": 19, "Repeat Sales": 1701}, {"Week": 16, "Repeat Sales": 2297}, {"Week": 8, "Repeat Sales": 1576}, {"Week": 26, "Repeat Sales": 1738}, {"Week": 32, "Repeat Sales": 1095}, {"Week": 17, "Repeat Sales": 2039}, {"Week": 20, "Repeat Sales": 1801}, {"Week": 11, "Repeat Sales": 2320}, {"Week": 76, "Repeat Sales": 1573}, {"Week": 70, "Repeat Sales": 1249}, {"Week": 29, "Repeat Sales": 1398}, {"Week": 2, "Repeat Sales": 227}, {"Week": 14, "Repeat Sales": 2575}, {"Week": 23, "Repeat Sales": 1427}, {"Week": 5, "Repeat Sales": 976}, {"Week": 67, "Repeat Sales": 973}, {"Week": 73, "Repeat Sales": 1004}, {"Week": 56, "Repeat Sales": 1221}, {"Week": 77, "Repeat Sales": 967}, {"Week": 65, "Repeat Sales": 1516}, {"Week": 44, "Repeat Sales": 1454}, {"Week": 59, "Repeat Sales": 1209}, {"Week": 35, "Repeat Sales": 1155}, {"Week": 62, "Repeat Sales": 1793}, {"Week": 50, "Repeat Sales": 1868}, {"Week": 68, "Repeat Sales": 1202}, {"Week": 38, "Repeat Sales": 1456}, {"Week": 71, "Repeat Sales": 1113}, {"Week": 74, "Repeat Sales": 1265}, {"Week": 53, "Repeat Sales": 1143}, {"Week": 47, "Repeat Sales": 1464}, {"Week": 41, "Repeat Sales": 1456}]}}, {"mode": "vega-lite"});
+  })({"config": {"view": {"continuousWidth": 300, "continuousHeight": 300, "stroke": null}, "axisX": {"grid": false}, "axisY": {"grid": false}}, "layer": [{"data": {"name": "data-3cdc8e66b306e491b9c48ea4993b1894"}, "mark": {"type": "line", "strokeDash": [4, 4], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0, 56.0, 60.0, 64.0, 68.0, 72.0, 76.0]}, "field": "Week", "scale": {"domain": [0, 78]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}, {"data": {"name": "data-0e59aace9a3ff4fbdea5bb10c681f0e3"}, "mark": {"type": "line", "strokeDash": [1, 0], "strokeWidth": 2}, "encoding": {"color": {}, "x": {"axis": {"labelExpr": "datum.value", "title": "Week", "values": [0.0, 4.0, 8.0, 12.0, 16.0, 20.0, 24.0, 28.0, 32.0, 36.0, 40.0, 44.0, 48.0, 52.0, 56.0, 60.0, 64.0, 68.0, 72.0, 76.0]}, "field": "Week", "scale": {"domain": [0, 78]}, "type": "quantitative"}, "y": {"field": "Repeat Sales", "scale": {}, "title": "Units Purchased", "type": "quantitative"}}}], "height": 250, "title": "Forecast Weekly Repeat Sales", "width": 650, "$schema": "https://vega.github.io/schema/vega-lite/v6.4.1.json", "datasets": {"data-3cdc8e66b306e491b9c48ea4993b1894": [{"Week": 1, "Repeat Sales": 0.0}, {"Week": 2, "Repeat Sales": 265.9329113821809}, {"Week": 3, "Repeat Sales": 494.7341193043053}, {"Week": 4, "Repeat Sales": 727.6377336828009}, {"Week": 5, "Repeat Sales": 955.6460644533299}, {"Week": 6, "Repeat Sales": 1206.437795980034}, {"Week": 7, "Repeat Sales": 1442.9576822956778}, {"Week": 8, "Repeat Sales": 1635.9532959826802}, {"Week": 9, "Repeat Sales": 1825.3444925310832}, {"Week": 10, "Repeat Sales": 2036.2734041816602}, {"Week": 11, "Repeat Sales": 2231.0097963960507}, {"Week": 12, "Repeat Sales": 2397.6707392261414}, {"Week": 13, "Repeat Sales": 2520.8546966345602}, {"Week": 14, "Repeat Sales": 2346.5958484432463}, {"Week": 15, "Repeat Sales": 2228.4142600713244}, {"Week": 16, "Repeat Sales": 2137.282504234453}, {"Week": 17, "Repeat Sales": 2062.7952394349877}, {"Week": 18, "Repeat Sales": 1999.772418466948}, {"Week": 19, "Repeat Sales": 1945.1909973825047}, {"Week": 20, "Repeat Sales": 1897.1090619307793}, {"Week": 21, "Repeat Sales": 1854.195590893073}, {"Week": 22, "Repeat Sales": 1815.4943253612594}, {"Week": 23, "Repeat Sales": 1780.2931764996595}, {"Week": 24, "Repeat Sales": 1748.0466534897664}, {"Week": 25, "Repeat Sales": 1718.3271718849533}, {"Week": 26, "Repeat Sales": 1690.7931154356913}, {"Week": 27, "Repeat Sales": 1665.1671199387583}, {"Week": 28, "Repeat Sales": 1641.2208580867923}, {"Week": 29, "Repeat Sales": 1618.7641048491596}, {"Week": 30, "Repeat Sales": 1597.636705730673}, {"Week": 31, "Repeat Sales": 1577.7025643012473}, {"Week": 32, "Repeat Sales": 1558.8450657744556}, {"Week": 33, "Repeat Sales": 1540.9635419232452}, {"Week": 34, "Repeat Sales": 1523.9705042450162}, {"Week": 35, "Repeat Sales": 1507.7894526999498}, {"Week": 36, "Repeat Sales": 1492.3531216794017}, {"Week": 37, "Repeat Sales": 1477.6020622951376}, {"Week": 38, "Repeat Sales": 1463.4834863278393}, {"Week": 39, "Repeat Sales": 1449.9503158724854}, {"Week": 40, "Repeat Sales": 1436.9603962340173}, {"Week": 41, "Repeat Sales": 1424.4758395262104}, {"Week": 42, "Repeat Sales": 1412.4624737661754}, {"Week": 43, "Repeat Sales": 1400.8893777597668}, {"Week": 44, "Repeat Sales": 1389.7284862419508}, {"Week": 45, "Repeat Sales": 1378.954252924883}, {"Week": 46, "Repeat Sales": 1368.5433615673248}, {"Week": 47, "Repeat Sales": 1358.4744770942186}, {"Week": 48, "Repeat Sales": 1348.7280302973293}, {"Week": 49, "Repeat Sales": 1339.2860308347201}, {"Week": 50, "Repeat Sales": 1330.1319041909621}, {"Week": 51, "Repeat Sales": 1321.2503490159907}, {"Week": 52, "Repeat Sales": 1312.6272118695629}, {"Week": 53, "Repeat Sales": 1304.2493768917452}, {"Week": 54, "Repeat Sales": 1296.1046683219047}, {"Week": 55, "Repeat Sales": 1288.1817641179077}, {"Week": 56, "Repeat Sales": 1280.4701191981924}, {"Week": 57, "Repeat Sales": 1272.9598970533739}, {"Week": 58, "Repeat Sales": 1265.6419086601047}, {"Week": 59, "Repeat Sales": 1258.5075577850641}, {"Week": 60, "Repeat Sales": 1251.5487918968652}, {"Week": 61, "Repeat Sales": 1244.7580580129036}, {"Week": 62, "Repeat Sales": 1238.1282629003001}, {"Week": 63, "Repeat Sales": 1231.6527371281363}, {"Week": 64, "Repeat Sales": 1225.3252025344318}, {"Week": 65, "Repeat Sales": 1219.1397427278453}, {"Week": 66, "Repeat Sales": 1213.0907762923607}, {"Week": 67, "Repeat Sales": 1207.1730324046541}, {"Week": 68, "Repeat Sales": 1201.381528609457}, {"Week": 69, "Repeat Sales": 1195.7115505289655}, {"Week": 70, "Repeat Sales": 1190.158633308893}, {"Week": 71, "Repeat Sales": 1184.718544626823}, {"Week": 72, "Repeat Sales": 1179.3872691085062}, {"Week": 73, "Repeat Sales": 1174.1609940152139}, {"Week": 74, "Repeat Sales": 1169.0360960804612}, {"Week": 75, "Repeat Sales": 1164.00912938776}, {"Week": 76, "Repeat Sales": 1159.0768141927358}, {"Week": 77, "Repeat Sales": 1154.2360266032233}, {"Week": 78, "Repeat Sales": 1149.483789039993}], "data-0e59aace9a3ff4fbdea5bb10c681f0e3": [{"Week": 6, "Repeat Sales": 1437}, {"Week": 72, "Repeat Sales": 1117}, {"Week": 30, "Repeat Sales": 3050}, {"Week": 42, "Repeat Sales": 1296}, {"Week": 36, "Repeat Sales": 1112}, {"Week": 9, "Repeat Sales": 1861}, {"Week": 39, "Repeat Sales": 1272}, {"Week": 51, "Repeat Sales": 1069}, {"Week": 15, "Repeat Sales": 2210}, {"Week": 3, "Repeat Sales": 497}, {"Week": 78, "Repeat Sales": 929}, {"Week": 27, "Repeat Sales": 1402}, {"Week": 45, "Repeat Sales": 2592}, {"Week": 57, "Repeat Sales": 1114}, {"Week": 48, "Repeat Sales": 1731}, {"Week": 33, "Repeat Sales": 1367}, {"Week": 18, "Repeat Sales": 1800}, {"Week": 54, "Repeat Sales": 1142}, {"Week": 63, "Repeat Sales": 1591}, {"Week": 60, "Repeat Sales": 1202}, {"Week": 24, "Repeat Sales": 1619}, {"Week": 12, "Repeat Sales": 2520}, {"Week": 21, "Repeat Sales": 1400}, {"Week": 69, "Repeat Sales": 1022}, {"Week": 75, "Repeat Sales": 1383}, {"Week": 66, "Repeat Sales": 1090}, {"Week": 7, "Repeat Sales": 1449}, {"Week": 46, "Repeat Sales": 1726}, {"Week": 13, "Repeat Sales": 2381}, {"Week": 10, "Repeat Sales": 2053}, {"Week": 22, "Repeat Sales": 1543}, {"Week": 19, "Repeat Sales": 1701}, {"Week": 61, "Repeat Sales": 1885}, {"Week": 25, "Repeat Sales": 2038}, {"Week": 28, "Repeat Sales": 1186}, {"Week": 43, "Repeat Sales": 1718}, {"Week": 58, "Repeat Sales": 1294}, {"Week": 31, "Repeat Sales": 2233}, {"Week": 40, "Repeat Sales": 1157}, {"Week": 34, "Repeat Sales": 1197}, {"Week": 55, "Repeat Sales": 1287}, {"Week": 1, "Repeat Sales": 0}, {"Week": 4, "Repeat Sales": 707}, {"Week": 16, "Repeat Sales": 2297}, {"Week": 49, "Repeat Sales": 1856}, {"Week": 52, "Repeat Sales": 942}, {"Week": 64, "Repeat Sales": 1756}, {"Week": 37, "Repeat Sales": 1532}, {"Week": 23, "Repeat Sales": 1427}, {"Week": 76, "Repeat Sales": 1573}, {"Week": 73, "Repeat Sales": 1004}, {"Week": 67, "Repeat Sales": 973}, {"Week": 17, "Repeat Sales": 2039}, {"Week": 14, "Repeat Sales": 2575}, {"Week": 2, "Repeat Sales": 227}, {"Week": 5, "Repeat Sales": 976}, {"Week": 70, "Repeat Sales": 1249}, {"Week": 26, "Repeat Sales": 1738}, {"Week": 29, "Repeat Sales": 1398}, {"Week": 32, "Repeat Sales": 1095}, {"Week": 11, "Repeat Sales": 2320}, {"Week": 20, "Repeat Sales": 1801}, {"Week": 8, "Repeat Sales": 1576}, {"Week": 65, "Repeat Sales": 1516}, {"Week": 77, "Repeat Sales": 967}, {"Week": 47, "Repeat Sales": 1464}, {"Week": 68, "Repeat Sales": 1202}, {"Week": 62, "Repeat Sales": 1793}, {"Week": 59, "Repeat Sales": 1209}, {"Week": 41, "Repeat Sales": 1456}, {"Week": 38, "Repeat Sales": 1456}, {"Week": 35, "Repeat Sales": 1155}, {"Week": 44, "Repeat Sales": 1454}, {"Week": 71, "Repeat Sales": 1113}, {"Week": 74, "Repeat Sales": 1265}, {"Week": 53, "Repeat Sales": 1143}, {"Week": 56, "Repeat Sales": 1221}, {"Week": 50, "Repeat Sales": 1868}]}}, {"mode": "vega-lite"});
 </script>
 </div>
 </div>
-<div id="bd5f1615" class="cell" data-execution_count="24">
+<div id="723f8a8a" class="cell" data-execution_count="24">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>qt <span class="op">=</span> np.linspace(beta.ppf(<span class="dv">0</span>, w1_alpha_T, w1_beta_T), beta.ppf(<span class="dv">1</span>, w1_alpha_T, w1_beta_T), <span class="dv">300</span>)</span>
@@ -4388,7 +4388,7 @@ position: relative;
 <p>Mean = 0.490, Variance = 0.017</p>
 </div>
 </div>
-<div id="e819772c" class="cell" data-execution_count="25">
+<div id="b55346df" class="cell" data-execution_count="25">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>qt_dist <span class="op">=</span> pl.DataFrame({<span class="st">&#39;qT&#39;</span>: qt, <span class="st">&#39;Week 1 PDF&#39;</span>: y_w1, <span class="st">&#39;All 12 Week PDF&#39;</span>: y_w12})</span>
@@ -4409,22 +4409,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="25">
 
 <style>
-#altair-viz-272f4092e2e54ed68e343f66949bf066.vega-embed {
+#altair-viz-ceb59b364471410daaa0e8050ffded7f.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-272f4092e2e54ed68e343f66949bf066.vega-embed details,
-#altair-viz-272f4092e2e54ed68e343f66949bf066.vega-embed details summary {
+#altair-viz-ceb59b364471410daaa0e8050ffded7f.vega-embed details,
+#altair-viz-ceb59b364471410daaa0e8050ffded7f.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-272f4092e2e54ed68e343f66949bf066"></div>
+<div id="altair-viz-ceb59b364471410daaa0e8050ffded7f"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-272f4092e2e54ed68e343f66949bf066") {
-      outputDiv = document.getElementById("altair-viz-272f4092e2e54ed68e343f66949bf066");
+    if (outputDiv.id !== "altair-viz-ceb59b364471410daaa0e8050ffded7f") {
+      outputDiv = document.getElementById("altair-viz-ceb59b364471410daaa0e8050ffded7f");
     }
 
     const paths = {

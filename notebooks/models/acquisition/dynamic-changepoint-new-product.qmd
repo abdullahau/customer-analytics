@@ -1,6 +1,10 @@
 ---
 title: A Dynamic Changepoint Model for New Product Sales Forecasting
 jupyter: python3
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/acquisition/dynamic-changepoint-new-product.qmd
 ---
 
 **Source**: [A Dynamic Changepoint Model for New Product Sales Forecasting](https://www.jstor.org/stable/30036656)

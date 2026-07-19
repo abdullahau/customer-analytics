@@ -1,5 +1,9 @@
 ---
 title: BG/BB Model - Discrete-Time, Noncontractual Setting
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/purchasing/bg-bb.qmd
 ---
 
 **Source**:

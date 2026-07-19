@@ -1,5 +1,9 @@
 ---
 title: Depth-of-Repeat Model - Forecasting Aggregate Repeat-Buying
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/acquisition/depth-of-repeat.qmd
 ---
 
 

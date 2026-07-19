@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Abdullah Mahmood">
-<meta name="dcterms.date" content="2026-07-15">
+<meta name="dcterms.date" content="2026-07-19">
 
 <title>Gamma-Gamma Model of Monetary Value</title>
 <style>
@@ -2408,7 +2408,7 @@ bottom: -1.25;
   <li><a href="#parameter-estimation" id="toc-parameter-estimation" class="nav-link active" data-scroll-target="#parameter-estimation"><span class="header-section-number">1</span> Parameter Estimation</a></li>
   <li><a href="#computing-conditional-expectations" id="toc-computing-conditional-expectations" class="nav-link" data-scroll-target="#computing-conditional-expectations"><span class="header-section-number">2</span> Computing Conditional Expectations</a></li>
   </ul>
-<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li></ul></div></nav>
+<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/spend/gamma-gamma.qmd"><i class="bi bi-file-code"></i>View source</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
@@ -2431,7 +2431,7 @@ bottom: -1.25;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 15, 2026</p>
+      <p class="date">July 19, 2026</p>
     </div>
   </div>
   
@@ -2447,7 +2447,7 @@ bottom: -1.25;
 <ul>
 <li><a href="https://www.brucehardie.com/notes/025/">The Gamma-Gamma Model of Monetary Value</a></li>
 </ul>
-<div id="80dd065b" class="cell" data-execution_count="1">
+<div id="87d656f3" class="cell" data-execution_count="1">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
@@ -2466,7 +2466,7 @@ bottom: -1.25;
 <pre><code>RendererRegistry.enable(&#39;html&#39;)</code></pre>
 </div>
 </div>
-<div id="a5265558" class="cell" data-execution_count="2">
+<div id="92811c77" class="cell" data-execution_count="2">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>cdnow <span class="op">=</span> CDNOW(master<span class="op">=</span><span class="va">False</span>, calib_p<span class="op">=</span><span class="dv">273</span>)</span>
@@ -2482,7 +2482,7 @@ bottom: -1.25;
 </details>
 </div>
 <p>The Gamma-Gamma model assumes that there is no relationship between the monetary value and the purchase frequency. We can check this assumption by calculating the correlation between the average spend and the frequency of purchases.</p>
-<div id="af191cb6" class="cell" data-execution_count="3">
+<div id="afd271cd" class="cell" data-execution_count="3">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>corr_data <span class="op">=</span> rfm_data.select(<span class="st">&#39;P1X&#39;</span>, <span class="st">&#39;zbar&#39;</span>).collect()</span>
@@ -2497,61 +2497,61 @@ bottom: -1.25;
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a><span class="co"># The value of this correlation is close to 0.11, which in practice is considered low enough to proceed with the model.</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display" data-execution_count="3">
-<div id="adjuxqyirb" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="dlkdbynqmc" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#adjuxqyirb table {
+#dlkdbynqmc table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#adjuxqyirb thead, tbody, tfoot, tr, td, th { border-style: none; }
+#dlkdbynqmc thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#adjuxqyirb p { margin: 0; padding: 0; }
-#adjuxqyirb .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#adjuxqyirb .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#adjuxqyirb .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#adjuxqyirb .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#adjuxqyirb .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#adjuxqyirb .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#adjuxqyirb .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#adjuxqyirb .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#adjuxqyirb .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#adjuxqyirb .gt_column_spanner_outer:first-child { padding-left: 0; }
-#adjuxqyirb .gt_column_spanner_outer:last-child { padding-right: 0; }
-#adjuxqyirb .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#adjuxqyirb .gt_spanner_row { border-bottom-style: hidden; }
-#adjuxqyirb .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#adjuxqyirb .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: middle; }
-#adjuxqyirb .gt_from_md> :first-child { margin-top: 0; }
-#adjuxqyirb .gt_from_md> :last-child { margin-bottom: 0; }
-#adjuxqyirb .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; }
-#adjuxqyirb .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
-#adjuxqyirb .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#adjuxqyirb .gt_row_group_first td { border-top-width: 2px; }
-#adjuxqyirb .gt_row_group_first th { border-top-width: 2px; }
-#adjuxqyirb .gt_striped { color: #333333; background-color: #F4F4F4; }
-#adjuxqyirb .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#adjuxqyirb .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#adjuxqyirb .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
-#adjuxqyirb .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#adjuxqyirb .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#adjuxqyirb .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
-#adjuxqyirb .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
-#adjuxqyirb .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#adjuxqyirb .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#adjuxqyirb .gt_left { text-align: left; }
-#adjuxqyirb .gt_center { text-align: center; }
-#adjuxqyirb .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#adjuxqyirb .gt_font_normal { font-weight: normal; }
-#adjuxqyirb .gt_font_bold { font-weight: bold; }
-#adjuxqyirb .gt_font_italic { font-style: italic; }
-#adjuxqyirb .gt_super { font-size: 65%; }
-#adjuxqyirb .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#adjuxqyirb .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
-#adjuxqyirb .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#adjuxqyirb .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#adjuxqyirb .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#adjuxqyirb .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#dlkdbynqmc p { margin: 0; padding: 0; }
+#dlkdbynqmc .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#dlkdbynqmc .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#dlkdbynqmc .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#dlkdbynqmc .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#dlkdbynqmc .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#dlkdbynqmc .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#dlkdbynqmc .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#dlkdbynqmc .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#dlkdbynqmc .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#dlkdbynqmc .gt_column_spanner_outer:first-child { padding-left: 0; }
+#dlkdbynqmc .gt_column_spanner_outer:last-child { padding-right: 0; }
+#dlkdbynqmc .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#dlkdbynqmc .gt_spanner_row { border-bottom-style: hidden; }
+#dlkdbynqmc .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#dlkdbynqmc .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: middle; }
+#dlkdbynqmc .gt_from_md> :first-child { margin-top: 0; }
+#dlkdbynqmc .gt_from_md> :last-child { margin-bottom: 0; }
+#dlkdbynqmc .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; }
+#dlkdbynqmc .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+#dlkdbynqmc .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#dlkdbynqmc .gt_row_group_first td { border-top-width: 2px; }
+#dlkdbynqmc .gt_row_group_first th { border-top-width: 2px; }
+#dlkdbynqmc .gt_striped { color: #333333; background-color: #F4F4F4; }
+#dlkdbynqmc .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#dlkdbynqmc .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#dlkdbynqmc .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
+#dlkdbynqmc .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#dlkdbynqmc .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#dlkdbynqmc .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+#dlkdbynqmc .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+#dlkdbynqmc .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#dlkdbynqmc .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#dlkdbynqmc .gt_left { text-align: left; }
+#dlkdbynqmc .gt_center { text-align: center; }
+#dlkdbynqmc .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#dlkdbynqmc .gt_font_normal { font-weight: normal; }
+#dlkdbynqmc .gt_font_bold { font-weight: bold; }
+#dlkdbynqmc .gt_font_italic { font-style: italic; }
+#dlkdbynqmc .gt_super { font-size: 65%; }
+#dlkdbynqmc .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#dlkdbynqmc .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
+#dlkdbynqmc .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#dlkdbynqmc .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#dlkdbynqmc .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#dlkdbynqmc .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-bootstrap="false">
@@ -2583,7 +2583,7 @@ tr { background-color: transparent; }
 </div>
 </div>
 </div>
-<div id="e92e70d4" class="cell" data-execution_count="4">
+<div id="353a5161" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Descriptive statistics of the average spend per repeat transaction</span></span>
@@ -2655,7 +2655,7 @@ white-space: pre-wrap;
 </div>
 </div>
 <p>Probability density estimate of the sample</p>
-<div id="dacbf920" class="cell" data-execution_count="5">
+<div id="53fc38e2" class="cell" data-execution_count="5">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>m <span class="op">=</span> np.arange(<span class="fl">2.5</span>, <span class="dv">301</span>, <span class="fl">2.5</span>) <span class="co"># Average transaction value range</span></span>
@@ -2671,7 +2671,7 @@ white-space: pre-wrap;
 <pre><code>Kernel Smoothing Bandwidth: 0.18800626075684287</code></pre>
 </div>
 </div>
-<div id="1f53f5e6" class="cell" data-execution_count="6">
+<div id="cc27fdc9" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Estimate the probability density function</span></span>
@@ -2689,7 +2689,7 @@ white-space: pre-wrap;
 </details>
 </div>
 <p>The distribution of average spend per (repeat) transaction across the 946 individuals who made a repeat transaction in the calibration period. Each customer’s average is computed across a (typically very) small number of transactions.</p>
-<div id="ede3589d" class="cell" data-execution_count="7">
+<div id="06f2283b" class="cell" data-execution_count="7">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>act_dist_plot <span class="op">=</span> (</span>
@@ -2712,22 +2712,22 @@ white-space: pre-wrap;
 <div class="cell-output cell-output-display" data-execution_count="7">
 
 <style>
-#altair-viz-132eef17148e4a7888c5d5c71b458db7.vega-embed {
+#altair-viz-21a9f433f78b498b9f6712c9b764ed4c.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-132eef17148e4a7888c5d5c71b458db7.vega-embed details,
-#altair-viz-132eef17148e4a7888c5d5c71b458db7.vega-embed details summary {
+#altair-viz-21a9f433f78b498b9f6712c9b764ed4c.vega-embed details,
+#altair-viz-21a9f433f78b498b9f6712c9b764ed4c.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-132eef17148e4a7888c5d5c71b458db7"></div>
+<div id="altair-viz-21a9f433f78b498b9f6712c9b764ed4c"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-132eef17148e4a7888c5d5c71b458db7") {
-      outputDiv = document.getElementById("altair-viz-132eef17148e4a7888c5d5c71b458db7");
+    if (outputDiv.id !== "altair-viz-21a9f433f78b498b9f6712c9b764ed4c") {
+      outputDiv = document.getElementById("altair-viz-21a9f433f78b498b9f6712c9b764ed4c");
     }
 
     const paths = {
@@ -2781,7 +2781,7 @@ position: relative;
 </div>
 <section id="parameter-estimation" class="level2" data-number="1">
 <h2 data-number="1" class="anchored" data-anchor-id="parameter-estimation"><span class="header-section-number">1</span> Parameter Estimation</h2>
-<div id="4373833e" class="cell" data-execution_count="8">
+<div id="3c4fbaa8" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> gammagamma(x, zbar, guess<span class="op">=</span>{<span class="st">&#39;p&#39;</span>: <span class="fl">0.01</span>, <span class="st">&#39;q&#39;</span>: <span class="fl">0.01</span>, <span class="st">&#39;gamma&#39;</span>: <span class="fl">0.01</span>}):</span>
@@ -2828,7 +2828,7 @@ position: relative;
 </div>
 </div>
 <p>The distribution where the means have been computed across <span class="math inline">\(x → ∞\)</span> transactions</p>
-<div id="913fef7e" class="cell" data-execution_count="9">
+<div id="912b17a5" class="cell" data-execution_count="9">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>zeta <span class="op">=</span> np.arange(<span class="dv">300</span>) <span class="op">+</span> <span class="dv">1</span></span>
@@ -2852,22 +2852,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="9">
 
 <style>
-#altair-viz-89bf658205f5499d965a3e322e872e9a.vega-embed {
+#altair-viz-fe38825bd0be401e829ec7d4845297c3.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-89bf658205f5499d965a3e322e872e9a.vega-embed details,
-#altair-viz-89bf658205f5499d965a3e322e872e9a.vega-embed details summary {
+#altair-viz-fe38825bd0be401e829ec7d4845297c3.vega-embed details,
+#altair-viz-fe38825bd0be401e829ec7d4845297c3.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-89bf658205f5499d965a3e322e872e9a"></div>
+<div id="altair-viz-fe38825bd0be401e829ec7d4845297c3"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-89bf658205f5499d965a3e322e872e9a") {
-      outputDiv = document.getElementById("altair-viz-89bf658205f5499d965a3e322e872e9a");
+    if (outputDiv.id !== "altair-viz-fe38825bd0be401e829ec7d4845297c3") {
+      outputDiv = document.getElementById("altair-viz-fe38825bd0be401e829ec7d4845297c3");
     }
 
     const paths = {
@@ -2919,7 +2919,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="7eb76153" class="cell" data-execution_count="10">
+<div id="32c2abb9" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># compute the density of average transaction value</span></span>
@@ -2951,7 +2951,7 @@ position: relative;
 <span id="cb12-27"><a href="#cb12-27" aria-hidden="true" tabindex="-1"></a>g <span class="op">=</span> np.dot(nx, g1.T) <span class="op">/</span> np.<span class="bu">sum</span>(nx)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="bae7e9f7" class="cell" data-execution_count="11">
+<div id="7af9905a" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>est_dist_plot <span class="op">=</span> (</span>
@@ -2976,22 +2976,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="11">
 
 <style>
-#altair-viz-fd9db9eb68c64b4795e248684ee30645.vega-embed {
+#altair-viz-e938cd87a7ac4f8ea2778fd1d485f888.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-fd9db9eb68c64b4795e248684ee30645.vega-embed details,
-#altair-viz-fd9db9eb68c64b4795e248684ee30645.vega-embed details summary {
+#altair-viz-e938cd87a7ac4f8ea2778fd1d485f888.vega-embed details,
+#altair-viz-e938cd87a7ac4f8ea2778fd1d485f888.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-fd9db9eb68c64b4795e248684ee30645"></div>
+<div id="altair-viz-e938cd87a7ac4f8ea2778fd1d485f888"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-fd9db9eb68c64b4795e248684ee30645") {
-      outputDiv = document.getElementById("altair-viz-fd9db9eb68c64b4795e248684ee30645");
+    if (outputDiv.id !== "altair-viz-e938cd87a7ac4f8ea2778fd1d485f888") {
+      outputDiv = document.getElementById("altair-viz-e938cd87a7ac4f8ea2778fd1d485f888");
     }
 
     const paths = {
@@ -3046,7 +3046,7 @@ position: relative;
 </section>
 <section id="computing-conditional-expectations" class="level2" data-number="2">
 <h2 data-number="2" class="anchored" data-anchor-id="computing-conditional-expectations"><span class="header-section-number">2</span> Computing Conditional Expectations</h2>
-<div id="592b55c6" class="cell" data-execution_count="12">
+<div id="499201a7" class="cell" data-execution_count="12">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>E_Z <span class="op">=</span> p<span class="op">*</span>gamma<span class="op">/</span>(q<span class="op">-</span><span class="dv">1</span>)</span>

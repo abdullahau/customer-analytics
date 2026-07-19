@@ -1,5 +1,9 @@
 ---
 title: Analysing Buyer Behaviour Using Consumer Panel Data
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/analyses/buyer-behavior-summary-panel-data.qmd
 ---
 
 ## Introduction

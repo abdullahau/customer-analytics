@@ -1,5 +1,9 @@
 ---
 title: "NBD-Dirichlet Model of Consumer Buying Behavior for Marketing Research"
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet.qmd
 ---
 
 **Sources**:
@@ -143,7 +147,7 @@ $$
 P_n = \left(1 + \frac{MT}{K}\right)^{-K} \frac{\Gamma(K+n)}{n!\,\Gamma(K)} \left(\frac{MT}{MT+K}\right)^{n}
 $$
 
-This is the same NBD as in [`nbd-overview`](../purchasing/nbd-overview.qmd) — Poisson
+This is the same NBD as in [`nbd-overview`](../purchasing/nbd-overview) — Poisson
 counting with gamma heterogeneity — applied here to the *category* rather than to one
 firm's transactions.
 

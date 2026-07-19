@@ -1,5 +1,9 @@
 ---
 title: CDNOW Data Set & Summaries
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/data-prep/cdnow-dataset.qmd
 ---
 
 The file `CDNOW_master.csv` contains the entire purchase history up to the end of June 1998 of the cohort of 23,570 individuals who made their first-ever purchase at CDNOW in the first quarter of 1997. Each record in this file, 69,659 in total, comprises four fields: the **customer’s ID**, the **date of the transaction**, the **number of CDs purchased**, and the **dollar value of the transaction**. A 1/10th systematic sample of the whole cohort (2357 customers) is also available for developing models of buyer behaviour in noncontractual settings. The primary purpose of this notebook is to document the process of creating the 1/10th sample of the complete dataset. We also show how to create the summary of this dataset used in [Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution](https://abdullahau.github.io/customer-analytics/Sales-Forecast-Finite-Mixture-Beta-Geometric), and how the full dataset is used in “RFM and CLV: Using Iso-value Curves for Customer Base Analysis".

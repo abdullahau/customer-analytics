@@ -1,5 +1,9 @@
 ---
 title: Calculating Customer Acquisition Cost
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/analyses/customer-acquisition-cost.qmd
 ---
 
 Source: [Video Series - Customer Acquisition Cost (by Dan McCarthy)](https://www.youtube.com/watch?v=PZe6LUAyREQ)

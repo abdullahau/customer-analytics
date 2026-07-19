@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Abdullah Mahmood">
-<meta name="dcterms.date" content="2026-07-15">
+<meta name="dcterms.date" content="2026-07-19">
 
 <title>BG/NBD Model</title>
 <style>
@@ -2426,7 +2426,7 @@ bottom: -1.25;
   <li><a href="#creating-a-fit-histogram-for-the-paretonbd-model" id="toc-creating-a-fit-histogram-for-the-paretonbd-model" class="nav-link" data-scroll-target="#creating-a-fit-histogram-for-the-paretonbd-model"><span class="header-section-number">3.5</span> Creating a Fit Histogram for the Pareto/NBD Model</a></li>
   </ul></li>
   </ul>
-<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li></ul></div></nav>
+<div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/purchasing/bg-nbd.qmd"><i class="bi bi-file-code"></i>View source</a></li></ul></div></nav>
 </div>
 <main class="content" id="quarto-document-content">
 
@@ -2449,7 +2449,7 @@ bottom: -1.25;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">July 15, 2026</p>
+      <p class="date">July 19, 2026</p>
     </div>
   </div>
   
@@ -2481,7 +2481,7 @@ bottom: -1.25;
 <h2 data-number="1" class="anchored" data-anchor-id="imports"><span class="header-section-number">1</span> Imports</h2>
 <section id="import-packages" class="level3" data-number="1.1">
 <h3 data-number="1.1" class="anchored" data-anchor-id="import-packages"><span class="header-section-number">1.1</span> Import Packages</h3>
-<div id="cec114bf" class="cell" data-execution_count="1">
+<div id="fbcbeb33" class="cell" data-execution_count="1">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> polars <span class="im">as</span> pl</span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
 <span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> scipy.optimize <span class="im">import</span> minimize</span>
@@ -2499,7 +2499,7 @@ bottom: -1.25;
 </section>
 <section id="import-data" class="level3" data-number="1.2">
 <h3 data-number="1.2" class="anchored" data-anchor-id="import-data"><span class="header-section-number">1.2</span> Import Data</h3>
-<div id="d6b9c34e" class="cell" data-execution_count="2">
+<div id="ee371fbc" class="cell" data-execution_count="2">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>calib_p <span class="op">=</span> <span class="dv">273</span>  <span class="co"># 39 week calibration period</span></span>
 <span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>data <span class="op">=</span> CDNOW(master<span class="op">=</span><span class="va">False</span>, calib_p<span class="op">=</span>calib_p)</span>
@@ -2528,7 +2528,7 @@ bottom: -1.25;
 <h2 data-number="2" class="anchored" data-anchor-id="bgnbd-model"><span class="header-section-number">2</span> BG/NBD Model</h2>
 <section id="parameter-estimation" class="level3" data-number="2.1">
 <h3 data-number="2.1" class="anchored" data-anchor-id="parameter-estimation"><span class="header-section-number">2.1</span> Parameter Estimation</h3>
-<div id="b4e25d6b" class="cell" data-execution_count="3">
+<div id="28e6e8b7" class="cell" data-execution_count="3">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bgnbd_est(rfm_data, guess<span class="op">=</span>{<span class="st">&quot;r&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;alpha&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;a&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;b&quot;</span>: <span class="fl">0.01</span>}):</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>        r, alpha, a, b <span class="op">=</span> x</span>
@@ -2555,7 +2555,7 @@ bottom: -1.25;
 <span id="cb4-24"><a href="#cb4-24" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">&quot;maxiter&quot;</span>: <span class="dv">10000</span>},</span>
 <span id="cb4-25"><a href="#cb4-25" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="7cc1aca6" class="cell" data-execution_count="4">
+<div id="526d28e9" class="cell" data-execution_count="4">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> bgnbd_est(rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy())</span>
@@ -2582,7 +2582,7 @@ bottom: -1.25;
 <span id="cb5-22"><a href="#cb5-22" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/3229766705.py:11: RuntimeWarning: invalid value encountered in log
+<pre><code>/tmp/ipykernel_393750/3229766705.py:11: RuntimeWarning: invalid value encountered in log
   np.log(a) - np.log(b + p1x - 1) - (r + p1x) * np.log(alpha + t_x),</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -2593,7 +2593,7 @@ bottom: -1.25;
 <p>Log-Likelihood = -9582.4292</p>
 </div>
 </div>
-<div id="33f0aef0" class="cell" data-execution_count="5">
+<div id="aa034ef2" class="cell" data-execution_count="5">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bgnbd_est(rfm_data, guess<span class="op">=</span>{<span class="st">&quot;r&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;alpha&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;a&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;b&quot;</span>: <span class="fl">0.01</span>}):</span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
 <span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>        r, alpha, a, b <span class="op">=</span> x</span>
@@ -2624,7 +2624,7 @@ bottom: -1.25;
 <span id="cb7-28"><a href="#cb7-28" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">&quot;maxiter&quot;</span>: <span class="dv">10000</span>},</span>
 <span id="cb7-29"><a href="#cb7-29" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="71016875" class="cell" data-execution_count="6">
+<div id="76d0ffbb" class="cell" data-execution_count="6">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> bgnbd_est(rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy())</span>
@@ -2645,7 +2645,7 @@ bottom: -1.25;
 <span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/2910011743.py:15: RuntimeWarning: invalid value encountered in log
+<pre><code>/tmp/ipykernel_393750/2910011743.py:15: RuntimeWarning: invalid value encountered in log
   np.log(a) - np.log(b + p1x - 1) - (r + p1x) * np.log(alpha + t_x),</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -2656,7 +2656,7 @@ bottom: -1.25;
 <p>Log-Likelihood = -6176.3040</p>
 </div>
 </div>
-<div id="f6ac5612" class="cell" data-execution_count="7">
+<div id="20c05e03" class="cell" data-execution_count="7">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bgnbd_est(rfm_data, guess<span class="op">=</span>{<span class="st">&quot;r&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;alpha&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;a&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;b&quot;</span>: <span class="fl">0.01</span>}):</span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
 <span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>        r, alpha, a, b <span class="op">=</span> x</span>
@@ -2692,7 +2692,7 @@ bottom: -1.25;
 <span id="cb10-33"><a href="#cb10-33" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">&quot;maxiter&quot;</span>: <span class="dv">10000</span>},</span>
 <span id="cb10-34"><a href="#cb10-34" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="c875b1a9" class="cell" data-execution_count="8">
+<div id="9e3aef73" class="cell" data-execution_count="8">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> bgnbd_est(rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy())</span>
@@ -2713,9 +2713,9 @@ bottom: -1.25;
 <span id="cb11-16"><a href="#cb11-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/2927824950.py:14: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_393750/2927824950.py:14: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   D_2 = r * np.log(alpha, where=alpha &gt; 0) - (r + p1x) * np.log(
-/tmp/ipykernel_525550/2927824950.py:23: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+/tmp/ipykernel_393750/2927824950.py:23: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   + np.where(p1x &gt; 0, np.log(C_3 + C_4, where=(C_3 + C_4) &gt; 0), np.log(C_3))</code></pre>
 </div>
 <div class="cell-output cell-output-display cell-output-markdown">
@@ -2726,7 +2726,7 @@ bottom: -1.25;
 <p>Log-Likelihood = -9582.4292</p>
 </div>
 </div>
-<div id="b5a9091a" class="cell" data-execution_count="9">
+<div id="b54f69fa" class="cell" data-execution_count="9">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> bgnbd_est(rfm_data, guess<span class="op">=</span>{<span class="st">&quot;r&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;alpha&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;a&quot;</span>: <span class="fl">0.01</span>, <span class="st">&quot;b&quot;</span>: <span class="fl">0.01</span>}):</span>
 <span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
 <span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>        r, alpha, a, b <span class="op">=</span> x</span>
@@ -2771,7 +2771,7 @@ bottom: -1.25;
 <span id="cb13-42"><a href="#cb13-42" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">&quot;maxiter&quot;</span>: <span class="dv">20000</span>},</span>
 <span id="cb13-43"><a href="#cb13-43" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="3613769a" class="cell" data-execution_count="10">
+<div id="39c5708b" class="cell" data-execution_count="10">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> bgnbd_est(rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy())</span>
@@ -2802,7 +2802,7 @@ bottom: -1.25;
 </section>
 <section id="generating-a-forecast-of-aggregate-repeat-transactions" class="level3" data-number="2.2">
 <h3 data-number="2.2" class="anchored" data-anchor-id="generating-a-forecast-of-aggregate-repeat-transactions"><span class="header-section-number">2.2</span> Generating a Forecast of Aggregate Repeat Transactions</h3>
-<div id="b42887ec" class="cell" data-execution_count="11">
+<div id="0a8ddc6d" class="cell" data-execution_count="11">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>z <span class="op">=</span> (t <span class="op">/</span> <span class="dv">7</span>) <span class="op">/</span> (alpha <span class="op">+</span> (t <span class="op">/</span> <span class="dv">7</span>))</span>
@@ -2831,7 +2831,7 @@ bottom: -1.25;
 </section>
 <section id="computing-conditional-expectations" class="level3" data-number="2.3">
 <h3 data-number="2.3" class="anchored" data-anchor-id="computing-conditional-expectations"><span class="header-section-number">2.3</span> Computing Conditional Expectations</h3>
-<div id="e2bdb78b" class="cell" data-execution_count="12">
+<div id="76746416" class="cell" data-execution_count="12">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>rfm_data_array <span class="op">=</span> rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;P2X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy()</span>
@@ -2886,13 +2886,13 @@ bottom: -1.25;
 <span id="cb16-50"><a href="#cb16-50" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/210621077.py:27: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_393750/210621077.py:27: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   ce_act = np.divide(np.bincount(p1x, weights=p2x), np1x, where=np1x != 0)
-/tmp/ipykernel_525550/210621077.py:28: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+/tmp/ipykernel_393750/210621077.py:28: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   ce_est = np.divide(np.bincount(p1x, weights=ce), np1x, where=np1x != 0)</code></pre>
 </div>
 </div>
-<div id="5a421d36" class="cell" data-execution_count="13">
+<div id="5d29a605" class="cell" data-execution_count="13">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>p1x_cust <span class="op">=</span> <span class="dv">2</span></span>
@@ -2925,7 +2925,7 @@ bottom: -1.25;
 </section>
 <section id="creating-a-fit-histogram-for-the-bgnbd-model" class="level3" data-number="2.4">
 <h3 data-number="2.4" class="anchored" data-anchor-id="creating-a-fit-histogram-for-the-bgnbd-model"><span class="header-section-number">2.4</span> Creating a Fit Histogram for the BG/NBD Model</h3>
-<div id="f1beef41" class="cell" data-execution_count="14">
+<div id="574a5ce0" class="cell" data-execution_count="14">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>T <span class="op">=</span> <span class="dv">39</span> <span class="op">-</span> trial_weeks <span class="co"># length of the period of time over which the customer could have made repeat purchases</span></span>
@@ -2965,7 +2965,7 @@ bottom: -1.25;
 <span id="cb19-35"><a href="#cb19-35" aria-hidden="true" tabindex="-1"></a>bgnbd_hist <span class="op">=</span> pl.Series(<span class="st">&#39;BG/NBD&#39;</span>, E_f_x)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="3d6742b8" class="cell" data-execution_count="15">
+<div id="c8f4575c" class="cell" data-execution_count="15">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>fit_hist_bgnbd <span class="op">=</span> (</span>
@@ -3023,7 +3023,7 @@ white-space: pre-wrap;
 <h2 data-number="3" class="anchored" data-anchor-id="paretonbd-model"><span class="header-section-number">3</span> Pareto/NBD Model</h2>
 <section id="parameter-estimation-1" class="level3" data-number="3.1">
 <h3 data-number="3.1" class="anchored" data-anchor-id="parameter-estimation-1"><span class="header-section-number">3.1</span> Parameter Estimation</h3>
-<div id="ae7a4d97" class="cell" data-execution_count="16">
+<div id="37c83a0e" class="cell" data-execution_count="16">
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> paretonbd_est(rfm_data, guess<span class="op">=</span>{<span class="st">&quot;r&quot;</span>: <span class="dv">1</span>, <span class="st">&quot;alpha&quot;</span>: <span class="dv">1</span>, <span class="st">&quot;s&quot;</span>: <span class="dv">1</span>, <span class="st">&quot;beta&quot;</span>: <span class="dv">1</span>}):</span>
 <span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>    <span class="kw">def</span> log_likelihood(x):</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>        r, alpha, s, beta <span class="op">=</span> x</span>
@@ -3060,7 +3060,7 @@ white-space: pre-wrap;
 <span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>        options<span class="op">=</span>{<span class="st">&quot;maxiter&quot;</span>: <span class="dv">10000</span>},</span>
 <span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>    )</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div id="18e4d9c7" class="cell" data-execution_count="17">
+<div id="8320cf76" class="cell" data-execution_count="17">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>result <span class="op">=</span> paretonbd_est(rfm_data.select(<span class="st">&quot;P1X&quot;</span>, <span class="st">&quot;t_x&quot;</span>, <span class="st">&quot;T&quot;</span>).collect().to_numpy())</span>
@@ -3097,7 +3097,7 @@ white-space: pre-wrap;
 </section>
 <section id="generating-a-forecast-of-aggregate-repeat-transactions-1" class="level3" data-number="3.2">
 <h3 data-number="3.2" class="anchored" data-anchor-id="generating-a-forecast-of-aggregate-repeat-transactions-1"><span class="header-section-number">3.2</span> Generating a Forecast of Aggregate Repeat Transactions</h3>
-<div id="ec474a4c" class="cell" data-execution_count="18">
+<div id="0d90c41f" class="cell" data-execution_count="18">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>E_X_t <span class="op">=</span> r <span class="op">*</span> beta <span class="op">/</span> (alpha <span class="op">*</span> (s <span class="op">-</span> <span class="dv">1</span>)) <span class="op">*</span> (<span class="dv">1</span> <span class="op">-</span> (beta <span class="op">/</span> (beta <span class="op">+</span> (t <span class="op">/</span> <span class="dv">7</span>))) <span class="op">**</span> (s <span class="op">-</span> <span class="dv">1</span>))</span>
@@ -3121,7 +3121,7 @@ white-space: pre-wrap;
 <span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="615f73b4" class="cell" data-execution_count="19">
+<div id="f7d31fb5" class="cell" data-execution_count="19">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>cum_sales_plot_data <span class="op">=</span> (</span>
@@ -3155,22 +3155,22 @@ white-space: pre-wrap;
 <div class="cell-output cell-output-display" data-execution_count="19">
 
 <style>
-#altair-viz-06f4d8f10ef343da82e079c764bd15f3.vega-embed {
+#altair-viz-8d0f2b47e6114ff18005753ec585f0d9.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-06f4d8f10ef343da82e079c764bd15f3.vega-embed details,
-#altair-viz-06f4d8f10ef343da82e079c764bd15f3.vega-embed details summary {
+#altair-viz-8d0f2b47e6114ff18005753ec585f0d9.vega-embed details,
+#altair-viz-8d0f2b47e6114ff18005753ec585f0d9.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-06f4d8f10ef343da82e079c764bd15f3"></div>
+<div id="altair-viz-8d0f2b47e6114ff18005753ec585f0d9"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-06f4d8f10ef343da82e079c764bd15f3") {
-      outputDiv = document.getElementById("altair-viz-06f4d8f10ef343da82e079c764bd15f3");
+    if (outputDiv.id !== "altair-viz-8d0f2b47e6114ff18005753ec585f0d9") {
+      outputDiv = document.getElementById("altair-viz-8d0f2b47e6114ff18005753ec585f0d9");
     }
 
     const paths = {
@@ -3222,7 +3222,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="37fa812b" class="cell" data-execution_count="20">
+<div id="d013b4f9" class="cell" data-execution_count="20">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>weekly_sales_plot_data <span class="op">=</span> (</span>
@@ -3256,22 +3256,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="20">
 
 <style>
-#altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e.vega-embed {
+#altair-viz-cb51226bfead47b9b6d58ab434f760c4.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e.vega-embed details,
-#altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e.vega-embed details summary {
+#altair-viz-cb51226bfead47b9b6d58ab434f760c4.vega-embed details,
+#altair-viz-cb51226bfead47b9b6d58ab434f760c4.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e"></div>
+<div id="altair-viz-cb51226bfead47b9b6d58ab434f760c4"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e") {
-      outputDiv = document.getElementById("altair-viz-ec8a6f30b68f4cc99bd7891a69f32d0e");
+    if (outputDiv.id !== "altair-viz-cb51226bfead47b9b6d58ab434f760c4") {
+      outputDiv = document.getElementById("altair-viz-cb51226bfead47b9b6d58ab434f760c4");
     }
 
     const paths = {
@@ -3326,7 +3326,7 @@ position: relative;
 </section>
 <section id="computing-pactive" class="level3" data-number="3.3">
 <h3 data-number="3.3" class="anchored" data-anchor-id="computing-pactive"><span class="header-section-number">3.3</span> Computing P(active)</h3>
-<div id="7095bcc7" class="cell" data-execution_count="21">
+<div id="9fa55c69" class="cell" data-execution_count="21">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Compute P(active|p1x,tx,T)</span></span>
@@ -3374,13 +3374,13 @@ position: relative;
 <span id="cb26-43"><a href="#cb26-43" aria-hidden="true" tabindex="-1"></a>pa_est <span class="op">=</span> np.divide(np.bincount(p1x, weights<span class="op">=</span>pactive), np1x, where<span class="op">=</span>np1x <span class="op">!=</span> <span class="dv">0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/814629507.py:38: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_393750/814629507.py:38: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   pa_actual = np.divide(
-/tmp/ipykernel_525550/814629507.py:43: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+/tmp/ipykernel_393750/814629507.py:43: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   pa_est = np.divide(np.bincount(p1x, weights=pactive), np1x, where=np1x != 0)</code></pre>
 </div>
 </div>
-<div id="13488c34" class="cell" data-execution_count="22">
+<div id="8b9d5f0a" class="cell" data-execution_count="22">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># create right-censored version for plot</span></span>
@@ -3434,22 +3434,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="22">
 
 <style>
-#altair-viz-5906164bde2b4150a1209010f5b33b49.vega-embed {
+#altair-viz-97b735008f0c4847902dae97d3b585a2.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-5906164bde2b4150a1209010f5b33b49.vega-embed details,
-#altair-viz-5906164bde2b4150a1209010f5b33b49.vega-embed details summary {
+#altair-viz-97b735008f0c4847902dae97d3b585a2.vega-embed details,
+#altair-viz-97b735008f0c4847902dae97d3b585a2.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-5906164bde2b4150a1209010f5b33b49"></div>
+<div id="altair-viz-97b735008f0c4847902dae97d3b585a2"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-5906164bde2b4150a1209010f5b33b49") {
-      outputDiv = document.getElementById("altair-viz-5906164bde2b4150a1209010f5b33b49");
+    if (outputDiv.id !== "altair-viz-97b735008f0c4847902dae97d3b585a2") {
+      outputDiv = document.getElementById("altair-viz-97b735008f0c4847902dae97d3b585a2");
     }
 
     const paths = {
@@ -3504,7 +3504,7 @@ position: relative;
 </section>
 <section id="computing-conditional-expectations-1" class="level3" data-number="3.4">
 <h3 data-number="3.4" class="anchored" data-anchor-id="computing-conditional-expectations-1"><span class="header-section-number">3.4</span> Computing Conditional Expectations</h3>
-<div id="0c1b9635" class="cell" data-execution_count="23">
+<div id="b5197c85" class="cell" data-execution_count="23">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>t_ce <span class="op">=</span> <span class="dv">39</span>  <span class="co"># period for which conditional expectations are to be computed</span></span>
@@ -3526,11 +3526,11 @@ position: relative;
 <span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>ce_est <span class="op">=</span> np.divide(np.bincount(p1x, weights<span class="op">=</span>ce), np1x, where<span class="op">=</span>np1x <span class="op">!=</span> <span class="dv">0</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-stderr">
-<pre><code>/tmp/ipykernel_525550/4087072533.py:17: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
+<pre><code>/tmp/ipykernel_393750/4087072533.py:17: UserWarning: &#39;where&#39; used without &#39;out&#39;, expect uninitialized memory in output. If this is intentional, use out=None.
   ce_est = np.divide(np.bincount(p1x, weights=ce), np1x, where=np1x != 0)</code></pre>
 </div>
 </div>
-<div id="9dee77ac" class="cell" data-execution_count="24">
+<div id="4fe19e6a" class="cell" data-execution_count="24">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># create right-censored version for plot</span></span>
@@ -3551,7 +3551,7 @@ position: relative;
 <span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="fa1e1e2b" class="cell" data-execution_count="25">
+<div id="14dcd106" class="cell" data-execution_count="25">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -3580,22 +3580,22 @@ position: relative;
 <div class="cell-output cell-output-display" data-execution_count="25">
 
 <style>
-#altair-viz-1a8db66be0684406bc5bef2aa934ee43.vega-embed {
+#altair-viz-c9b61e390ca241bdaf3c0338ec411822.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-1a8db66be0684406bc5bef2aa934ee43.vega-embed details,
-#altair-viz-1a8db66be0684406bc5bef2aa934ee43.vega-embed details summary {
+#altair-viz-c9b61e390ca241bdaf3c0338ec411822.vega-embed details,
+#altair-viz-c9b61e390ca241bdaf3c0338ec411822.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-1a8db66be0684406bc5bef2aa934ee43"></div>
+<div id="altair-viz-c9b61e390ca241bdaf3c0338ec411822"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-1a8db66be0684406bc5bef2aa934ee43") {
-      outputDiv = document.getElementById("altair-viz-1a8db66be0684406bc5bef2aa934ee43");
+    if (outputDiv.id !== "altair-viz-c9b61e390ca241bdaf3c0338ec411822") {
+      outputDiv = document.getElementById("altair-viz-c9b61e390ca241bdaf3c0338ec411822");
     }
 
     const paths = {
@@ -3650,7 +3650,7 @@ position: relative;
 </section>
 <section id="creating-a-fit-histogram-for-the-paretonbd-model" class="level3" data-number="3.5">
 <h3 data-number="3.5" class="anchored" data-anchor-id="creating-a-fit-histogram-for-the-paretonbd-model"><span class="header-section-number">3.5</span> Creating a Fit Histogram for the Pareto/NBD Model</h3>
-<div id="83e9eafd" class="cell" data-execution_count="26">
+<div id="c6536f29" class="cell" data-execution_count="26">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>T <span class="op">=</span> <span class="dv">39</span> <span class="op">-</span> trial_weeks <span class="co"># length of the period of time over which the customer could have made repeat purchases</span></span>
@@ -3691,7 +3691,7 @@ position: relative;
 <span id="cb33-36"><a href="#cb33-36" aria-hidden="true" tabindex="-1"></a>paretonbd_hist <span class="op">=</span> pl.Series(<span class="st">&quot;Pareto/NBD&quot;</span>, E_f_x)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 </div>
-<div id="52a71013" class="cell" data-execution_count="27">
+<div id="c32b6114" class="cell" data-execution_count="27">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>fit_hist <span class="op">=</span> fit_hist_bgnbd.hstack([paretonbd_hist]).with_columns(</span>
@@ -3731,7 +3731,7 @@ white-space: pre-wrap;
 </div>
 </div>
 </div>
-<div id="16bdd337" class="cell" data-execution_count="28">
+<div id="c35c0c7a" class="cell" data-execution_count="28">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>barchart_data <span class="op">=</span> fit_hist.unpivot(</span>
@@ -3766,22 +3766,22 @@ white-space: pre-wrap;
 <div class="cell-output cell-output-display" data-execution_count="28">
 
 <style>
-#altair-viz-581a233518f043138bf59fd62fdddaff.vega-embed {
+#altair-viz-3eaa3009f04b46f8a6af506673d016d6.vega-embed {
 width: 100%;
 display: flex;
 }
-#altair-viz-581a233518f043138bf59fd62fdddaff.vega-embed details,
-#altair-viz-581a233518f043138bf59fd62fdddaff.vega-embed details summary {
+#altair-viz-3eaa3009f04b46f8a6af506673d016d6.vega-embed details,
+#altair-viz-3eaa3009f04b46f8a6af506673d016d6.vega-embed details summary {
 position: relative;
 }
 </style>
-<div id="altair-viz-581a233518f043138bf59fd62fdddaff"></div>
+<div id="altair-viz-3eaa3009f04b46f8a6af506673d016d6"></div>
 <script type="text/javascript">
   var VEGA_DEBUG = (typeof VEGA_DEBUG == "undefined") ? {} : VEGA_DEBUG;
   (function(spec, embedOpt){
     let outputDiv = document.currentScript.previousElementSibling;
-    if (outputDiv.id !== "altair-viz-581a233518f043138bf59fd62fdddaff") {
-      outputDiv = document.getElementById("altair-viz-581a233518f043138bf59fd62fdddaff");
+    if (outputDiv.id !== "altair-viz-3eaa3009f04b46f8a6af506673d016d6") {
+      outputDiv = document.getElementById("altair-viz-3eaa3009f04b46f8a6af506673d016d6");
     }
 
     const paths = {
@@ -3833,7 +3833,7 @@ position: relative;
 </script>
 </div>
 </div>
-<div id="f6990df6" class="cell" data-execution_count="29">
+<div id="f29fb649" class="cell" data-execution_count="29">
 <details class="code-fold">
 <summary>Code</summary>
 <div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>(</span>
@@ -3845,61 +3845,61 @@ position: relative;
 <span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </details>
 <div class="cell-output cell-output-display" data-execution_count="29">
-<div id="owfpqbmzzo" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<div id="jxxhcnotob" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
 <style>
-#owfpqbmzzo table {
+#jxxhcnotob table {
 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Helvetica Neue', 'Fira Sans', 'Droid Sans', Arial, sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
 }
-#owfpqbmzzo thead, tbody, tfoot, tr, td, th { border-style: none; }
+#jxxhcnotob thead, tbody, tfoot, tr, td, th { border-style: none; }
 tr { background-color: transparent; }
-#owfpqbmzzo p { margin: 0; padding: 0; }
-#owfpqbmzzo .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
-#owfpqbmzzo .gt_caption { padding-top: 4px; padding-bottom: 4px; }
-#owfpqbmzzo .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
-#owfpqbmzzo .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
-#owfpqbmzzo .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#owfpqbmzzo .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#owfpqbmzzo .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
-#owfpqbmzzo .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
-#owfpqbmzzo .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
-#owfpqbmzzo .gt_column_spanner_outer:first-child { padding-left: 0; }
-#owfpqbmzzo .gt_column_spanner_outer:last-child { padding-right: 0; }
-#owfpqbmzzo .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
-#owfpqbmzzo .gt_spanner_row { border-bottom-style: hidden; }
-#owfpqbmzzo .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
-#owfpqbmzzo .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: middle; }
-#owfpqbmzzo .gt_from_md> :first-child { margin-top: 0; }
-#owfpqbmzzo .gt_from_md> :last-child { margin-bottom: 0; }
-#owfpqbmzzo .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; }
-#owfpqbmzzo .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
-#owfpqbmzzo .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
-#owfpqbmzzo .gt_row_group_first td { border-top-width: 2px; }
-#owfpqbmzzo .gt_row_group_first th { border-top-width: 2px; }
-#owfpqbmzzo .gt_striped { color: #333333; background-color: #F4F4F4; }
-#owfpqbmzzo .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#owfpqbmzzo .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#owfpqbmzzo .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
-#owfpqbmzzo .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
-#owfpqbmzzo .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
-#owfpqbmzzo .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
-#owfpqbmzzo .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
-#owfpqbmzzo .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#owfpqbmzzo .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#owfpqbmzzo .gt_left { text-align: left; }
-#owfpqbmzzo .gt_center { text-align: center; }
-#owfpqbmzzo .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
-#owfpqbmzzo .gt_font_normal { font-weight: normal; }
-#owfpqbmzzo .gt_font_bold { font-weight: bold; }
-#owfpqbmzzo .gt_font_italic { font-style: italic; }
-#owfpqbmzzo .gt_super { font-size: 65%; }
-#owfpqbmzzo .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#owfpqbmzzo .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
-#owfpqbmzzo .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
-#owfpqbmzzo .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
-#owfpqbmzzo .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
-#owfpqbmzzo .gt_asterisk { font-size: 100%; vertical-align: 0; }
+#jxxhcnotob p { margin: 0; padding: 0; }
+#jxxhcnotob .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #333333; font-size: 16px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: solid; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #A8A8A8; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+#jxxhcnotob .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+#jxxhcnotob .gt_title { color: #333333; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+#jxxhcnotob .gt_subtitle { color: #333333; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+#jxxhcnotob .gt_heading { background-color: #FFFFFF; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#jxxhcnotob .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#jxxhcnotob .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+#jxxhcnotob .gt_col_heading { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+#jxxhcnotob .gt_column_spanner_outer { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+#jxxhcnotob .gt_column_spanner_outer:first-child { padding-left: 0; }
+#jxxhcnotob .gt_column_spanner_outer:last-child { padding-right: 0; }
+#jxxhcnotob .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+#jxxhcnotob .gt_spanner_row { border-bottom-style: hidden; }
+#jxxhcnotob .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+#jxxhcnotob .gt_empty_group_heading { padding: 0.5px; color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: middle; }
+#jxxhcnotob .gt_from_md> :first-child { margin-top: 0; }
+#jxxhcnotob .gt_from_md> :last-child { margin-bottom: 0; }
+#jxxhcnotob .gt_row { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; }
+#jxxhcnotob .gt_stub { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+#jxxhcnotob .gt_stub_row_group { color: #333333; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+#jxxhcnotob .gt_row_group_first td { border-top-width: 2px; }
+#jxxhcnotob .gt_row_group_first th { border-top-width: 2px; }
+#jxxhcnotob .gt_striped { color: #333333; background-color: #F4F4F4; }
+#jxxhcnotob .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#jxxhcnotob .gt_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#jxxhcnotob .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
+#jxxhcnotob .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+#jxxhcnotob .gt_grand_summary_row { color: #333333; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+#jxxhcnotob .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+#jxxhcnotob .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+#jxxhcnotob .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#jxxhcnotob .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#jxxhcnotob .gt_left { text-align: left; }
+#jxxhcnotob .gt_center { text-align: center; }
+#jxxhcnotob .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+#jxxhcnotob .gt_font_normal { font-weight: normal; }
+#jxxhcnotob .gt_font_bold { font-weight: bold; }
+#jxxhcnotob .gt_font_italic { font-style: italic; }
+#jxxhcnotob .gt_super { font-size: 65%; }
+#jxxhcnotob .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#jxxhcnotob .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
+#jxxhcnotob .gt_sourcenotes { color: #333333; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+#jxxhcnotob .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+#jxxhcnotob .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+#jxxhcnotob .gt_asterisk { font-size: 100%; vertical-align: 0; }
 </style>
 
 <table class="gt_table table table-sm table-striped small" data-quarto-bootstrap="false">

@@ -1,5 +1,9 @@
 ---
 title: Estimating Concentration in Champagne Purchasing
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/analyses/estimating-purchasing-concentration.qmd
 ---
 
 ## Import

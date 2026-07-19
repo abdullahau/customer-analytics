@@ -1,5 +1,9 @@
 ---
 title: Gamma-Gamma Model of Monetary Value
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/spend/gamma-gamma.qmd
 ---
 
 **Source**:

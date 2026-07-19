@@ -1,5 +1,9 @@
 ---
 title: "Sales Forecast: Predicting Unit Sales Using Finite Mixture Model with Beta-Geometric Distribution"
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/acquisition/finite-mixture-bg-sales-forecast.qmd
 ---
 
 ## Introduction

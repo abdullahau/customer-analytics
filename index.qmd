@@ -120,6 +120,7 @@ The same handful of moves reappears in nearly every essay:
 #### Brand Choice (Category-Wide, Multi-Brand)
 
 - [NBD-Dirichlet Model of Consumer Buying Behavior](https://abdullahau.github.io/customer-analytics/notebooks/models/brand-choice/nbd-dirichlet) — the Ehrenberg–Bass model of a whole category: NBD category incidence × Dirichlet-multinomial brand choice. Brand performance measures as interpretative norms; **Double Jeopardy** and the **Duplication of Purchase Law** fall out as predictions. Reproduces the 1984 toothpaste example.
+- [NBD-Dirichlet Applied to Consumer Panel Data](https://abdullahau.github.io/customer-analytics/notebooks/models/brand-choice/nbd-dirichlet-panel) — the same model fitted to the edible-grocery panel, with observed-vs-theoretical throughout. The duplication residuals diagnose a **partitioned category**, corroborating the negative weekly share correlation found in the descriptive analysis.
 
 #### Retention (Contractual / Discrete-Time)
 

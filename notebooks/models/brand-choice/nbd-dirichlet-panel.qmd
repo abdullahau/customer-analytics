@@ -1,0 +1,613 @@
+---
+title: "NBD-Dirichlet Applied to Consumer Panel Data"
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet-panel.qmd
+---
+
+Applies the Dirichlet model to the **edible grocery** panel used in
+[Analysing Buyer Behaviour Using Consumer Panel Data](../../analyses/buyer-behavior-summary-panel-data)
+— 5,021 static panellists, two years, five brands (Alpha, Bravo, Charlie, Delta,
+Other).
+
+The derivations, the literature and the marketing argument are in
+[NBD-Dirichlet Model of Consumer Buying Behavior](nbd-dirichlet), which reproduces
+the 1984 toothpaste example. This notebook keeps the formulas as a reference card
+and spends its words on what the model does **when it meets data it was not tuned
+on** — which here means a category it fits noticeably less well.
+
+A companion R script,
+[`nbd-dirichlet-panel.R`](https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet-panel.R),
+runs Feiming Chen's `NBDdirichlet` v1.4 on the same inputs. Every theoretical number
+below is checked against it.
+
+## Formula reference card
+
+Four assumption levels: category purchases **Poisson**($\mu$) × **gamma** across
+consumers → **NBD**; brand choice **multinomial**($\mathbf p$) × **Dirichlet**($\boldsymbol\alpha$)
+across consumers → **Dirichlet-multinomial**; the two independent.
+
+Three parameters: $M$ (per-capita category rate), $K$ (diversity in *how often*),
+$S = \sum_j\alpha_j$ (diversity in *which brand*). Brand $j$ has $\alpha_j = S\mu_j$
+where $\mu_j$ is market share.
+
+| Quantity | Formula |
+|---|---|
+| Category incidence | $P_n = \left(1+\tfrac{MT}{K}\right)^{-K}\tfrac{\Gamma(K+n)}{n!\,\Gamma(K)}\left(\tfrac{MT}{MT+K}\right)^{n}$ |
+| Fit $M$ | $M = B \times W$ (category penetration × category buy rate) |
+| Fit $K$ ("mean and zeros") | solve $1-B = (1+M/K)^{-K}$ |
+| Brand choice given $n$ | $p(r\mid n)=\binom{n}{r}\dfrac{B(\alpha_j+r,\;S-\alpha_j+n-r)}{B(\alpha_j,\;S-\alpha_j)}$ |
+| — the $r=0$ case | $p(0\mid n)=\prod_{a=0}^{n-1}\dfrac{S-\alpha_j+a}{S+a}$, $\;p(0\mid 0)=1$ |
+| Fit $S$ | per brand, solve $1-\sum_n P_n\,p(0\mid n) = b_j^{\text{obs}}$; pool by share-weighted mean, dropping outliers |
+| Penetration | $b_j = 1-\sum_{n\ge0}P_n\,p(0\mid n)$ |
+| Purchases per brand buyer | $w_j = \tfrac{1}{b_j}\sum_{n\ge1}P_n\sum_{r=1}^{n}r\,p(r\mid n)$ |
+| Category purchases per brand buyer | $w_{P,j} = \tfrac{1}{b_j}\sum_{n\ge1}n\,P_n\,[1-p(0\mid n)]$ |
+| Brand purchase frequency dist. | $f_j(r)=\sum_{n\ge r}P_n\,p(r\mid n)$ |
+| Restricted to category buyers in $R$ | $b_{j\mid R}=1-\tfrac{\sum_{n\in R}P_n p(0\mid n)}{\sum_{n\in R}P_n}$ |
+| Duplication | $b_{(j+k)}=1-\sum_n P_n\,p_{j+k}(0\mid n)$; $\;b_{jk}=b_j+b_k-b_{(j+k)}$; $\;b_{j\mid k}=b_{jk}/b_k$ |
+| Time extrapolation | replace $M \to MT$. $K$ and $S$ are **time-invariant** |
+
+Additivity is what makes all of this computable: merging brands adds their $\alpha$,
+so "brand $j$ vs everything else" is a two-category Dirichlet-multinomial, i.e. a
+**beta-binomial**.
+
+## Imports
+
+```{python}
+#| code-fold: false
+import numpy as np
+import pandas as pd
+from scipy.optimize import minimize_scalar
+from scipy.special import gammaln, betaln
+
+import matplotlib.pyplot as plt
+from IPython.display import display_markdown
+
+%config InlineBackend.figure_formats = ['svg']
+plt.rcParams["axes.spines.right"] = False
+plt.rcParams["axes.spines.top"] = False
+pd.set_option("display.precision", 2)
+
+PANEL_SIZE = 5021   # static panel
+YEAR = 1            # weeks 1-52
+NSTAR = 170         # truncation for the sums over n (justified below)
+```
+
+## Deriving the model inputs from the panel
+
+The Dirichlet needs four things. The panel gives transactions, so we aggregate.
+
+A **purchase occasion** is a unique `(panel_id, trans_id)`. A trip on which two
+brands were bought counts as **one category occasion** but as **one occasion for each
+brand** — the convention used in the source notebook.
+
+```{python}
+#| code-fold: false
+df = pd.read_csv("data/panel-datasets/edible_grocery.csv", encoding="utf-8-sig")
+yr = df[(df.week > (YEAR - 1) * 52) & (df.week <= YEAR * 52)]
+
+brand_occ = yr[["panel_id", "trans_id", "brand"]].drop_duplicates()
+cat_occ   = yr[["panel_id", "trans_id"]].drop_duplicates()
+
+brand_name = np.array(sorted(brand_occ.brand.unique()))
+nbrand = len(brand_name)
+
+grp = brand_occ.groupby("brand")
+occasions = grp.size().loc[brand_name]
+buyers    = grp.panel_id.nunique().loc[brand_name]
+
+brand_share   = (occasions / occasions.sum()).to_numpy()
+brand_pen_obs = (buyers / PANEL_SIZE).to_numpy()
+
+cat_pen     = cat_occ.panel_id.nunique() / PANEL_SIZE
+cat_buyrate = len(cat_occ) / cat_occ.panel_id.nunique()
+
+pd.DataFrame({"occasions": occasions, "buyers": buyers,
+              "share": brand_share, "pen (obs)": brand_pen_obs},
+             index=brand_name)
+```
+
+```{python}
+display_markdown(
+    f"Category penetration **{cat_pen:.4f}**, buy rate **{cat_buyrate:.4f}** "
+    f"→ $M$ = **{cat_pen * cat_buyrate:.4f}**\n\n"
+    f"Brand occasions {occasions.sum():,} vs category occasions {len(cat_occ):,} "
+    f"— **{100 * (occasions.sum() - len(cat_occ)) / len(cat_occ):.2f}%** of trips "
+    f"involved more than one brand.",
+    raw=True,
+)
+```
+
+**A modelling wrinkle to note up front.** The Dirichlet assumes every category
+purchase goes to exactly one brand, so $\sum_j r_j = n$. Here 2.2% of trips break
+that — a household bought Alpha *and* Delta on one trip. $M$ is therefore built from
+category occasions while shares are built from brand occasions, and the two bases
+differ by 2.2%. Small enough to proceed, but it is a real (if minor) violation of the
+model's own arithmetic, not just a rounding matter.
+
+Compare with the toothpaste example: category penetration is **0.91** here against
+0.56, and two brands hold 85% of the category. This is a much more concentrated,
+much more widely bought category — a genuinely different test.
+
+## Fitting
+
+### $M$ and $K$
+
+```{python}
+#| code-fold: false
+def estimate_K(M, cat_pen, max_K=30.0):
+    """Mean-and-zeros: solve (1 + M/K)^-K = 1 - B for K."""
+    cp = np.log(1.0 - cat_pen)
+    return minimize_scalar(lambda K: (K * np.log(1.0 + M / K) + cp) ** 2,
+                           bounds=(1e-4, max_K), method="bounded").x
+
+M0 = cat_pen * cat_buyrate
+K = estimate_K(M0, cat_pen)
+
+print(f"M = {M0:.4f}   K = {K:.4f}")
+print(f"existence condition M > -log(P0):  {M0:.3f} > {-np.log(1 - cat_pen):.3f}  ->  "
+      f"{M0 > -np.log(1 - cat_pen)}")
+print(f"implied P(0) = {(1 + M0 / K) ** -K:.4f}   observed = {1 - cat_pen:.4f}")
+```
+
+$K = 2.6$ against 0.78 for toothpaste. Higher $K$ means **less** dispersion in
+category buying rates — consistent with a category that 91% of households buy.
+
+### $P_n$ and the truncation check
+
+```{python}
+#| code-fold: false
+def Pn(M, K, n):
+    """NBD probability of n category purchases, computed in logs."""
+    n = np.atleast_1d(np.asarray(n, dtype=int))
+    a = np.arange(int(n.max()))
+    logratio = np.concatenate(([0.0], np.cumsum(np.log(K + a) - np.log(1.0 + a))))
+    return np.exp(-K * np.log(1.0 + M / K)
+                  + logratio[n]
+                  + np.where(n > 0, n * np.log(M / (M + K)), 0.0))
+
+
+def check_truncation(M, K, nstar=NSTAR):
+    ns = np.arange(nstar + 1)
+    P = Pn(M, K, ns)
+    return {"sum P(n)": P.sum(), "implied mean": (ns * P).sum(), "target M": M}
+
+pd.DataFrame([check_truncation(M0 * t, K) | {"t": t} for t in (1, 2, 4)]).set_index("t")
+```
+
+The default `nstar = 50` in the R package is **not** safe here. With $M \approx 4$
+per year, the two-year and four-year sums need far more mass; `NSTAR = 170` keeps
+$\sum P_n$ at 1.000 and recovers the mean at every horizon used below. This
+diagnostic is the way to choose it — a too-small `nstar` silently biases every
+measure downward.
+
+### The brand-choice kernel
+
+The whole beta-binomial is precomputed once per brand as a matrix
+$Q[n, r] = p(r \mid n)$, upper-triangular since $r \le n$.
+
+```{python}
+#| code-fold: false
+def pr_matrix(alpha, S, nstar=NSTAR):
+    """(nstar+1, nstar+1) matrix of p(r | n); zero where r > n.
+
+    log p(r|n) = log C(n,r) + log B(a+r, S-a+n-r) - log B(a, S-a)
+    """
+    n = np.arange(nstar + 1)[:, None]
+    r = np.arange(nstar + 1)[None, :]
+    ok = r <= n
+    nr = np.where(ok, n - r, 0)          # mask before gammaln to avoid poles
+    log_q = (gammaln(n + 1) - gammaln(r + 1) - gammaln(nr + 1)
+             + betaln(alpha + r, S - alpha + nr) - betaln(alpha, S - alpha))
+    return np.where(ok, np.exp(log_q), 0.0)
+
+
+def p_zero_vec(alpha, S, nstar=NSTAR):
+    """p(0 | n) for n = 0..nstar via the telescoped product, as a cumulative sum."""
+    a = np.arange(nstar)
+    return np.concatenate(([1.0], np.exp(np.cumsum(np.log(S - alpha + a)
+                                                   - np.log(S + a)))))
+```
+
+### $S$
+
+```{python}
+#| code-fold: false
+def S_for_brand(j, M, K, share, pen_obs, nstar=NSTAR, max_S=30.0):
+    P = Pn(M, K, np.arange(nstar + 1))
+
+    def obj(S):
+        return (1.0 - np.sum(P * p_zero_vec(S * share[j], S, nstar)) - pen_obs[j]) ** 2
+
+    return minimize_scalar(obj, bounds=(1e-9, max_S), method="bounded").x
+
+
+def fivenum(x):
+    """R's stats::fivenum — Tukey hinges, not interpolated quartiles."""
+    x = np.sort(np.asarray(x, dtype=float))
+    n = len(x)
+    n4 = np.floor((n + 3) / 2) / 2
+    d = np.array([1.0, n4, (n + 1) / 2, n + 1 - n4, float(n)])
+    return 0.5 * (x[np.floor(d).astype(int) - 1] + x[np.ceil(d).astype(int) - 1])
+
+
+def pool_S(S_all, share):
+    """Share-weighted mean, dropping (a) 1.5*IQR outliers and (b) anything above
+    the upper boxplot notch. Both tests come from R's boxplot.stats(), which the
+    NBDdirichlet package calls but does not implement itself."""
+    _, hinge_lo, median, hinge_hi, _ = fivenum(S_all)
+    iqr = hinge_hi - hinge_lo
+    fence = (S_all < hinge_lo - 1.5 * iqr) | (S_all > hinge_hi + 1.5 * iqr)
+    notch_hi = median + 1.58 * iqr / np.sqrt(len(S_all))
+    drop = fence | (S_all > notch_hi)
+    return np.average(S_all[~drop], weights=share[~drop]), drop, notch_hi
+
+
+S_all = np.array([S_for_brand(j, M0, K, brand_share, brand_pen_obs)
+                  for j in range(nbrand)])
+S, dropped, notch_hi = pool_S(S_all, brand_share)
+
+display_markdown(
+    f"Upper notch **{notch_hi:.4f}** → dropped **"
+    + (", ".join(brand_name[dropped]) if dropped.any() else "none")
+    + f"**  →  pooled **S = {S:.4f}**",
+    raw=True,
+)
+
+pd.DataFrame({"share": brand_share, "pen (obs)": brand_pen_obs,
+              "S_j": S_all, "dropped": dropped}, index=brand_name)
+```
+
+$S = 0.62$, roughly half the toothpaste value of 1.30. **Low $S$ means a polarised
+category**: consumers have strongly differentiated brand propensities rather than
+picking near-randomly in proportion to share. That matches the source notebook's
+finding that over two-thirds of category buyers bought only one brand all year.
+
+```{python}
+display_markdown(
+    f"| | $M$ | $K$ | $S$ |\n|---|---|---|---|\n"
+    f"| edible grocery (year, 5 brands) | {M0:.3f} | {K:.3f} | {S:.3f} |\n"
+    f"| toothpaste (quarter, 8 brands) | 1.456 | 0.778 | 1.295 |",
+    raw=True,
+)
+```
+
+## Brand performance measures
+
+```{python}
+#| code-fold: false
+def brand_measures(M, K, S, alpha, nstar=NSTAR, limit=None):
+    """(penetration, unnormalised E[brand purchases], unnormalised E[cat purchases])."""
+    ns = np.arange(nstar + 1) if limit is None else np.asarray(limit, dtype=int)
+    P = Pn(M, K, ns)
+    Q = pr_matrix(alpha, S, nstar)[ns]
+    r = np.arange(nstar + 1)
+    pen = 1.0 - np.sum(P * Q[:, 0])
+    return pen, np.sum(P * (Q * r).sum(axis=1)), np.sum(ns * P * (1.0 - Q[:, 0]))
+
+
+def buy_table(M, K, S, share, names, nstar=NSTAR):
+    rows = []
+    for j in range(len(share)):
+        b, e_brand, e_cat = brand_measures(M, K, S, S * share[j], nstar)
+        rows.append([b, e_brand / b, e_cat / b])
+    return pd.DataFrame(rows, index=names,
+                        columns=["pen.brand", "pur.brand", "pur.cat"])
+
+buy = buy_table(M0, K, S, brand_share, brand_name)
+buy.round(2)
+```
+
+### Observed versus theoretical
+
+The point of using real panel data rather than the paper's published summary is that
+we can compute the **observeds** ourselves.
+
+```{python}
+#| code-fold: false
+# panellist x brand matrix of purchase occasions
+X = (brand_occ.groupby(["panel_id", "brand"]).size()
+     .unstack(fill_value=0).reindex(columns=brand_name, fill_value=0))
+n_cat = cat_occ.groupby("panel_id").size()
+X = X.reindex(n_cat.index, fill_value=0)
+ever = (X > 0).astype(int)
+
+obs = pd.DataFrame({
+    "b (O)": ever.sum() / PANEL_SIZE,
+    "w (O)": X.sum() / ever.sum(),
+    "wp (O)": [n_cat[ever[b] == 1].mean() for b in brand_name],
+}, index=brand_name)
+
+ot = pd.DataFrame({
+    "share": brand_share,
+    "b (O)": obs["b (O)"], "b (T)": buy["pen.brand"],
+    "w (O)": obs["w (O)"], "w (T)": buy["pur.brand"],
+    "wp (O)": obs["wp (O)"], "wp (T)": buy["pur.cat"],
+})
+ot.loc["Average"] = ot.mean()
+ot.round(2)
+```
+
+Read it the way Ehrenberg would — down the columns, at two significant figures.
+
+- **Penetration** is close for the two big brands (0.52/0.54 and 0.51/0.50) but the
+  model **under-predicts** the small brands: Charlie 0.16 observed against 0.14
+  theoretical, Delta 0.08 against 0.06.
+- **$w$** goes the other way: the model **over-predicts** loyalty for small brands
+  (Charlie 2.3 observed vs 2.7 theoretical).
+- **$w_P$** shows the natural-monopoly trend rising as share falls in *both* columns,
+  but the observed trend is steeper (4.9 → 6.0) than the theoretical (4.8 → 5.1).
+
+So the fit is **materially worse than the toothpaste example**, where penetration
+came within a point across all eight brands. That is worth taking seriously rather
+than reporting an average and moving on.
+
+### Double Jeopardy
+
+```{python}
+dj = pd.DataFrame({
+    "share": brand_share,
+    "b (O)": obs["b (O)"], "w (O)": obs["w (O)"],
+    "w(1-b) (O)": obs["w (O)"] * (1 - obs["b (O)"]),
+    "w(1-b) (T)": buy["pur.brand"] * (1 - buy["pen.brand"]),
+})
+dj.round(2)
+```
+
+Both the observed and theoretical `w(1-b)` columns are far flatter than either $b$ or
+$w$ alone — the Double Jeopardy relation holds in the data. The observed column runs
+1.6–2.2 while share varies twenty-fold; the theoretical runs 1.5–2.5. Neither is
+constant, but the residual variation is a fraction of the variation the relation
+absorbs.
+
+## The summary tables
+
+### Purchase frequency distribution
+
+```{python}
+#| code-fold: false
+def freq_table(M, K, S, share, names, cutoff=5, nstar=NSTAR):
+    P = Pn(M, K, np.arange(nstar + 1))
+    rows = []
+    for j in range(len(share)):
+        f = (P[:, None] * pr_matrix(S * share[j], S, nstar)).sum(axis=0)
+        rows.append(list(f[:cutoff + 1]) + [f[cutoff + 1:].sum()])
+    cols = [str(i) for i in range(cutoff + 1)] + [f"{cutoff + 1}+"]
+    return pd.DataFrame(rows, index=names, columns=cols)
+
+theo_freq = freq_table(M0, K, S, brand_share, brand_name)
+theo_freq.round(2)
+```
+
+```{python}
+obs_freq = pd.DataFrame(
+    {b: X[b].clip(upper=6).value_counts().reindex(range(7), fill_value=0)
+     for b in brand_name}).T
+obs_freq[0] += PANEL_SIZE - len(X)          # households that bought no category at all
+obs_freq = obs_freq / PANEL_SIZE
+obs_freq.columns = [str(i) for i in range(6)] + ["6+"]
+
+pd.concat({"Observed": obs_freq.round(2), "Theoretical": theo_freq.round(2)},
+          axis=1).swaplevel(axis=1).sort_index(axis=1)
+```
+
+The reverse-J shape is reproduced for every brand. The visible miss is at $r = 1$ for
+the small brands — Charlie has 8% of households buying once against a predicted 5%.
+Too many light buyers relative to the model, the same signature Ehrenberg discusses
+as an "excess of occasional buyers".
+
+### Heavy versus light category buyers
+
+```{python}
+#| code-fold: false
+def heavy_table(M, K, S, share, names, limit, nstar=NSTAR):
+    limit = np.asarray(limit, dtype=int)
+    P_sum = Pn(M, K, limit).sum()
+    rows = []
+    for j in range(len(share)):
+        b_lim, e_brand, _ = brand_measures(M, K, S, S * share[j], nstar, limit=limit)
+        not_buying = 1.0 - b_lim
+        rows.append([1.0 - not_buying / P_sum, e_brand / (P_sum - not_buying)])
+    return pd.DataFrame(rows, index=names,
+                        columns=["Penetration", "Avg Purchase Freq"])
+
+pd.concat({"light (1-6)": heavy_table(M0, K, S, brand_share, brand_name, range(1, 7)),
+           "heavy (7+)": heavy_table(M0, K, S, brand_share, brand_name,
+                                     range(7, NSTAR + 1))}, axis=1).round(2)
+```
+
+Heavy category buyers are more likely to buy *every* brand, and to buy each more
+often — a selection effect, not a segment.
+
+### Duplication of purchase — where the model breaks
+
+```{python}
+#| code-fold: false
+def dup_table(M, K, S, share, names, focal, nstar=NSTAR):
+    P = Pn(M, K, np.arange(nstar + 1))
+    b_k = brand_measures(M, K, S, S * share[focal], nstar)[0]
+    out = np.zeros(len(share))
+    out[focal] = 1.0
+    for j in range(len(share)):
+        if j == focal:
+            continue
+        # additivity: the composite brand (j+k) has alpha = alpha_j + alpha_k
+        b_comp = 1.0 - np.sum(P * pr_matrix(S * (share[focal] + share[j]), S, nstar)[:, 0])
+        b_j = brand_measures(M, K, S, S * share[j], nstar)[0]
+        out[j] = (b_j + b_k - b_comp) / b_k
+    return pd.Series(out, index=names, name=names[focal])
+
+theo_dup = pd.concat([dup_table(M0, K, S, brand_share, brand_name, f)
+                      for f in range(nbrand)], axis=1).T
+theo_dup.round(2)
+```
+
+```{python}
+counts = ever.T.values @ ever.values                 # duplication count table
+obs_dup = pd.DataFrame(counts / np.diag(counts)[:, None],
+                       index=brand_name, columns=brand_name)
+obs_dup.round(2)
+```
+
+```{python}
+resid = (obs_dup - theo_dup).where(~np.eye(nbrand, dtype=bool))
+resid.round(2)
+```
+
+This residual table is the most informative output in the notebook, and it is not
+noise — it is **structured**:
+
+- **Alpha ↔ Bravo duplicate less than predicted** (−0.05, −0.06). The two market
+  leaders share *fewer* buyers than their sizes imply.
+- **Every small brand duplicates with Alpha and Bravo more than predicted**
+  (+0.10 to +0.23). Delta's buyers buy Alpha at 0.63 against a predicted 0.40.
+
+That pattern — big brands under-duplicating with each other, small brands
+over-duplicating with the big ones — is the signature of a **partitioned category**.
+Alpha and Bravo are close substitutes fought over by a set of households who mostly
+pick one and stay; the small brands are secondary purchases made by heavy category
+buyers who are already buying a leader.
+
+It corroborates something found independently in the
+[source notebook](../../analyses/buyer-behavior-summary-panel-data): the weekly
+volume shares of Alpha and Bravo are **strongly negatively correlated**. Two brands
+trading share back and forth week to week is exactly what "close substitutes, few
+shared buyers" looks like in a time series.
+
+The Duplication of Purchase Law predicts $b_{j\mid k} = D\,b_j$ with one $D$ for the
+category. Let us see how much damage that does here.
+
+```{python}
+D = (obs_dup.values[~np.eye(nbrand, dtype=bool)].sum()
+     / np.add.outer(obs["b (O)"].values, np.zeros(nbrand)).T[
+         ~np.eye(nbrand, dtype=bool)].sum())
+
+pred = pd.DataFrame(np.outer(np.ones(nbrand), obs["b (O)"].values * D),
+                    index=brand_name, columns=brand_name).where(
+                        ~np.eye(nbrand, dtype=bool))
+display_markdown(f"Single duplication coefficient **D = {D:.2f}**", raw=True)
+pd.concat({"observed": obs_dup.where(~np.eye(nbrand, dtype=bool)).round(2),
+           "D x b_j": pred.round(2)}, axis=1).swaplevel(axis=1).sort_index(axis=1)
+```
+
+A single $D$ gets the *order of magnitude* right everywhere but misses the structure
+— which is the honest verdict on this category. In Ehrenberg's own framing from
+*Repeat-Buying* §10.5, such departures are "local densities superimposed on the
+underlying duplication pattern", and he is explicit that genuine partitioning is
+**rare but real**. This looks like a real instance.
+
+## Time extrapolation
+
+Only $M$ scales; $K$ and $S$ are structural.
+
+```{python}
+#| code-fold: false
+yr2 = buy_table(M0 * 2, K, S, brand_share, brand_name)
+pd.concat({"year 1": buy, "years 1-2": yr2}, axis=1).round(2)
+```
+
+```{python}
+#| fig-cap: "Theoretical penetration and buying-rate growth over two years."
+tseq = np.arange(0, 2.01, 0.1)
+pen_g = np.zeros((nbrand, len(tseq)))
+buy_g = np.ones((nbrand, len(tseq)))
+for i, t in enumerate(tseq):
+    if t == 0:
+        continue
+    tbl = buy_table(M0 * t, K, S, brand_share, brand_name)
+    pen_g[:, i] = tbl["pen.brand"].values
+    buy_g[:, i] = tbl["pur.brand"].values
+
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.2))
+colors = plt.cm.viridis(np.linspace(0, 0.85, nbrand))
+for j in range(nbrand):
+    axes[0].plot(tseq, pen_g[j], color=colors[j], lw=1.8, label=brand_name[j])
+    axes[1].plot(tseq, buy_g[j], color=colors[j], lw=1.8)
+
+# observed year-1 penetration, for reference
+axes[0].scatter(np.ones(nbrand), obs["b (O)"].values, color=colors,
+                zorder=5, s=28, marker="D", edgecolor="white", linewidth=0.8)
+
+axes[0].set(xlabel="Years", ylabel="Penetration",
+            title="Penetration growth (♦ = observed year 1)")
+axes[1].set(xlabel="Years", ylabel="Purchases per buyer", title="Buying-rate growth")
+for ax in axes:
+    ax.grid(alpha=0.25, lw=0.5)
+axes[0].legend(fontsize=8, frameon=False, loc="upper left")
+fig.tight_layout()
+plt.show()
+```
+
+Penetration grows less than pro rata; the extra buyers in a longer window are lighter
+buyers, and $w$ absorbs the rest. The observed year-1 markers sit close to the curves
+for Alpha and Bravo and above them for the small brands — the same under-prediction
+seen in the O-vs-T table, now visible as a vertical gap.
+
+## Validation against the R package
+
+Run [`nbd-dirichlet-panel.R`](https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet-panel.R)
+from the repository root:
+
+```bash
+Rscript notebooks/models/brand-choice/nbd-dirichlet-panel.R
+```
+
+It sources `references/implementations/NBDdirichlet/R/` directly — the vendored v1.4,
+not whatever CRAN currently ships — builds the same inputs from the same CSV, and
+prints the parameters and all four summary tables.
+
+```{python}
+#| code-fold: false
+r_buy = pd.DataFrame(
+    {"pen.brand": [0.54, 0.50, 0.14, 0.06, 0.03],
+     "pur.brand": [3.27, 3.20, 2.70, 2.63, 2.60],
+     "pur.cat":   [4.75, 4.78, 5.01, 5.05, 5.07]},
+    index=brand_name)
+
+r_dup = pd.DataFrame(
+    [[1.00, 0.39, 0.10, 0.05, 0.02],
+     [0.41, 1.00, 0.10, 0.05, 0.02],
+     [0.40, 0.37, 1.00, 0.05, 0.02],
+     [0.40, 0.37, 0.10, 1.00, 0.02],
+     [0.40, 0.37, 0.10, 0.05, 1.00]],
+    index=brand_name, columns=brand_name)
+
+checks = {
+    "M":   (round(M0, 2), 3.99),
+    "K":   (round(K, 2), 2.60),
+    "S":   (round(S, 2), 0.62),
+    "buy table (max abs diff)":  ((buy.round(2) - r_buy).abs().values.max(), 0.0),
+    "dup table (max abs diff)":  ((theo_dup.round(2) - r_dup).abs().values.max(), 0.0),
+}
+pd.DataFrame([{"quantity": k, "python": v[0], "R": v[1], "match": v[0] == v[1]}
+              for k, v in checks.items()]).set_index("quantity")
+```
+
+Both implementations also agree that the per-brand $S_j$ are
+`0.5016, 0.6800, 1.1698, 1.1076, 0.8667` and that **Charlie is dropped by the notch
+test** (upper notch 1.1689) — the second half of the two-part outlier rule that the
+R package inherits from `boxplot.stats()` rather than implementing itself.
+
+## What this application shows
+
+Running the model on a category it was not chosen to flatter is more instructive than
+another clean reproduction:
+
+1. **The parameters are readable.** $K = 2.6$ (vs 0.78) says a near-universally bought
+   category; $S = 0.62$ (vs 1.30) says a polarised one. Both match what the
+   descriptive analysis found independently.
+2. **Double Jeopardy survives.** $w(1-b)$ is far flatter than $b$ or $w$ across a
+   twenty-fold share range, in the observed data as well as the fit.
+3. **The duplication residuals diagnose a partition.** Structured, signed residuals —
+   leaders under-duplicating, followers over-duplicating with leaders — are not a
+   failed fit but a **finding**, and one corroborated by the negative weekly share
+   correlation between Alpha and Bravo.
+4. **`nstar` is not a set-and-forget default.** The package ships 50; this category
+   needs ~170. The check is one line and belongs in any application.
+
+The caveats from the [main essay](nbd-dirichlet) all still apply — stationarity,
+short periods, the heavy-buyer tail, the instability of $S$ across period lengths. To
+those, this data set adds the multi-brand-trip wrinkle: 2.2% of occasions here
+allocate to more than one brand, which the model's $\sum_j r_j = n$ arithmetic does
+not admit.

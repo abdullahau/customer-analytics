@@ -79,10 +79,12 @@ grocery_lf = pl.scan_csv(
         'week': pl.UInt16,
         'sku_id': pl.UInt8,
         'units': pl.Int16,
-        'price': pl.Float32,
+        'price': pl.Float64,
         'brand': pl.Categorical})
 grocery_lf.head().collect()
 ```
+
+*Note on `price`*: it is deliberately read as `Float64` rather than `Float32`. Spend is `units × price` accumulated over thousands of rows, and the decile analyses below rank households by total spend and then cut on a **cumulative** sum. In `Float32` that running total loses enough precision that genuinely distinct household spends collapse into ties, and households straddling a decile boundary get assigned to the wrong decile — the household counts still look right, but the per-decile transaction and brand averages silently drift.
 
 ```{python}
 sku_lf = pl.scan_csv(
@@ -160,30 +162,23 @@ def weekly_spend_summary(brand, lf):
 ```{python}
 # Weekly Grocery Volume Sales LazyFrame (Query Plan): Weekly 'volume' by 'Brand' or 'All'
 def weekly_vol_summary(brand, lf):
-    with pl.StringCache():
-        lf = (
-            lf
-            .join(
-                other=sku_lf,
-                left_on="sku_id",
-                right_on="sku_id"            
-            )
-            .select(['week', 'units', 'brand', 'weight'])
-        )
-        
-        if brand != 'All': 
-            brand = [brand] if type(brand) == str else brand
-            lf = lf.filter(
-                pl.col('brand').is_in(*[brand])
-            )
-            
-        summary = lf.with_columns(
-            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume')
-        ).group_by('week', 'brand').agg(
-            pl.col("volume").sum().alias('Weekly Volume')
-        ).sort('week')
-        
-    return summary
+    lf = (
+        lf
+        .join(other=sku_lf, on="sku_id")
+        .select(['week', 'units', 'brand', 'weight'])
+    )
+
+    if brand != 'All':
+        brands = [brand] if isinstance(brand, str) else list(brand)
+        lf = lf.filter(pl.col('brand').is_in(brands))
+
+    return (
+        lf
+        .with_columns((pl.col('units') * pl.col('weight') / 1000).alias('volume'))
+        .group_by('week', 'brand')
+        .agg(pl.col("volume").sum().alias('Weekly Volume'))
+        .sort('week')
+    )
 ```
 
 ```{python}
@@ -291,7 +286,6 @@ def freq_dist_plot(
             .with_columns(
                 (pl.col("Frequency") / pl.col("Frequency").sum()).alias("% of Total")
             )
-            .collect()
         )
 
     # Create the Altair chart
@@ -376,25 +370,21 @@ pct_volume
 ```
 
 ```{python}
-with pl.StringCache():
-    pct_volume_plot = (
-        weekly_vol_summary('All', grocery_lf)
-        .group_by('week')
-        .agg(
-            pl.col('Weekly Volume').sum().alias('Total Weekly Volume')
-        )
-        .join(
-            other=weekly_vol_summary(['Alpha', 'Bravo'], grocery_lf),
-            on='week',
-        )
-        .filter(
-            (pl.col('brand').is_in(['Alpha', 'Bravo']))
-        )
-        .with_columns(
-            # compute brand wise % of total volume sale
-            (pl.col('Weekly Volume') / pl.col('Total Weekly Volume')).alias('pct_volume')
-        )
-    ).collect()
+pct_volume_plot = (
+    weekly_vol_summary('All', grocery_lf)
+    .group_by('week')
+    .agg(
+        pl.col('Weekly Volume').sum().alias('Total Weekly Volume')
+    )
+    .join(
+        other=weekly_vol_summary(['Alpha', 'Bravo'], grocery_lf),
+        on='week',
+    )
+    .with_columns(
+        # compute brand wise % of total volume sale
+        (pl.col('Weekly Volume') / pl.col('Total Weekly Volume')).alias('pct_volume')
+    )
+).collect()
 
 weekly_plot(dataframe=pct_volume_plot, 
             y='pct_volume', 
@@ -667,7 +657,11 @@ avg_sku_price.drop(pl.col('sku_id')).describe()
 *Garbage Collect*
 
 ```{python}
-exceptions = ['grocery_lf', 'sku_lf', 'kiwi_lf', 'In', 'exceptions', 'active_variables']
+exceptions = [
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 'BRANDS', 'panel_size',
+    'panellist_trans', 'panellist_spend', 'panellist_vol', 'panellist_category',
+    'penetration', 'ppb', 'decile_base', 'decile_table',
+    'In', 'exceptions', 'active_variables']
 
 active_variables = [
     var for var, value in globals().items()
@@ -715,233 +709,109 @@ Result of the intermediate prep should produce a dataset that summarizes transac
 
 ![](/references/figures/Consumer-Panel-Data-Relationship.png){fig-align="center" width="605"}
 
-**One row per transaction**, with a binary indicator of whether or not each brand was purchased.
+The Excel note gets there in two hops: first collapse the raw purchase lines to **one row per transaction** carrying a binary indicator of which brands were bought, then sum those indicators per panellist. In polars the same thing is one step — count *distinct* `trans_id`s within each `panel_id × brand` group — which is why the code below has no intermediate indicator table. The distinction that matters is the same either way: we are counting purchase **occasions**, not units, and not raw rows (a single transaction contributes several rows when the checkout scanned items separately).
 
--   Filter for year == 1, group by transaction ID, panel ID and brand, then count unique panel_ids per transaction and brand
+**The three panellist-level summaries**
 
--   Each panelist has done some number of transactions. Group unique transactions and obtain the count of transactions occasions in which any listed brand was purchased
+Every analysis in the rest of this note is built from just three tables, each one row per panellist and one column per brand (plus a `Category` column):
 
--   Note: this is not a sum of total units (by brand) purchased per panellist.
+| Table | Cell value |
+|---|---|
+| `panellist_trans` | number of **purchase occasions** on which the brand was bought |
+| `panellist_spend` | total **dollars** spent on the brand |
+| `panellist_vol`   | total **kilograms** of the brand purchased |
 
--   Note: Because there are multiple entires for the same transaction ID, we are not doing a count of brand instance per panelist (without trans_id grouping) as this would duplicate the occasions in some cases.
+These are exactly the `panellist x brand (trans)`, `(spend)` and `(volume)` worksheets of the Excel note, and the `df_panellist_trans`, `df_panellist_spend` and `df_panellist_vol` data frames of the R note.
 
--   Produce a dataset where there is just one row per transaction, with a binary indicator of whether or not each brand was purchased.
+Two details matter:
 
--   Create a new column to track category purchase. Each row is an instance of at least one brand purchase so category column is set to 1.
+-   **Transactions are not additive across brands.** A brand transaction is a purchase *occasion* on which at least one item of that brand was bought, so it is a count of distinct `trans_id`s — not a sum of units. `Category` is likewise the count of distinct `trans_id`s, which is why the brand columns can sum to *more* than `Category`: panellist `3102016`'s transaction `844` is one category occasion but counts once for Alpha and once for Delta. Spend and volume, by contrast, are plain sums, so there `Category` is exactly the row total.
+-   **All three tables share the same `panel_id` ordering**, so they can be lined up positionally (as the matrix algebra later on requires) without re-joining.
 
-**Panellist-level *transaction* summary**
-
-The function below executes a query plan which summarizes each panellist's purchase occasions (transactions) for each brand
-
-```{python}
-def trans_summary(brand, lf, year):
-    
-    # Primary Step: Filter by Year 1 and Remove Unused Columns
-    filtered_lf = lf.filter(
-        (pl.col('week') <= (year * 52)) &
-        (pl.col('week') > ((year - 1) * 52))
-    ).drop(
-        pl.col('week','sku_id')
-    )
-
-    # Intermediate Step: Group by trans_id, panel_id, and brand
-    group_trans = filtered_lf.drop(
-        pl.col('price', 'units')
-    ).group_by(
-        'trans_id', 'panel_id', 'brand'
-    ).n_unique()
-    
-    if brand == "Category":
-        # Panellist-level category transaction summary
-        summary = group_trans.group_by(
-            'panel_id'
-        ).n_unique()
-    else:
-        # Panellist-level brand transaction summary
-        summary = group_trans.filter(
-            pl.col('brand') == brand
-        ).group_by(
-            'panel_id'
-        ).n_unique()
-    
-    return summary.select(
-        pl.col('panel_id'),
-        pl.col('trans_id').alias('# of Purchases'),
-        pl.col('brand').alias('Brands Purchased')
-    )
-```
+Building all three in a single pass over the data matters: the earlier version of this note re-scanned and re-collected the CSV once per call, more than a dozen times over.
 
 ```{python}
-def trans_pivot(lf, year):
-    
-    # Primary Step: Filter by Year 1 and Remove Unused Columns
-    filtered_lf = lf.filter(
-        (pl.col('week') <= (year * 52)) &
-        (pl.col('week') > ((year - 1) * 52))
-    ).drop(
-        pl.col('week','sku_id')
-    )
+BRANDS = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other']
 
-    # Intermediate Step: Group by trans_id, panel_id, and brand
-    group_trans = filtered_lf.drop(
-        pl.col('price', 'units')
-    ).group_by(
-        'trans_id', 'panel_id', 'brand'
-    ).n_unique() # count of unique entires
-    
-    summary = group_trans.collect().pivot(
-        on='brand',
-        index='panel_id',
-        values='panel_id',
-        aggregate_function="len"
-        
-    ).join(
-        other=group_trans.group_by('panel_id').n_unique().drop('brand').collect(),
-        on='panel_id'
-    ).rename(
-        {'trans_id': 'Category'}
-    ).drop(
-        pl.col('panel_id')
-    )
-    
-    return summary
-```
 
-**Panellist-level *spend* summary**
+def panellist_matrices(lf, year=1):
+    """Panellist x brand transaction, spend and volume matrices for a given year.
 
-The function below executes a query plan which summarizes the amount each panellist spent on each brand (and in the category) during year 1.
-
-```{python}
-def spend_summary(brand, lf, year):
-    
-    group_spend = lf.filter(
-        (pl.col('week') <= (year * 52)) &
-        (pl.col('week') > ((year - 1) * 52))
-    ).drop(
-        pl.col('week','sku_id')
-    ).with_columns(
-        ((pl.col('units') * pl.col('price'))).alias('spend')
-    )
-    
-    if brand == "Category":
-        # Panellist-level category spend summary
-        summary = group_spend.drop(
-            pl.col('units', 'price', 'brand')
-        ).group_by(
-            'panel_id'
-        ).agg(
-            pl.col('spend').sum()
+    Returns three DataFrames sharing an identical `panel_id` ordering, each with
+    one column per brand plus a `Category` column.
+    """
+    period = (
+        lf
+        .filter(pl.col('week').is_between((year - 1) * 52 + 1, year * 52))
+        .join(sku_lf, on='sku_id')
+        .with_columns(
+            (pl.col('units') * pl.col('price')).alias('spend'),
+            # weight from grams to kilograms
+            (pl.col('units') * pl.col('weight') / 1000).alias('volume'),
         )
-    else:
-        # Panellist-level brand spend summary
-        summary = group_spend.drop(
-            pl.col('units', 'price')
-        ).group_by(
-            'panel_id', 'brand'
-        ).agg(
-            pl.col('spend').sum()
-        ).filter(
-            pl.col('brand') == brand
-        ).drop('brand')
-        
-    return summary
-```
-
-```{python}
-def spend_pivot(lf, year):
-    
-    group_spend = lf.filter(
-        (pl.col('week') <= (year * 52)) &
-        (pl.col('week') > ((year - 1) * 52))
-    ).drop(
-        pl.col('week','sku_id')
-    ).with_columns(
-        ((pl.col('units') * pl.col('price'))).alias('spend')
-    ).collect().pivot(
-        on='brand',
-        index='panel_id',
-        values='spend',
-        aggregate_function='sum'
-    ).select(
-        'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'
+        .collect()
     )
 
-    return group_spend
-```
-
-**Panellist-level *volume purchasing* summary**
-
-The function below executes a query plan which summarises each panellist’s volume purchasing in year 1.
-
-```{python}
-def vol_summary(brand, lf, year):
-    with pl.StringCache():
-        group_vol = lf.filter(
-            (pl.col('week') <= (year * 52)) &
-            (pl.col('week') > ((year - 1) * 52))
-        ).join(
-            other=sku_lf,
-            left_on='sku_id',
-            right_on='sku_id'
-        ).drop(
-            pl.col('week','sku_id')
-        ).with_columns(
-            # volume column that is the product of weight of each SKU and the units of SKU sold
-            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume') # # weight from grams to kilograms
-        ).drop(
-            pl.col('units', 'price', 'weight')
+    def wide(frame, values, aggregate_function):
+        """Pivot a long panel_id x brand aggregate into a brand-per-column table."""
+        return (
+            frame
+            .pivot(on='brand', index='panel_id', values=values,
+                   aggregate_function=aggregate_function)
+            .select(['panel_id'] + BRANDS)
+            .fill_null(0)
+            .sort('panel_id')
         )
-        
-        if brand == "Category":
-            # Panellist-level category volume sales summary
-            summary = group_vol.drop(
-                pl.col('brand')
-            ).group_by(
-                'panel_id'
-            ).agg(
-                pl.col('volume').sum()
-            )
-        else:
-            # Panellist-level brand volume sales summary
-            summary = group_vol.group_by(
-                'panel_id', 'brand'
-            ).agg(
-                pl.col('volume').sum()
-            ).filter(
-                pl.col('brand') == brand
-            ).drop('brand')
-        
-    return summary
+
+    # Transactions: distinct purchase occasions, so brand columns are NOT additive
+    # and `Category` has to be counted separately rather than summed across brands.
+    trans = (
+        wide(
+            period.group_by('panel_id', 'brand').agg(pl.col('trans_id').n_unique()),
+            values='trans_id', aggregate_function='first',
+        )
+        .join(
+            period.group_by('panel_id').agg(pl.col('trans_id').n_unique().alias('Category')),
+            on='panel_id',
+        )
+        .sort('panel_id')
+    )
+
+    # Spend and volume are plain sums, so `Category` is the row total.
+    spend, volume = (
+        wide(period, values=value, aggregate_function='sum')
+        .with_columns(pl.sum_horizontal(BRANDS).alias('Category'))
+        for value in ('spend', 'volume')
+    )
+
+    return trans, spend, volume
+
+
+panellist_trans, panellist_spend, panellist_vol = panellist_matrices(grocery_lf, year=1)
+
+panellist_trans.head()
 ```
 
 ```{python}
-def vol_pivot(lf, year):
-    with pl.StringCache():
-        group_vol = lf.filter(
-            (pl.col('week') <= (year * 52)) &
-            (pl.col('week') > ((year - 1) * 52))
-        ).join(
-            other=sku_lf,
-            left_on='sku_id',
-            right_on='sku_id'
-        ).drop(
-            pl.col('week','sku_id')
-        ).with_columns(
-            # volume column that is the product of weight of each SKU and the units of SKU sold
-            (((pl.col('units') * pl.col('weight'))/1000)).alias('volume') # # weight from grams to kilograms
-        ).drop(
-            pl.col('units', 'price', 'weight')
-        ).collect().pivot(
-            on='brand',
-            index='panel_id',
-            values='volume',
-            aggregate_function='sum'
-        ).select(
-            'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other'
-        )
-        
-    return group_vol
+panellist_spend.head()
 ```
+
+```{python}
+panellist_vol.head()
+```
+
+A fourth, derived table is convenient often enough to be worth naming: each category buyer's total purchase occasions alongside how many *distinct* brands they bought.
+
+```{python}
+panellist_category = panellist_trans.select(
+    'panel_id',
+    pl.col('Category').alias('# of Purchases'),
+    pl.sum_horizontal(pl.col(BRANDS) > 0).alias('Brands Purchased'),
+)
+
+panellist_category.head()
+```
+
 
 Looking at panellist-level spend and panellist-level volume purchasing, we note that for each row, `Category` equals the sum of the brand numbers, as we would expect. But this is not always the case in panellist-level transactions. Why is the sum of the brand-specific numbers sometimes greater than the associated category number?
 
@@ -961,8 +831,8 @@ Looking at *panellist-level transaction summary*, we see that there are 4574 row
 
 ```{python}
 # the number of panellists who purchased each brand at least once in year 1
-buyers = trans_pivot(grocery_lf, 1).count().select(
-    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other', 'Category'
+buyers = panellist_trans.select(
+    (pl.col(BRANDS + ['Category']) > 0).sum()
 ).unpivot(
     variable_name='brand',
     value_name='buyers'
@@ -986,8 +856,8 @@ buyers = trans_pivot(grocery_lf, 1).count().select(
 ```{python}
 # On how many purchase occasions did the brand/category buyers of each brand/category buy that brand/category?
 # i.e, On how many purchase occasions did the 2624 buyers of Alpha buy Alpha?
-transactions = trans_pivot(grocery_lf, 1).sum().select(
-    'Alpha', 'Bravo', 'Charlie', 'Delta', 'Other', 'Category'
+transactions = panellist_trans.select(
+    pl.col(BRANDS + ['Category']).sum()
 ).unpivot(
     variable_name='brand',
     value_name='transactions'
@@ -1069,10 +939,9 @@ Looking at the *panellist-level transaction summary*, the distribution of catego
 ```{python}
 # Category Transaction Distribution
 category_trans_dist = (
-    trans_summary('Category', grocery_lf, 1)
+    panellist_category
     .group_by(pl.col('# of Purchases'))
     .agg(pl.len().alias("Frequency"))
-    .collect() 
     # Add zero purchase row to the top of the data series with a new column name 'Frequency'
     .pipe(
         lambda df: df.vstack(
@@ -1190,10 +1059,10 @@ In contrast to the `groupby` aggregation output associated with our summary of c
 ```{python}
 # Alpha Brand Transaction Distribution
 alpha_trans_dist = (
-    trans_summary('Alpha', grocery_lf, 1)
-    .group_by(pl.col('# of Purchases'))
+    panellist_trans
+    .filter(pl.col('Alpha') > 0)
+    .group_by(pl.col('Alpha').alias('# of Purchases'))
     .agg(pl.len().alias("Frequency"))
-    .collect() 
     .pipe(
         lambda df: df.vstack(
             pl.DataFrame(
@@ -1259,7 +1128,7 @@ We see that 16% of category buyers spent up to \$5 in the category during this o
 Before deciding on what bin width to use when creating the histogram, let us first compute some basic descriptive statistics.
 
 ```{python}
-category_spend = spend_summary('Category', grocery_lf, 1).drop('panel_id')
+category_spend = panellist_spend.select(pl.col('Category').alias('spend'))
 
 category_spend.describe()
 ```
@@ -1267,7 +1136,7 @@ category_spend.describe()
 We wish to visualize the variability in category spend. Given this objective, some would automatically think of creating a (kernel) density plot.
 
 ```{python}
-alt.Chart(category_spend.collect()).transform_density(
+alt.Chart(category_spend).transform_density(
     'spend',
     as_=['spend', 'Density']
 ).mark_area().encode(
@@ -1286,7 +1155,7 @@ There appears to be quite a bit of variability in category spend. To get further
 ```{python}
 percentiles = np.arange(5, 96, 5)
 # np.percentile returns the k-th percentile of values in a range
-percentile_values = np.percentile(category_spend.select('spend').collect(), percentiles)
+percentile_values = np.percentile(category_spend['spend'], percentiles)
 
 percentile_df = pl.DataFrame({
     'Percentile Level': percentiles,
@@ -1344,7 +1213,7 @@ Let us now create the distribution of spend on Alpha. We will follow the same ba
 Note that there are a number of 0 or NaN values in the Alpha spend column. While these panellists purchased in the category during the year, they did not purchase any of Alpha’s SKUs. The first thing we need to do is remove these observations.
 
 ```{python}
-alpha_spend = spend_summary('Alpha', grocery_lf, 1).drop('panel_id')
+alpha_spend = panellist_spend.filter(pl.col('Alpha') > 0).select(pl.col('Alpha').alias('spend'))
 
 alpha_spend.describe()
 ```
@@ -1352,7 +1221,7 @@ alpha_spend.describe()
 ```{python}
 percentiles = np.arange(5, 96, 5)
 
-percentile_values = np.percentile(alpha_spend.select('spend').collect(), percentiles)
+percentile_values = np.percentile(alpha_spend['spend'], percentiles)
 
 percentile_df = pl.DataFrame({
     'Percentile Level': percentiles,
@@ -1397,14 +1266,16 @@ How would you determine the validity of the assumption that the buyers who purch
 
 ```{python}
 # One-Time Alpha Buyers
-one_time_alpha_buyers = trans_summary('Alpha',grocery_lf,1).filter(pl.col('# of Purchases') == 1).collect()
+one_time_alpha_buyers = panellist_trans.filter(pl.col('Alpha') == 1).select('panel_id')
 one_time_alpha_buyers
 
 # Alpha buyers who spent between $2 to $4
-spend_range_alpha_buyers = spend_summary('Alpha', grocery_lf, 1).filter(
+spend_range_alpha_buyers = panellist_spend.select(
+    'panel_id', pl.col('Alpha').alias('spend')
+).filter(
     (pl.col('spend') >= 2) &
     (pl.col('spend') < 4)
-).collect()
+)
 
 res = one_time_alpha_buyers.join(
     spend_range_alpha_buyers, on='panel_id', how='semi'
@@ -1431,7 +1302,7 @@ grocery_lf.filter(
 ).join(
     spend_range_alpha_buyers.lazy().select('panel_id'), on='panel_id', how='semi'
 ).join(
-    one_time_alpha_buyers.lazy().select('panel_id'), on='panel_id', how='semi'
+    one_time_alpha_buyers.lazy(), on='panel_id', how='semi'
 ).with_columns(
     ((pl.col('units') * pl.col('price'))).alias('spend')
 ).select(pl.col('spend').sum()).collect().item()
@@ -1442,7 +1313,7 @@ grocery_lf.filter(
 #### Distribution of Category Volume Purchase Frequency
 
 ```{python}
-category_vol = vol_summary('Category', grocery_lf, 1).drop('panel_id')
+category_vol = panellist_vol.select(pl.col('Category').alias('volume'))
 
 category_vol.describe()
 ```
@@ -1450,8 +1321,7 @@ category_vol.describe()
 ```{python}
 percentiles = np.arange(5, 96, 5)
 
-with pl.StringCache(): 
-    percentile_values = np.percentile(category_vol.select('volume').collect(), percentiles)
+percentile_values = np.percentile(category_vol['volume'], percentiles)
 
 percentile_df = pl.DataFrame({
     'Percentile Level': percentiles,
@@ -1490,7 +1360,7 @@ chart.show()
 Note that there are a number of 0 or NaN values in the Alpha volume purchase column. These panaellists (like the brand spend section) purchased in the category during the year, but they did not purchase any of Alpha's products. Let us remove observations of `panel_ids` that have not at least made 1 purchase from Alpha brand during the year.
 
 ```{python}
-alpha_vol = vol_summary('Alpha', grocery_lf, 1).drop('panel_id')
+alpha_vol = panellist_vol.filter(pl.col('Alpha') > 0).select(pl.col('Alpha').alias('volume'))
 
 alpha_vol.describe()
 ```
@@ -1498,8 +1368,7 @@ alpha_vol.describe()
 ```{python}
 percentiles = np.arange(5, 96, 5)
 
-with pl.StringCache(): 
-    percentile_values = np.percentile(alpha_vol.select('volume').collect(), percentiles)
+percentile_values = np.percentile(alpha_vol['volume'], percentiles)
 
 percentile_df = pl.DataFrame({
     'Percentile Level': percentiles,
@@ -1539,9 +1408,10 @@ chart.show()
 
 ```{python}
 exceptions = [
-    'grocery_lf', 'sku_lf', 'kiwi_lf', 
-    'In', 'exceptions', 'active_variables',
-    'penetration', 'ppb', 'panel_size']
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 'BRANDS', 'panel_size',
+    'panellist_trans', 'panellist_spend', 'panellist_vol', 'panellist_category',
+    'penetration', 'ppb', 'decile_base', 'decile_table',
+    'In', 'exceptions', 'active_variables']
 
 active_variables = [
     var for var, value in globals().items()
@@ -1566,59 +1436,57 @@ We have observed that there is a lot of variability in purchase frequency and sp
 
 We will first focus on creating the table below. The table captures the decile analysis of category buying behaviour (where each decile equals 10% category buyers). Recall that 4574 households made at least one category purchase in year 1. Having **sorted these households by total category spend**, we create **10 equally sized groups**. Decile 1 is the 10% of households that spent the most in the category during year 1, decile 2 is the next largest 10% of spenders, and so on.
 
+Both versions rank the same set of households, so we start from a single base table: one row per category buyer with their total category spend, their category transactions, and the number of distinct brands they bought.
+
+The **ordering must be deterministic**. 2,548 of the 4,574 households share a total spend with at least one other household, and both decile definitions cut on a *cumulative* quantity, so households sitting on a decile boundary are decided by the tie-break. Sorting on spend alone leaves that tie order arbitrary — polars does not guarantee a stable sort — and the table then changes from run to run. Sorting by `spend` descending **and then `panel_id` ascending** fixes the order and reproduces the R note exactly.
+
 ```{python}
-# Create decile cuts in the group_spend data using the sorted and ranked data
+decile_base = (
+    panellist_spend.select('panel_id', pl.col('Category').alias('spend'))
+    .join(panellist_category, on='panel_id')
+    # deterministic tie-break: highest spend first, then lowest panel_id
+    .sort(['spend', 'panel_id'], descending=[True, False])
+)
 
-# Part 1: Break-tie ranking of total category spend data
-# Part 2: Decile cuts in ranking
-buyer_decile = spend_summary(
-    'Category', grocery_lf, 1
-).with_columns(
-    pl.col('spend').rank(method='ordinal', descending=True).alias('rank'),
-).with_columns(
-    (np.floor(10 * (pl.col('rank') - 1) / pl.col('rank').max()) + 1).cast(pl.UInt16).alias('decile')
-).sort('decile', 'rank').collect()
 
-buyer_decile
+def decile_table(base):
+    """Summarise buying behaviour by decile, given a frame with a `decile` column."""
+    return (
+        base
+        .group_by('decile')
+        .agg(
+            pl.len().alias('HH'),
+            pl.col('spend').sum(),
+            pl.col('# of Purchases').sum().alias('trans'),
+            pl.col('Brands Purchased').mean().alias('# Unique Brands'),
+        )
+        .sort('decile')
+        .with_columns(
+            (pl.col('HH') / pl.col('HH').sum()).alias('% HH'),
+            (pl.col('spend') / pl.col('spend').sum()).alias('% Spend'),
+            (pl.col('trans') / pl.col('trans').sum()).alias('% Trans'),
+            (pl.col('spend') / pl.col('HH')).alias('Spend/HH'),
+            (pl.col('trans') / pl.col('HH')).alias('Cat Trans/HH'),
+            (pl.col('spend') / pl.col('trans')).alias('Avg Spend/Trans'),
+        )
+        .select('decile', '% HH', '% Spend', '% Trans', 'Spend/HH',
+                'Cat Trans/HH', 'Avg Spend/Trans', '# Unique Brands')
+        .rename({'decile': 'Decile'})
+    )
+```
+
+Deciles of equal *size*: rank the sorted households and split into ten groups of 10% of buyers each.
+
+```{python}
+buyer_decile = decile_base.with_columns(
+    ((pl.int_range(pl.len()) * 10) // pl.len() + 1).alias('decile')
+)
+
+decile_tab = decile_table(buyer_decile)
+decile_tab
 ```
 
 ```{python}
-# Helper functions
-def calculate_percentage(series):
-    return series / series.sum()
-
-def group_aggregate(data, group_col, agg_col, agg_expr):
-    return data.group_by(group_col).agg(agg_expr(pl.col(agg_col)))
-
-# Decile table creation
-decile_tab = buyer_decile.select("decile").unique().sort("decile").rename({"decile": "Decile"})
-
-# Populate decile statistics
-# Decile counts and % HH
-decile_counts = group_aggregate(buyer_decile, 'decile', 'panel_id', pl.Expr.count)
-decile_tab.insert_column(1, pl.lit(calculate_percentage(decile_counts['panel_id'])).alias('% HH')) 
-
-# % Spend
-decile_spend = group_aggregate(buyer_decile, 'decile', 'spend', pl.Expr.sum)
-decile_tab.insert_column(2, pl.lit(calculate_percentage(decile_spend['spend'])).alias('% Spend')) 
-
-# % Transactions
-group_trans = trans_summary('Category', grocery_lf, 1).collect().join(
-    other=buyer_decile.group_by('panel_id').agg(pl.col('decile').sum()),
-    on='panel_id'
-).sort('decile')
-decile_trans = group_aggregate(group_trans, 'decile', '# of Purchases', pl.Expr.sum)
-decile_tab.insert_column(3, pl.lit(calculate_percentage(decile_trans['# of Purchases'])).alias('% Trans')) 
-
-# Spend/HH, Cat Trans/HH, Avg Spend/Trans (AOV)
-decile_tab.insert_column(4, pl.lit(decile_spend['spend'] / decile_counts['panel_id']).alias('Spend/HH'))
-decile_tab.insert_column(5, pl.lit(decile_trans['# of Purchases'] / decile_counts['panel_id']).alias('Cat Trans/HH'))
-decile_tab.insert_column(6, pl.lit(decile_spend['spend'] / decile_trans['# of Purchases']).alias('Avg Spend/Trans'))
-
-# Unique Brands Purchased
-unique_brands = group_aggregate(group_trans, 'decile', 'Brands Purchased', pl.Expr.mean)
-decile_tab.insert_column(7, pl.lit(unique_brands['Brands Purchased']).alias('# Unique Brands'))
-
 (
     GT(decile_tab, rowname_col='Decile')
     .tab_header(title='Decile Analysis of Category Buying Behavior',
@@ -1639,64 +1507,28 @@ This is a very basic decile table. Some additional information that could be rep
 The decile analysis we have just completed uses deciles that represent 10% of the category buyers. An alternative approach is to create deciles that represent **10% of category spend**. In other words, the decile analysis took the entire customer base that purchased the category in year 1 and split the base into ten equal group. In this analysis, we will take the total customer spend or total revenue and split that revenue into ten equal groups. The only change to what we have done above is how we create the decile variable.
 
 ```{python}
-# Divide the total revenue into 10 equal parts and generate the decile bins
-spend_total = spend_summary('Category', grocery_lf, 1).select(pl.col('spend')).sum().collect().to_series()[0]
-breaks = np.arange(0, spend_total, spend_total/10)
-labels = [f'{i}' for i in range(0, 11, 1)]
+# Assign each household to the decile of *cumulative* category spend it falls in.
+# `cum` is the running share of total category revenue (0-100%); the 1e-6 nudge
+# matches the R note and keeps a household landing exactly on a boundary in the
+# decile above it.
+spend_total = decile_base['spend'].sum()
 
-spend_decile = spend_summary(
-    'Category', grocery_lf, 1
-).sort(
-    'spend', descending=True
-).with_columns(
-    pl.col('spend').cum_sum().alias('cum sum') # Create a cumulative sum column for category spend (category revenue)
-).with_columns(
-    pl.col('cum sum').cut( # Cut function determines the decile range for each cumulative sum value
-        breaks=breaks,
-        labels=labels # Function also adds the decile label from 1 to 10
-    ).cast(pl.UInt16).alias('decile')
-).sort('decile').collect()
+spend_decile = (
+    decile_base
+    .with_columns((100 * pl.col('spend').cum_sum() / spend_total).alias('cum'))
+    .with_columns(
+        (((pl.col('cum') - 1e-6) / 10).floor() + 1)
+        .clip(1, 10)
+        .cast(pl.UInt16)
+        .alias('decile')
+    )
+)
 
-spend_decile
+decile_tab_spend = decile_table(spend_decile)
+decile_tab_spend
 ```
 
 ```{python}
-# Helper functions
-def calculate_percentage(series):
-    return series / series.sum()
-
-def group_aggregate(data, group_col, agg_col, agg_expr):
-    return data.group_by(group_col).agg(agg_expr(pl.col(agg_col)))
-
-# Decile table creation
-decile_tab_spend = spend_decile.select("decile").unique().sort("decile").rename({"decile": "Decile"})
-
-# Populate decile statistics
-# Decile counts and % HH
-decile_counts = group_aggregate(spend_decile, 'decile', 'panel_id', pl.Expr.count)
-decile_tab_spend.insert_column(1, pl.lit(calculate_percentage(decile_counts['panel_id'])).alias('% HH')) 
-
-# % Spend
-decile_spend = group_aggregate(spend_decile, 'decile', 'spend', pl.Expr.sum)
-decile_tab_spend.insert_column(2, pl.lit(calculate_percentage(decile_spend['spend'])).alias('% Spend')) 
-
-# % Transactions
-group_trans = trans_summary('Category', grocery_lf, 1).collect().join(
-    other=spend_decile.group_by('panel_id').agg(pl.col('decile').sum()),
-    on='panel_id'
-).sort('decile')
-decile_trans = group_aggregate(group_trans, 'decile', '# of Purchases', pl.Expr.sum)
-decile_tab_spend.insert_column(3, pl.lit(calculate_percentage(decile_trans['# of Purchases'])).alias('% Trans')) 
-
-# Spend/HH, Cat Trans/HH, Avg Spend/Trans (AOV)
-decile_tab_spend.insert_column(4, pl.lit(decile_spend['spend'] / decile_counts['panel_id']).alias('Spend/HH'))
-decile_tab_spend.insert_column(5, pl.lit(decile_trans['# of Purchases'] / decile_counts['panel_id']).alias('Cat Trans/HH'))
-decile_tab_spend.insert_column(6, pl.lit(decile_spend['spend'] / decile_trans['# of Purchases']).alias('Avg Spend/Trans'))
-
-# Unique Brands Purchased
-unique_brands = group_aggregate(group_trans, 'decile', 'Brands Purchased', pl.Expr.mean)
-decile_tab_spend.insert_column(7, pl.lit(unique_brands['Brands Purchased']).alias('# Unique Brands'))
-
 (
     GT(decile_tab_spend, rowname_col='Decile')
     .tab_header(title='Decile Analysis of Category Buying Behavior',
@@ -1722,11 +1554,11 @@ The Lorenz curve for transactions associated with Alpha is computed and plotted 
 # We are only interested in those panellists that made at least one purchase of Alpha in year 1.
 # Alpha Brand Transaction Distribution of Transactions Greater Than 0
 alpha_trans_dist = (
-    trans_summary('Alpha', grocery_lf, 1)
-    .filter(pl.col('# of Purchases') > 0)
-    .group_by('# of Purchases')
+    panellist_trans
+    .filter(pl.col('Alpha') > 0)
+    .group_by(pl.col('Alpha').alias('# of Purchases'))
     # Frequency of the Grouped Transaction Count
-    .agg(pl.col('# of Purchases').count().alias('Frequency'))
+    .agg(pl.len().alias('Frequency'))
     .sort('# of Purchases')
     # Add a '% of Buyers' column
     .with_columns((pl.col('Frequency')/pl.col('Frequency').sum()).alias('% of Buyers'))
@@ -1742,7 +1574,7 @@ alpha_trans_dist = (
 )
 
 (
-    GT(alpha_trans_dist.collect(), rowname_col='# of Purchases')
+    GT(alpha_trans_dist, rowname_col='# of Purchases')
     .tab_header(title='Alpha Buyers & Transaction Distribution',
                 subtitle= 'Lorenz Curve Table')
     .tab_stubhead(label="# of Purchases")
@@ -1762,7 +1594,7 @@ zero_row = pl.DataFrame({
     'Cum % Transactions': [0.0]
 })
 
-alpha_lorenz_plot = alpha_trans_dist.select('Cum % of Buyers' ,'Cum % Transactions').collect()
+alpha_lorenz_plot = alpha_trans_dist.select('Cum % of Buyers' ,'Cum % Transactions')
 alpha_lorenz_plot_zero = pl.concat([zero_row, alpha_lorenz_plot])
 
 chart = alt.Chart(alpha_lorenz_plot_zero).mark_line().encode(
@@ -1828,7 +1660,8 @@ Purchase frequency is a discrete quantity and we created the Lorenz curve off th
 
 ```{python}
 alpha_spend_dist = (
-    spend_summary('Alpha', grocery_lf, 1)
+    panellist_spend
+    .select('panel_id', pl.col('Alpha').alias('spend'))
     .filter(pl.col('spend') > 0)
     # Sort Alpha customer from lowest to highest
     .sort(pl.col('spend'), descending=False)
@@ -1837,7 +1670,7 @@ alpha_spend_dist = (
     .with_columns((pl.col('spend')/pl.col('spend').sum()).alias('% Spend'))
     # Compute the cumulative percentage of spend numbers
     .with_columns((pl.col('% Spend').cum_sum()).cast(pl.Float64).alias('Cum % Spend'))
-).collect()
+)
 
 # Compute the cumulative percentage of buyers number
 spend_count = alpha_spend_dist.height
@@ -1883,9 +1716,10 @@ np.interp(0.8, xp=alpha_lorenz_plot['Cum % Cust'], fp=alpha_lorenz_plot['Cum % S
 
 ```{python}
 exceptions = [
-    'grocery_lf', 'sku_lf', 'kiwi_lf', 
-    'In', 'exceptions', 'active_variables',
-    'penetration', 'ppb', 'panel_size']
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 'BRANDS', 'panel_size',
+    'panellist_trans', 'panellist_spend', 'panellist_vol', 'panellist_category',
+    'penetration', 'ppb', 'decile_base', 'decile_table',
+    'In', 'exceptions', 'active_variables']
 
 active_variables = [
     var for var, value in globals().items()
@@ -1912,12 +1746,12 @@ To set the scene, let us first determine the percentage of category buyers that 
 
 ```{python}
 brand_purchases = (
-    trans_summary('Category', grocery_lf, 1)
+    panellist_category
     .group_by('Brands Purchased')
     .agg(pl.col('panel_id').count().alias('Category Buyer'))
     .with_columns((pl.col('Category Buyer') / pl.col('Category Buyer').sum()).alias('% Category Buyers'))
     .sort('Brands Purchased')
-).collect()
+)
 
 (
     GT(brand_purchases, rowname_col='Brands Purchased')
@@ -1945,10 +1779,9 @@ Can also be computed as: (1 - 0.132 - 0.089)/(1 - 0.089) \[% of panellists that 
 ```{python}
 # number of category purchases made by each household and number of brands purchased by each household
 brand_loyalty = (
-    trans_summary('Category', grocery_lf, 1)
+    panellist_category
     .group_by('# of Purchases', 'Brands Purchased')
     .agg(pl.col('panel_id').count().alias('Count'))
-    .collect()
     .pivot(
         on='Brands Purchased',
         index='# of Purchases',
@@ -1980,15 +1813,15 @@ We can compute the (weighted) average number of different brands purchased for e
 
 ```{python}
 wa_brands_purchased = (
-    trans_summary('Category', grocery_lf, 1)
+    panellist_category
     .group_by('# of Purchases', 'Brands Purchased')
     .agg(pl.col('panel_id').count().alias('Count'))
     .with_columns((pl.col('Brands Purchased') * pl.col('Count')).alias('Product'))
     .group_by('# of Purchases')
     .agg(
-        (pl.col('Product').sum() / pl.col('Count').sum()) .alias('Weighted Average')
+        (pl.col('Product').sum() / pl.col('Count').sum()).alias('Weighted Average')
     ).sort(by='# of Purchases')
-).collect()
+)
 
 (
     GT(wa_brands_purchased, rowname_col='# of Purchases')
@@ -2111,29 +1944,27 @@ print(dup_purchase, dup_purchase.shape)
 ```
 
 ```{python}
-brand_purchases = trans_pivot(grocery_lf, 1).select('Alpha', 'Bravo', 'Charlie', 'Delta', 'Other')
+brand_purchases = panellist_trans.select(BRANDS).to_numpy()
 
 # Step 1: Create ever buyers matrix
-ever_buyers = brand_purchases.select(
-    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
-).to_numpy()
+ever_buyers = (brand_purchases > 0).astype(int)
 
 # Step 2: Compute duplication count matrix
 dup_count = ever_buyers.T @ ever_buyers
-brand_buyers = np.diag(dup_count).reshape(5, 1)
+brand_buyers = np.diag(dup_count).reshape(-1, 1)
 
 # Step 3: Compute duplication of purchase matrix
 dup_purchase = dup_count / brand_buyers
 
 # DataFrame conversion for tabular view
 dup_count_df = (
-    pl.from_numpy(dup_count, schema=brand_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_purchases.columns))
+    pl.from_numpy(dup_count, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 
 dup_purchase_df = (
-    pl.from_numpy(dup_purchase, schema=brand_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_purchases.columns))
+    pl.from_numpy(dup_purchase, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 ```
 
@@ -2208,49 +2039,25 @@ The duplication of purchase table tells use that 34% of Alpha buyers also purcha
 The SCR numbers for each brand are reported below. We see that Alpha has a share of category requirements of 69%. This means that 69% of the *total category volume purchased by buyers of Alpha goes to Alpha*. Contrast this to Delta, which has an SCR of 40%. This means that 40% of the volume purchased in the category by buyers of Delta goes to that brand.
 
 ```{python}
-# List of brands
-brands = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Other']
+# SCR falls straight out of the "ever buyers" matrix: pre-multiplying the
+# panellist x brand *volume* table by the transpose of the incidence matrix gives,
+# for each row brand, the category volume bought by that brand's buyers.
+brand_vol = panellist_vol.select(BRANDS).to_numpy()
+ever_buyers = (brand_vol > 0).astype(int)
 
-# Initialize results list
-scr_results = []
+cross_purch_matrix = ever_buyers.T @ brand_vol
 
-with pl.StringCache():
-    # Compute total category volume
-    total_vol = vol_summary('Category', grocery_lf, 1)
+scr = pl.DataFrame({
+    'Brands': BRANDS,
+    # Total purchasing of each brand
+    'Brand Purchasing': np.diag(cross_purch_matrix),
+    # Category purchasing conditioned on having bought the brand at least once
+    'Category Purchasing': cross_purch_matrix.sum(axis=1),
+}).with_columns(
+    (pl.col('Brand Purchasing') / pl.col('Category Purchasing')).alias('SCR')
+)
 
-    for brand in brands:
-        # Join brand-specific volume to total category volume to get total category volume for panelists who purchased the brand
-        scr_lf = (
-            total_vol.join(
-                other=vol_summary(brand, grocery_lf, 1),
-                on='panel_id',
-                how='inner'
-            )
-            .with_columns(
-                # Compute total brand and category volumes
-                # Total purchasing of each brand
-                (pl.col('volume_right').sum()).alias('Brand Volume'),
-                # The total amount of category purchasing conditioned on the fact that at least one purchase of the brand of interest was made.
-                (pl.col('volume').sum()).alias('Category Volume'),          
-            )
-            .with_columns(
-                # Compute SCR - ratio of brand purchasing to category purchasing
-                (pl.col('Brand Volume').sum() / pl.col('Category Volume').sum()).alias('SCR')          
-            )
-            .select('Brand Volume', 'Category Volume', 'SCR')
-            .collect()
-        )
-        
-        # Append results
-        scr_results.append({
-            "Brands": brand,
-            "Brand Purchasing": scr_lf.item(1, "Brand Volume"),
-            "Category Purchasing": scr_lf.item(1, "Category Volume"),
-            "SCR": scr_lf.item(1, "SCR")
-        })
-
-# Create final DataFrame
-scr = pl.DataFrame(scr_results)
+scr
 ```
 
 ```{python}
@@ -2269,23 +2076,6 @@ scr = pl.DataFrame(scr_results)
 )
 ```
 
-```{python}
-# Method 2
-
-brand_vol = vol_pivot(grocery_lf, 1).fill_null(0)
-
-ever_buyers = brand_vol.select(
-    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_vol.columns]
-).to_numpy()
-
-brand_vol = brand_vol.to_numpy()
-
-cross_purchasing = ever_buyers.T @ brand_vol
-brand_purchasing = np.diag(cross_purchasing)
-category_purchasing = np.sum(cross_purchasing, axis=1)
-scr = brand_purchasing / category_purchasing
-scr
-```
 
 ### Cross Purchasing
 
@@ -2394,29 +2184,27 @@ print(cross_purch, cross_purch.shape)
 The cross purchasing analysis for year 1 is computed and reported below. We see that for those panellists that purchased Alpha at least once in year 1, 69% of their category volume purchased went to Alpha, 18% went to Bravo, 8% to Charlie, and so on.
 
 ```{python}
-brand_vol_purchases = vol_pivot(grocery_lf, 1).fill_null(0)
+brand_vol_purchases = panellist_vol.select(BRANDS).to_numpy()
 
 # Step 1: Create ever buyers matrix
-ever_buyers = brand_vol_purchases.select(
-    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
-).to_numpy()
+ever_buyers = (brand_vol_purchases > 0).astype(int)
 
 # Step 2: Compute cross purchase matrix
 cross_purch_matrix = ever_buyers.T @ brand_vol_purchases
-total_volume_purchases = np.sum(cross_purch_matrix, axis=1).reshape(5, 1)
+total_volume_purchases = cross_purch_matrix.sum(axis=1).reshape(-1, 1)
 
 # Step 3: Compute cross purchase matrix as a % of total volume purchased of each brand
 cross_purch = cross_purch_matrix / total_volume_purchases
 
 # DataFrame conversion for tabular view
 cross_purch_matrix_df = (
-    pl.from_numpy(cross_purch_matrix, schema=brand_vol_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+    pl.from_numpy(cross_purch_matrix, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 
 cross_purch_df = (
-    pl.from_numpy(cross_purch, schema=brand_vol_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+    pl.from_numpy(cross_purch, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 ```
 
@@ -2474,8 +2262,8 @@ For a given brand, we can plot the associated row entries as a pie chart, for ex
 
 ```{python}
 cross_purch_plot = (
-    pl.from_numpy(cross_purch.T, schema=brand_vol_purchases.columns, orient='row')
-    .with_columns(pl.Series('Brands', brand_vol_purchases.columns))
+    pl.from_numpy(cross_purch.T, schema=BRANDS, orient='row')
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 
 base = alt.Chart(cross_purch_plot).encode(
@@ -2504,10 +2292,7 @@ As previously noted when we computed SCR, we see that Alpha accounts for 69% of 
 share_of_cat_purch = cross_purch[0]
 
 # Market Share - Volume
-market_share = (
-    brand_vol_purchases.sum() / # sum all columns -> returns a single row dataframe
-    brand_vol_purchases.sum_horizontal().sum() # sum of total category volume sales -> retruns a scalar value
-).to_numpy().reshape(5)
+market_share = brand_vol_purchases.sum(axis=0) / brand_vol_purchases.sum()
 
 # Share of residual purchasing -- Alpha Buyers
 # The percentage of the category purchasing not accounted for by Alpha that goes to each of the other brands
@@ -2535,7 +2320,7 @@ cols = pl.DataFrame({'Col': ['Share of Category Purchasing',
         'Share of Residual Purchasing - Category Buyers',
         'Index Against Expectation']})
 
-rows = cross_purch_df.columns[:-1]
+rows = BRANDS
 
 importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=cols)
 ```
@@ -2566,7 +2351,7 @@ importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=col
 ```{python}
 index_ae = pl.DataFrame({
     'Index Against Expectation - By Volume Purchase': index_against_expect[1:],
-    'Brands': cross_purch_df.columns[1:-1]})
+    'Brands': BRANDS[1:]})
 
 # Create the Altair chart
 alt.Chart(index_ae).mark_bar().encode(
@@ -2592,29 +2377,27 @@ We can repeat these analyses using spend rather than volume purchasing.
 We see, for example, that buyers of Alpha spent 71% of their category spend on Alpha. This is in contrast to the 69% of their category volume requirements satisfied by Alpha.
 
 ```{python}
-brand_spend_purchases = spend_pivot(grocery_lf, 1).fill_null(0)
+brand_spend_purchases = panellist_spend.select(BRANDS).to_numpy()
 
 # Step 1: Create ever buyers matrix
-ever_buyers = brand_spend_purchases.select(
-    [pl.when(pl.col(col) > 0).then(1).otherwise(0).alias(col) for col in brand_purchases.columns]
-).to_numpy()
+ever_buyers = (brand_spend_purchases > 0).astype(int)
 
 # Step 2: Compute cross purchase matrix
 cross_purch_matrix = ever_buyers.T @ brand_spend_purchases
-total_spend_purchases = np.sum(cross_purch_matrix, axis=1).reshape(5, 1)
+total_spend_purchases = cross_purch_matrix.sum(axis=1).reshape(-1, 1)
 
 # Step 3: Compute cross purchase matrix as a % of total spend of each brand
 cross_purch = cross_purch_matrix / total_spend_purchases
 
 # DataFrame conversion for tabular view
 cross_purch_matrix_df = (
-    pl.from_numpy(cross_purch_matrix, schema=brand_spend_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_spend_purchases.columns))
+    pl.from_numpy(cross_purch_matrix, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 
 cross_purch_df = (
-    pl.from_numpy(cross_purch, schema=brand_spend_purchases.columns)
-    .with_columns(pl.Series('Brands', brand_spend_purchases.columns))
+    pl.from_numpy(cross_purch, schema=BRANDS)
+    .with_columns(pl.Series('Brands', BRANDS))
 )
 ```
 
@@ -2675,10 +2458,7 @@ We can create a spend-based importance against expectation plot, using value mar
 share_of_cat_purch = cross_purch[0]
 
 # Market Share - Volume
-market_share = (
-    brand_spend_purchases.sum() / # sum all columns -> returns a single row dataframe
-    brand_spend_purchases.sum_horizontal().sum() # sum of total category volume sales -> retruns a scalar value
-).to_numpy().reshape(5)
+market_share = brand_spend_purchases.sum(axis=0) / brand_spend_purchases.sum()
 
 # Share of residual purchasing -- Alpha Buyers
 # The percentage of the category purchasing not accounted for by Alpha that goes to each of the other brands
@@ -2701,12 +2481,12 @@ stack = np.vstack((
     index_against_expect))
 
 cols = pl.DataFrame({'Col': ['Share of Category Purchasing', 
-        'Volume Market Share', 
+        'Value Market Share', 
         'Share of Residual Purchasing - Alpha Buyers', 
         'Share of Residual Purchasing - Category Buyers',
         'Index Against Expectation']})
 
-rows = cross_purch_df.columns[:-1]
+rows = BRANDS
 
 importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=cols)
 ```
@@ -2737,7 +2517,7 @@ importance_against_expect = pl.from_numpy(stack, schema=rows).hstack(columns=col
 ```{python}
 index_ae = pl.DataFrame({
     'Index Against Expectation - By Spend': index_against_expect[1:],
-    'Brands': cross_purch_df.columns[1:-1]})
+    'Brands': BRANDS[1:]})
 
 # Create the Altair chart
 alt.Chart(index_ae).mark_bar().encode(
@@ -2755,15 +2535,10 @@ alt.Chart(index_ae).mark_bar().encode(
 
 ```{python}
 exceptions = [
-    'grocery_lf', 
-    'sku_lf', 
-    'kiwi_lf', 
-    'In', 
-    'exceptions', 
-    'active_variables', 
-    'penetration', 
-    'ppb', 
-    'panel_size']
+    'grocery_lf', 'sku_lf', 'kiwi_lf', 'BRANDS', 'panel_size',
+    'panellist_trans', 'panellist_spend', 'panellist_vol', 'panellist_category',
+    'penetration', 'ppb', 'decile_base', 'decile_table',
+    'In', 'exceptions', 'active_variables']
 
 active_variables = [
     var for var, value in globals().items()
@@ -3345,87 +3120,6 @@ In order to dig deeper, we need to examine **temporal variation in customer-leve
 4)  Finally, we compute and plot the **marginal distribution** of all transaction levels each year. Marginal distribution is the proportion of panellists who made $x_{t}$ transactions in year 1 and year 2 relative to the count of total panellists.
 
 ```{python}
-# Summarizes the number of times Alpha was purchased in years 1 and 2 by each panellist
-alpha_yearly_trans = (
-    grocery_lf
-    .filter(pl.col('brand') == 'Alpha')
-    .with_columns((pl.col('week') / 52).ceil().cast(pl.UInt16).alias('year'))
-    # Aggregate to count unique 'trans_id' by 'panel_id' and 'year'
-    .group_by('panel_id','year')
-    .agg(pl.col('trans_id').n_unique().alias('num_trans'))
-)
-
-alpha_yearly_trans = (
-    # Reshape from long format to wide format
-    # Pivoting the dataframe based on 'year' to create a wide format.
-    alpha_yearly_trans.collect().pivot(
-        on='year',          # Each unique year will create a new column
-        values='num_trans', # The column to aggregate
-        index='panel_id'    # Rows will be indexed by 'panel_id'
-    )
-    # Rename the columns to 'Year 1' and 'Year 2'
-    .rename({'1': 'Year 1', '2': 'Year 2'})   
-    # Replace any null values with 0
-    .fill_null(0) 
-)
-
-# Create a basic joint distribution
-joint_dist_trans = (
-    alpha_yearly_trans
-    .group_by('Year 1', 'Year 2')
-    .agg(pl.col('panel_id').count().alias('count'))
-)
-
-# Add in the number of panellists that made no purchase of Alpha in either year
-# The processed dataframe so far is a subset of the main panel data containing the purchasing of those that bought Alpha at least once in the two years, there are 3142 such households.
-# The panel contains 5021 panellists. Therefore the correct number of households that made zero purchases of Alpha in years 1 and 2 should be included in the processed dataframe.
-tmp = panel_size - joint_dist_trans.select((pl.col('count')).sum()).item(0,0)
-zero_purch = pl.DataFrame({'Year 1': 0, 'Year 2': 0, 'count': tmp})
-
-# Right censor the distribution at 10+
-joint_dist_trans = (
-    joint_dist_trans.with_columns(
-        pl.when(pl.col('Year 1') > 9)
-        .then(10)
-        .otherwise(pl.col('Year 1'))
-        .alias('Year 1')
-    )
-    .with_columns(
-        pl.when(pl.col('Year 2') > 9)
-        .then(10)    
-        .otherwise(pl.col('Year 2'))
-        .alias('Year 2')   
-    )
-    .vstack(zero_purch.cast(pl.UInt32))
-)
-
-# Unpivot the right censor data to create a year 1 x year 2 distribution matrix of the count of panellists who made x_{1} in year 1 & x_{2} in year 2
-joint_dist_trans_pivot = (
-    joint_dist_trans
-    .sort('Year 2')
-    .pivot(
-        index='Year 1',
-        on='Year 2',
-        values='count',
-        aggregate_function='sum'  
-    )
-    .rename({'Year 1': 'Year'}) 
-    .sort('Year')   
-    .fill_null(0)    
-)
-
-# Compute the row percentages, giving us the conditional distributions of transaction counts (the % of panellists from year 1 and their associated transaction counts in year 2)
-# The conditional probability here is he empirical probability of making 𝑥_{2} transactions in year 2 given the panellist made 𝑥_{1} transactions in year 1
-year1_trans_total = joint_dist_trans_pivot.select(
-    pl.col('*').exclude('Year')
-).sum_horizontal()
-
-pct_year1_total = joint_dist_trans_pivot.with_columns(
-    (pl.col('*').exclude('Year') / year1_trans_total)
-)
-```
-
-```{python}
 # Summarizes Alpha transactions by year and panelist
 alpha_yearly_trans = (
     grocery_lf
@@ -3540,51 +3234,25 @@ pct_joint_dist = pct_joint_dist.select(pl.col('*').exclude('# Trans')).with_colu
 How do we interpret this table? Looking at *Year 1*, *Row 2*, we see that 35.3% of the panellists that made one purchase of Alpha in year 1 made no purchases of Alpha in year 2, 27.4% purchased Alpha once, 17.5% purchased Alpha twice, and so on.
 
 ```{python}
-# Compute marginal transaction distribution for each year: count of # of panellists who made x_{t} transactions as a % of total panellists
-def marginal_dist():
-    years = ['Year 1 Trans', 'Year 2 Trans']
-    dfs = []
-    for year in years:
-        y_dist = (
-            joint_dist_trans
-            .group_by(year)
-            .agg((pl.col('count').sum() / panel_size).alias(f'% of Total - {year}'))
-            .rename({year: 'num_trans'})
-            .sort('num_trans')        
-        )
-        dfs.append(y_dist)
-    
-    marginal_dist = dfs[0].hstack(dfs[1].drop('num_trans'))
-    
-    return marginal_dist
+# Marginal distribution: the % of panellists making x transactions, per year.
+# Built once in long form, then pivoted for the table.
+marginal_dist = (
+    pl.concat([
+        joint_dist_trans
+        .group_by(year)
+        .agg((pl.col('count').sum() / panel_size).alias('% of Total'))
+        .with_columns(pl.lit(year).alias('Year'))
+        .rename({year: 'num_trans'})
+        for year in ('Year 1 Trans', 'Year 2 Trans')
+    ])
+    .sort('Year', 'num_trans')
+)
 
-marginal_dist()
+marginal_dist.pivot(on='Year', index='num_trans', values='% of Total').sort('num_trans')
 ```
 
 ```{python}
-# marginal distribution for each year and the associated clustered bar chart
-
-# Step 1a: Compute marginal transaction distribution for each year: count of # of panellists who made x_{t} transactions as a % of total panellists
-# Step 1b: Convert Wide-form data to long-form data
-def marginal_dist():
-    years = ['Year 1 Trans', 'Year 2 Trans']
-    dfs = []
-    for year in years:
-        y_dist = (
-            joint_dist_trans
-            .group_by(year)
-            .agg((pl.col('count').sum() / panel_size).alias('% of Total'))  # marginal distribution of purchasing of Alpha in the first & second year.
-            .with_columns(pl.lit(year).alias('Year'))
-            .rename({year: 'num_trans'})        
-        )
-        dfs.append(y_dist)
-    
-    marginal_dist = dfs[0].vstack(dfs[1])
-    
-    return marginal_dist
-
-# Step 2: Plot long-form data as grouped bar chart
-alt.Chart(marginal_dist()).mark_bar().encode(
+alt.Chart(marginal_dist).mark_bar().encode(
     x=alt.X("num_trans:O", axis=alt.Axis(labelAngle=0, title='Number of Transactions')),
     xOffset="Year:N",
     y=alt.Y("% of Total:Q", axis=alt.Axis(format=".0%", title='% of Households')),
@@ -3717,46 +3385,6 @@ $$
 -   $Q_{q,i} \cdot Q_{q+1,i}$ leverages the binary nature of $Q$, where the product is $1$ only when both values are $1$. The formula aggregates over all panellists ($i$) to compute both the numerator and denominator.
 
 ```{python}
-alpha_qtrly_incidence = (
-    grocery_lf
-    .filter(pl.col('brand') == 'Alpha')
-    .with_columns((np.floor((pl.col('week') - 1) / 13) + 1).cast(pl.UInt16).alias('quarter'))
-    .group_by('panel_id', 'quarter')
-    .agg(pl.lit(1).alias('incidence'))  # Mark 1 for incidence
-    .collect()
-    .pivot(
-        values='incidence',
-        index='panel_id',
-        on='quarter',
-        aggregate_function='max'  # Ensures presence is represented as 1
-    )
-    .fill_null(0)  # Replace missing quarters with 0
-)
-
-# Calculate Repeat Buying Rate (RBR)
-rbr = []
-
-num_quarters = alpha_qtrly_incidence.shape[1] - 1  # Exclude 'panel_id' column
-for q in range(1, num_quarters):  # Iterate through quarter pairs dynamically
-    prev_col = str(q)
-    next_col = str(q + 1)
-
-    # Compute RBR for each quarter pair
-    rbr_value = (
-        (alpha_qtrly_incidence[prev_col] * alpha_qtrly_incidence[next_col]).sum() /
-        alpha_qtrly_incidence[prev_col].sum()
-    )
-    rbr.append(rbr_value)
-
-# Convert RBR values to a DataFrame for clarity
-rbr = pl.DataFrame({"Quarter Pair": [f"{q}->{q+1}" for q in range(1, num_quarters)], "RBR": rbr})
-
-display(alpha_qtrly_incidence)
-
-display(rbr)
-```
-
-```{python}
 # Prepare the incidence matrix
 alpha_qtrly_incidence = (
     grocery_lf
@@ -3815,10 +3443,13 @@ alpha_qtrly_price_avg = (
         (((pl.col('units') * pl.col('weight'))/1000)).alias('volume'),
         (pl.col('units') * pl.col('price')).cast(pl.Float32).alias('spend')
     )
-    .with_columns((pl.col('spend') / pl.col('volume')).alias('price/kg'))
-    .select('quarter', 'price/kg')
     .group_by('quarter')
-    .agg(pl.col('price/kg').mean().alias('avg_price_per_kg'))
+    # average price per kg is total revenue / total volume for the quarter -- the
+    # same definition used for the weekly and annual decompositions above. Taking
+    # the mean of per-line price/kg ratios instead would weight a single-unit
+    # purchase the same as a bulk one and does not reconcile with revenue.
+    .agg((pl.col('spend').sum() / pl.col('volume').sum()).alias('avg_price_per_kg'))
+    .sort('quarter')
     .collect()
 )
 
@@ -3928,7 +3559,7 @@ print(len(kiwi_df['Week'].unique())) # No, there are only 49 weeks of the year w
 
 # Which weeks are missing?
 print("3) Weeks with no transactions:")
-missing_weeks = list(set(np.arange(1, 53, dtype='int16')) - set(kiwi_df['Week'].unique()))
+missing_weeks = sorted(set(range(1, 53)) - set(kiwi_df['Week'].to_list()))
 print(missing_weeks)
 ```
 
@@ -3936,7 +3567,7 @@ print(missing_weeks)
 missing_df = pl.DataFrame(
     {col: [None]*len(missing_weeks) for col in kiwi_df.columns}
     ).with_columns(
-        pl.Series('Week', values = missing_weeks)
+        pl.Series('Week', values=missing_weeks, dtype=kiwi_df.schema['Week'])
     )
 
 kiwi_df = kiwi_df.vstack(missing_df)

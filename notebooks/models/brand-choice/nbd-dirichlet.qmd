@@ -450,7 +450,6 @@ authors' truncation procedure rather than a plain cutoff.)
 ### The three estimated parameters
 
 ```{python}
-#| code-fold: false
 display_markdown(
     f"""
 | Parameter | Value | Interpretation |

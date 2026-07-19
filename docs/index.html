@@ -2373,6 +2373,7 @@ bottom: -1.25;
   <li><a href="#customer-based-corporate-valuation-cbcv" id="toc-customer-based-corporate-valuation-cbcv" class="nav-link" data-scroll-target="#customer-based-corporate-valuation-cbcv">Customer-Based Corporate Valuation (CBCV)</a></li>
   <li><a href="#data-preparation" id="toc-data-preparation" class="nav-link" data-scroll-target="#data-preparation">Data Preparation</a></li>
   </ul></li>
+  <li><a href="#planned-ehrenbergbass-branch" id="toc-planned-ehrenbergbass-branch" class="nav-link" data-scroll-target="#planned-ehrenbergbass-branch">Planned — Ehrenberg–Bass Branch</a></li>
   <li><a href="#source-files" id="toc-source-files" class="nav-link" data-scroll-target="#source-files">Source Files</a></li>
   </ul>
 <div class="quarto-code-links"><h2>Code Links</h2><ul><li><a href="https://github.com/abdullahau/customer-analytics/"><i class="bi bi-github"></i>GitHub Repo</a></li><li><a href="https://github.com/abdullahau/customer-analytics/blob/main/index.qmd"><i class="bi bi-file-code"></i>View source</a></li></ul></div></nav>
@@ -2570,6 +2571,33 @@ bottom: -1.25;
 <li><a href="https://abdullahau.github.io/customer-analytics/notebooks/data-prep/cdnow-dataset">CDNOW Data Set &amp; Summaries</a> — building the CDNOW dataset used throughout.</li>
 </ul>
 </section>
+</section>
+<section id="planned-ehrenbergbass-branch" class="level2">
+<h2 class="anchored" data-anchor-id="planned-ehrenbergbass-branch">Planned — Ehrenberg–Bass Branch</h2>
+<p>The <a href="https://abdullahau.github.io/customer-analytics/notebooks/models/brand-choice/nbd-dirichlet-panel">panel application</a> of the Dirichlet misfits, and the diagnosis — Assumption A2, a segmented consumer base rather than a single Dirichlet — sets most of this agenda.</p>
+<p><strong>Handling the diagnosed failure</strong></p>
+<ul>
+<li><strong>Hierarchical / nested Dirichlet</strong> — fit within partition, then across; the direct answer to the segmentation found in the grocery data (1984 paper §5.3; Kau &amp; Ehrenberg 1984 for store choice).</li>
+<li><strong>Empirical Dirichlet</strong> — substitute the observed <span class="math inline">\(P_n\)</span> for the fitted NBD (1984 paper §2.4); better base-period fit, no time extrapolation.</li>
+<li><strong>Finite-mixture Dirichlet</strong> — a two-camp mixture on <span class="math inline">\(\mathbf{p}\)</span>, the natural formalisation of what the duplication residuals show.</li>
+</ul>
+<p><strong>Non-stationarity</strong></p>
+<ul>
+<li><strong>Conditional trend analysis</strong> (Goodhardt &amp; Ehrenberg 1967) — repeat-buying split by <em>previous</em> purchase level; separates a genuine loyalty failure from an excess of occasional buyers, two cases that look identical in the aggregate.</li>
+</ul>
+<p><strong>Incidence-side alternatives</strong></p>
+<ul>
+<li><strong>NBD penetration-growth curves</strong> — project <span class="math inline">\(b\)</span> and <span class="math inline">\(w\)</span> across period lengths from one base period, via <span class="math inline">\(k\)</span>-invariance.</li>
+<li><strong>LSD</strong> repeat-buying formulae — the one-parameter <span class="math inline">\(q\)</span> shortcuts, where the full Dirichlet has no closed form.</li>
+<li><strong>Beta-binomial</strong> brand-vs-not conditional on category purchases (Chatfield &amp; Goodhardt 1970).</li>
+<li><strong>Poisson-generalised inverse Gaussian</strong> (Sichel 1982) — heavier-tailed than gamma mixing.</li>
+<li><strong>Erlang interpurchase times</strong> (Chatfield &amp; Goodhardt 1973) — for buying more regular than Poisson.</li>
+</ul>
+<p><strong>Observed side</strong></p>
+<ul>
+<li><strong>Brand performance measures</strong> — the “observeds” audit the Dirichlet is benchmarked against; partly covered by the panel notebook, deserves standalone treatment.</li>
+<li><strong>Availability-constrained penetration</strong> — the standard explanation for Double Jeopardy deviations; needs store-level data the current panel lacks.</li>
+</ul>
 </section>
 <section id="source-files" class="level2">
 <h2 class="anchored" data-anchor-id="source-files">Source Files</h2>

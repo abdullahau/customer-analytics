@@ -13,14 +13,7 @@ Other).
 
 The derivations, the literature and the marketing argument are in
 [NBD-Dirichlet Model of Consumer Buying Behavior](nbd-dirichlet), which reproduces
-the 1984 toothpaste example. This notebook keeps the formulas as a reference card
-and spends its words on what the model does **when it meets data it was not tuned
-on** — which here means a category it fits noticeably less well.
-
-A companion R script,
-[`nbd-dirichlet-panel.R`](https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet-panel.R),
-runs Feiming Chen's `NBDdirichlet` v1.4 on the same inputs. Every theoretical number
-below is checked against it.
+the 1984 toothpaste example.
 
 ## Formula reference card
 
@@ -455,47 +448,377 @@ resid = (obs_dup - theo_dup).where(~np.eye(nbrand, dtype=bool))
 resid.round(2)
 ```
 
-This residual table is the most informative output in the notebook, and it is not
-noise — it is **structured**:
+The residuals are structured rather than noisy — but this table overstates part of
+the story, and it is worth being careful about why.
 
-- **Alpha ↔ Bravo duplicate less than predicted** (−0.05, −0.06). The two market
-  leaders share *fewer* buyers than their sizes imply.
-- **Every small brand duplicates with Alpha and Bravo more than predicted**
-  (+0.10 to +0.23). Delta's buyers buy Alpha at 0.63 against a predicted 0.40.
+Two things are mixed together here. The Dirichlet's own $b_j$ is off for the small
+brands (§ *Observed versus theoretical*), and any duplication computed from a wrong
+$b_j$ inherits that error. To separate a **genuine** duplication anomaly from
+penetration miss propagating, compare against the Duplication of Purchase Law fitted
+to the **observed** penetrations, with no Dirichlet involved:
 
-That pattern — big brands under-duplicating with each other, small brands
-over-duplicating with the big ones — is the signature of a **partitioned category**.
-Alpha and Bravo are close substitutes fought over by a set of households who mostly
-pick one and stay; the small brands are secondary purchases made by heavy category
-buyers who are already buying a leader.
+$$b_{jk} = D\,b_j\,b_k$$
 
-It corroborates something found independently in the
-[source notebook](../../analyses/buyer-behavior-summary-panel-data): the weekly
-volume shares of Alpha and Bravo are **strongly negatively correlated**. Two brands
-trading share back and forth week to week is exactly what "close substitutes, few
-shared buyers" looks like in a time series.
-
-The Duplication of Purchase Law predicts $b_{j\mid k} = D\,b_j$ with one $D$ for the
-category. Let us see how much damage that does here.
+Ehrenberg (*Repeat-Buying* §10.5, footnote) recommends exactly this symmetric form
+over the conditional $b_{j\mid k}$, because it is symmetric *and* homoscedastic — the
+residuals do not grow with the size of the brands being compared.
 
 ```{python}
-D = (obs_dup.values[~np.eye(nbrand, dtype=bool)].sum()
-     / np.add.outer(obs["b (O)"].values, np.zeros(nbrand)).T[
-         ~np.eye(nbrand, dtype=bool)].sum())
+#| code-fold: false
+off = ~np.eye(nbrand, dtype=bool)
+b_obs = obs["b (O)"].values
+b_jk = (ever.T.values @ ever.values) / PANEL_SIZE        # joint penetration
 
-pred = pd.DataFrame(np.outer(np.ones(nbrand), obs["b (O)"].values * D),
-                    index=brand_name, columns=brand_name).where(
-                        ~np.eye(nbrand, dtype=bool))
-display_markdown(f"Single duplication coefficient **D = {D:.2f}**", raw=True)
-pd.concat({"observed": obs_dup.where(~np.eye(nbrand, dtype=bool)).round(2),
-           "D x b_j": pred.round(2)}, axis=1).swaplevel(axis=1).sort_index(axis=1)
+D = b_jk[off].sum() / np.outer(b_obs, b_obs)[off].sum()
+sym_resid = pd.DataFrame(100 * (b_jk - D * np.outer(b_obs, b_obs)),
+                         index=brand_name, columns=brand_name).where(off)
+
+display_markdown(f"Single duplication coefficient **D = {D:.3f}** — "
+                 "residuals below in **percentage points of the panel**", raw=True)
+sym_resid.round(2)
 ```
 
-A single $D$ gets the *order of magnitude* right everywhere but misses the structure
-— which is the honest verdict on this category. In Ehrenberg's own framing from
-*Repeat-Buying* §10.5, such departures are "local densities superimposed on the
-underlying duplication pattern", and he is explicit that genuine partitioning is
-**rare but real**. This looks like a real instance.
+On this scale one residual dominates everything else:
+
+- **Alpha ↔ Bravo: −4.5 points.** The two leaders share far fewer buyers than their
+  sizes imply.
+- Every other pair falls between −0.4 and +1.5, averaging about +0.5.
+
+So the honest reading is narrower than "leaders under-duplicate, followers
+over-duplicate". The follower-side excess is mostly the Dirichlet's penetration miss
+showing through; against the observed penetrations it largely disappears. **The one
+robust anomaly is that Alpha and Bravo behave as near-mutually-exclusive
+alternatives.**
+
+That corroborates something found independently in the
+[source notebook](../../analyses/buyer-behavior-summary-panel-data): the weekly
+volume shares of Alpha and Bravo are **strongly negatively correlated**. Two brands
+trading share back and forth, while sharing few buyers, is one phenomenon seen two
+ways.
+
+### Sole-brand buyers — the sharpest miss
+
+The proportion of the population buying **only** brand $j$ all year is
+$\sum_{n\ge1}P_n\,p(n\mid n)$, and since $p(n\mid n)=B(\alpha_j+n,\,S-\alpha_j)/B(\alpha_j,\,S-\alpha_j)$
+it is cheap to compute. The sum must start at $n=1$ — $p(0\mid 0)=1$, so including
+$n=0$ would count every category non-buyer as a "sole buyer".
+
+```{python}
+#| code-fold: false
+from scipy.special import betaln as _betaln
+
+pos = np.arange(1, NSTAR + 1)
+P_pos = Pn(M0, K, np.arange(NSTAR + 1))[1:]
+
+def sole_theoretical(alpha, S):
+    return np.sum(P_pos * np.exp(_betaln(alpha + pos, S - alpha)
+                                 - _betaln(alpha, S - alpha)))
+
+n_brands_bought = ever.sum(axis=1)
+sole_obs = np.array([((ever[b] == 1) & (n_brands_bought == 1)).sum() / PANEL_SIZE
+                     for b in brand_name])
+sole_theo = np.array([sole_theoretical(S * s, S) for s in brand_share])
+
+pd.DataFrame({
+    "share": brand_share,
+    "sole (O)": sole_obs, "sole (T)": sole_theo,
+    "sole/pen (O)": sole_obs / obs["b (O)"].values,
+    "sole/pen (T)": sole_theo / buy["pen.brand"].values,
+}, index=brand_name).map("{:.3f}".format)
+```
+
+Look at the last two columns — the share of a brand's own buyers who bought nothing
+else all year:
+
+- **Leaders: essentially exact.** Alpha 0.52 observed against 0.50 theoretical;
+  Bravo 0.53 against 0.48.
+- **Followers: over-predicted by about 60%.** Charlie 0.19 observed against 0.32
+  theoretical; Delta 0.19 against 0.30; Other 0.13 against 0.30.
+
+The model thinks small brands should have a proportionally loyal core. They do not.
+
+## Diagnosis: which assumptions actually fail here
+
+Four independent measurements now point the same way for the small brands. Each is a
+different quantity, and all four are consistent with one story:
+
+| Measure | Observed | Theoretical | Direction |
+|---|---|---|---|
+| penetration $b$ (Charlie) | 0.16 | 0.14 | **more** buyers than predicted |
+| purchase rate $w$ (Charlie) | 2.3 | 2.7 | who buy it **less** often |
+| category rate $w_P$ (Charlie) | 5.2 | 5.0 | and buy the category **more** |
+| sole loyalty (Charlie) | 0.19 | 0.32 | and are far **less** exclusive |
+
+That is a coherent description: **the small brands are a repertoire add-on for heavy
+category buyers, not a proportionally scaled-down version of a leader.** Meanwhile
+the two leaders behave like near-monogamous alternatives — about half of each one's
+buyers bought nothing else all year, and they share 4.5 points fewer buyers than
+their sizes imply.
+
+### Ruling things out first
+
+Before blaming a modelling assumption it is worth checking the cheap explanations.
+
+```{python}
+#| code-fold: false
+def year_summary(y):
+    d = df[(df.week > (y - 1) * 52) & (df.week <= y * 52)]
+    o = d[["panel_id", "trans_id", "brand"]].drop_duplicates()
+    c = d[["panel_id", "trans_id"]].drop_duplicates()
+    g = o.groupby("brand")
+    return pd.DataFrame({"share": (g.size() / g.size().sum()).loc[brand_name],
+                         "pen": (g.panel_id.nunique() / PANEL_SIZE).loc[brand_name]}), \
+           c.panel_id.nunique() / PANEL_SIZE
+
+y1, cp1 = year_summary(1)
+y2, cp2 = year_summary(2)
+display_markdown(f"Category penetration: year 1 **{cp1:.3f}**, year 2 **{cp2:.3f}**. "
+                 f"Largest share change **{(y2.share - y1.share).abs().max():.3f}**.",
+                 raw=True)
+pd.concat({"year 1": y1, "year 2": y2}, axis=1).round(3)
+```
+
+**Non-stationarity is ruled out.** Category penetration is identical across the two
+years (0.911 → 0.912) and no brand's share moves more than 1.8 points. Whatever is
+wrong, it is not that the market is in motion. (Charlie drifts down 9.2% → 7.7%,
+which is the largest movement and worth noting, but far too small to explain a 60%
+miss on sole loyalty.)
+
+**The multi-brand-trip wrinkle is too small.** 2.2% of occasions allocate to more than
+one brand, violating $\sum_j r_j = n$. Real, but an order of magnitude smaller than
+the effects above.
+
+### The assumption that fails: A2
+
+Mapping onto the five assumptions:
+
+| | Assumption | Verdict here |
+|---|---|---|
+| B1 | Poisson category incidence | **Plausible.** Frequently-bought grocery, 4 purchases/year, no seasonality or stockpiling visible in the annual aggregates. |
+| B2 | Gamma-distributed rates | **Plausible.** $K=2.6$ reproduces observed non-buyers exactly by construction; the category frequency distribution is well-behaved. |
+| A1 | Multinomial brand choice | **Mostly holds**, apart from the 2.2% of multi-brand trips. |
+| **A2** | **Dirichlet-distributed choice vectors** | **Fails.** This is the one. |
+| C | Rate ⟂ choice | **Partly implicated** — small brands are disproportionately bought by heavy category buyers, which is a mild dependence between $\mu$ and $\mathbf p$. |
+
+The Dirichlet is the unique distribution expressing *"independence except for the
+constraint $\sum_j p_j = 1$"*. Fitting one says the category is **unsegmented**: your
+propensity for Alpha carries no information about how you split the remainder.
+
+Here it plainly does. The population looks closer to a **two-camp mixture** — a mass
+of households with $\mathbf p$ concentrated on Alpha, another concentrated on Bravo,
+with the small brands picked up occasionally by heavy buyers from either camp. A
+single Dirichlet cannot represent that: to reproduce the leaders' high sole loyalty it
+must drive $S$ down (we got $S=0.62$), but a low $S$ then predicts polarised loyalty
+for *every* brand, including the followers — which is exactly the over-prediction we
+see.
+
+This shows up in the fit before duplication is ever computed. The per-brand $S_j$ run
+**0.50, 0.68, 1.17, 1.11, 0.87** — ordered so that the leaders want a low $S$ and the
+followers a high one. In the toothpaste example the $S_j$ scatter is just as wide but
+**unordered** with respect to share. Systematic ordering of $S_j$ by brand size is the
+early warning; the duplication residuals are the confirmation.
+
+**Terminology worth getting right.** This is not "partitioning" in the usual sense of
+decaf-vs-regular or diet-vs-sugar, where a product attribute splits the category and
+within-partition duplication runs *high*. Here the leaders duplicate *low*. What is
+segmented is the **consumer base**, not the product space — two loyal camps rather
+than two sub-markets. The distinction matters for what you would do about it.
+
+### Cross-checking B1/B2 — is the incidence layer really innocent?
+
+The verdict above rests on the NBD layer being well specified. That is worth testing
+rather than asserting, and there is a cheap check: fit $K$ two independent ways. If
+the gamma-mixed Poisson is right they should agree.
+
+```{python}
+#| code-fold: false
+n_by_hh = cat_occ.groupby("panel_id").size()
+full = np.concatenate([n_by_hh.values, np.zeros(PANEL_SIZE - len(n_by_hh))])
+
+K_moments = full.mean() ** 2 / (full.var(ddof=1) - full.mean())
+
+display_markdown(
+    f"| estimator | $K$ |\n|---|---|\n"
+    f"| mean-and-zeros (used above) | {K:.4f} |\n"
+    f"| method of moments | {K_moments:.4f} |\n\n"
+    f"disagreement **{abs(K - K_moments) / K * 100:.0f}%** — "
+    f"observed variance {full.var(ddof=1):.2f} vs NBD-implied "
+    f"{full.mean() * (1 + full.mean() / K):.2f}",
+    raw=True,
+)
+```
+
+They agree to 1%. Two estimators using completely different features of the data —
+one the proportion of non-buyers, the other the variance — land in the same place.
+**The incidence half of the model is fine.** Whatever is wrong is on the brand-choice
+side, which is what the rest of the diagnosis says.
+
+### Where the Dirichlet breaks in general
+
+Everything above is a claim about *this* data, tested against it. The list below is
+the broader catalogue of known failure modes, mapped onto the assumptions. **None of
+these are diagnosed here** — they are the checklist to run against the next category.
+
+**B1 — non-Poisson incidence.** Strongly seasonal or episodic categories (sun care,
+antifreeze, Christmas goods); long-interpurchase-cycle durables (cars, appliances,
+mattresses), where replacement timing is a hazard process rather than a constant rate
+and you cannot observe enough repeat events anyway; categories with stockpiling,
+purchase acceleration or genuine satiation; and any analysis window short relative to
+the interpurchase interval — Ehrenberg's "very short periods" boundary.
+
+**A1 — constrained choice sets.** The model assumes every consumer could have chosen
+any brand. In practice **incomplete distribution is the big one**: a brand on shelf in
+40% of stores is not being *rejected* by the other 60%, it is not on offer. This shows
+up as under-predicted penetration and is the standard explanation for deviations from
+Double Jeopardy. Same mechanism for regional brands, retailer-exclusive lines, and
+category-level restrictions (pet food for non-pet-owners, alcohol for abstainers).
+
+The usual remedy is to **fit to the category-user base rather than the population**.
+Worth knowing what that costs:
+
+```{python}
+#| code-fold: false
+M_buyers = n_by_hh.mean()
+K_buyers = M_buyers ** 2 / (n_by_hh.var(ddof=1) - M_buyers)
+
+display_markdown(
+    f"| population | $B$ | $M$ | $K$ | mean-and-zeros usable? |\n|---|---|---|---|---|\n"
+    f"| whole panel ({PANEL_SIZE:,}) | {cat_pen:.3f} | {M0:.3f} | {K:.3f} | yes |\n"
+    f"| category buyers ({len(n_by_hh):,}) | 1.000 | {M_buyers:.3f} | {K_buyers:.3f} "
+    f"| **no** — $\\log(1-B)=\\log 0$ |",
+    raw=True,
+)
+```
+
+Two consequences, both easy to trip over. Restricting to category buyers sets $B=1$,
+which makes **"mean and zeros" undefined** — you must fall back to the method of
+moments. And $K$ moves from 2.60 to 3.80, a 46% change, purely from redefining who
+counts as a potential buyer. Here the choice barely matters for the brand-level
+conclusions because penetration is already 91%; in a category bought by 20% of
+households it would dominate everything.
+
+**Contractual and subscription settings.** Banking, insurance, telecoms, SaaS.
+Switching is discrete and costly, so repertoire buying is replaced by monogamy plus
+churn, and loyalty is structurally rather than stochastically high. This is the
+[contractual column](../../../README.md) of the Fader–Hardie taxonomy, and it is the
+wrong tool entirely — not a misfit but a category error.
+
+**Small-$N$, heavily concentrated B2B.** Gamma heterogeneity across a handful of large
+accounts is a poor description, and $S$ estimation becomes unstable — recall that $S$
+here is already a share-weighted average over per-brand estimates with outliers
+dropped, which needs enough brands to be meaningful.
+
+### What kind of product does this imply?
+
+Reading the parameters as Ehrenberg would, as descriptors rather than fitted noise:
+
+- $K = 2.6$ (vs 0.78 for toothpaste) — a **near-universal staple**. 91% of households
+  buy it, and they differ relatively little in how often.
+- $S = 0.62$ (vs 1.30) — **polarised choice**. Two-thirds of category buyers bought
+  one brand all year.
+- Effectively a **duopoly with a fringe**: 85% share in two brands that do not share
+  buyers, plus three small brands functioning as occasional alternates.
+
+Categories that behave this way tend to be ones where households settle on a staple
+and repurchase it without much deliberation, and where the two leaders are close
+functional substitutes differentiated by something habitual — taste, format, or
+household convention — rather than by occasion. The Dirichlet's home ground is the
+opposite: a repertoire category where buyers rotate across several acceptable brands.
+
+## Alternatives within the Ehrenberg–Bass tradition
+
+The tradition's response to a Dirichlet misfit is rarely "use a fancier model". It is
+usually to keep the model as the **norm** and treat the gap as the finding, or to
+apply a more targeted tool. Options, roughly in order of how well they suit this data:
+
+### Partitioned duplication coefficients — the direct fix here
+
+Ehrenberg's own remedy for exactly this situation (*Repeat-Buying* §10.5, Tables
+10.8–10.9): abandon a single $D$ and fit one per pair-type. In his worked example two
+manufacturer groups gave $D = 3.5$ and $2.5$ within, $1.5$ across.
+
+```{python}
+#| code-fold: false
+import itertools
+
+group = {"Alpha": "leader", "Bravo": "leader",
+         "Charlie": "follower", "Delta": "follower", "Other": "follower"}
+pair_key = lambda i, j: tuple(sorted((group[brand_name[i]], group[brand_name[j]])))
+
+cells = {}
+for key in [("leader", "leader"), ("follower", "leader"), ("follower", "follower")]:
+    num = den = 0.0
+    for i, j in itertools.combinations(range(nbrand), 2):
+        if pair_key(i, j) == key:
+            num += b_jk[i, j]
+            den += b_obs[i] * b_obs[j]
+    cells[key] = num / den
+
+D_matrix = np.array([[cells[pair_key(i, j)] if i != j else 1.0
+                      for j in range(nbrand)] for i in range(nbrand)])
+
+r_single = (b_jk - D * np.outer(b_obs, b_obs))[off]
+r_part = (b_jk - D_matrix * np.outer(b_obs, b_obs))[off]
+
+display_markdown(
+    "| coefficient | value |\n|---|---|\n"
+    f"| single $D$, all pairs | {D:.3f} |\n"
+    f"| $D$ within leaders | {cells[('leader', 'leader')]:.3f} |\n"
+    f"| $D$ leader × follower | {cells[('follower', 'leader')]:.3f} |\n"
+    f"| $D$ within followers | {cells[('follower', 'follower')]:.3f} |\n\n"
+    f"mean abs. residual: single $D$ **{100 * np.abs(r_single).mean():.2f} pp** → "
+    f"partitioned **{100 * np.abs(r_part).mean():.2f} pp** "
+    f"(**{100 * (1 - np.abs(r_part).mean() / np.abs(r_single).mean()):.0f}%** reduction)",
+    raw=True,
+)
+```
+
+Three numbers replace one and cut the mean absolute residual by 61%. They are also
+directly interpretable: the leaders *avoid* each other ($D=0.67$), leader-and-follower
+are near-independent ($D=0.95$), and the small brands *cluster* ($D=1.47$ — heavy
+category buyers collecting alternates).
+
+### Other options, and when they apply
+
+| Situation | Tool | Source |
+|---|---|---|
+| Non-stationarity | **Conditional Trend Analysis** — split buyers by prior-period purchase level and locate where the change came from, rather than fitting a dynamic model | Goodhardt & Ehrenberg (1967), *JMR* 4, 155–161; *Repeat-Buying* §7.6 |
+| Non-stationarity, single brand | **NBD alone** for the focal brand — single-brand predictions are unaffected by other brands moving | *Repeat-Buying* §4.10 |
+| Any misfit | **Dirichlet-as-benchmark** — fit stationary norms, report the gap as the result | 1984 paper §3.1 |
+| Category incidence fits badly | **Empirical Dirichlet** — substitute the *observed* $P_n$ for the fitted NBD. Better base-period fit, but you lose time extrapolation | 1984 paper §2.4 |
+| Repeat-buying across periods | **NBD/LSD** — one-parameter formulae in $q$ where the full Dirichlet has no closed form | *Repeat-Buying* Ch. 8 |
+| Just need brand-vs-not | **Beta-binomial** conditional on category purchases — cheaper and often sufficient | Chatfield & Goodhardt (1970), *Appl. Statist.* 19, 240–250 |
+| Heavy-buyer tail understated | **Poisson-generalised inverse Gaussian** — heavier-tailed than the gamma mixture | Sichel (1982), *Appl. Statist.* 31, 193–204 |
+| Buying more regular than Poisson | **Erlang interpurchase times** | Chatfield & Goodhardt (1973), *JASA* 68, 828–835 |
+| Nested choice (brand→flavour, brand→pack, brand→store) | **Hierarchical Dirichlet** — fit within partition, then across | Sketched in 1984 paper §5.3; store-choice in Kau & Ehrenberg (1984) |
+
+For **long-cycle durables, contractual and B2B categories**, the tradition largely
+abandons the compound-Poisson machinery and works with the empirical generalisations
+directly — Double Jeopardy, Natural Monopoly, Duplication of Purchase, the Law of
+Buyer Moderation (heavy buyers regress toward the mean in the next period, light
+buyers upward), Pareto Share (the top 20% of buyers account for roughly 50–60% of
+volume, not 80%) — validated on those categories rather than modelled through the
+Dirichlet. That evidence sits in *How Brands Grow Part 2* (Sharp & Romaniuk 2016)
+rather than in the 1984 paper.
+
+Note what that implies methodologically: the **laws outlive the model**. This data set
+is a small instance of the same thing — the Dirichlet misfits, but Double Jeopardy
+holds in the observed columns regardless. Ehrenberg's order of business was always
+empirical generalisation first, model second.
+
+### Adjacency to the rest of this repository
+
+The Pareto/NBD and BG/NBD family in
+[`models/purchasing/`](../purchasing/nbd-overview) is the **same Poisson-gamma
+skeleton** with the brand-choice layer removed and a dropout process bolted on. The
+Dirichlet asks "which of several brands, in a stationary market"; BTYD asks "is this
+customer still alive, at one firm".
+
+The bridge is **Assumption C**. The Dirichlet insists purchase rate and brand
+preference are independent; a customer-base view is precisely where you would relax
+it. This data set gives a concrete reason to want to — the small brands are
+disproportionately bought by heavy category buyers, which is a $\mu$–$\mathbf p$
+dependence that C forbids.
 
 ## Time extrapolation
 
@@ -544,51 +867,6 @@ buyers, and $w$ absorbs the rest. The observed year-1 markers sit close to the c
 for Alpha and Bravo and above them for the small brands — the same under-prediction
 seen in the O-vs-T table, now visible as a vertical gap.
 
-## Validation against the R package
-
-Run [`nbd-dirichlet-panel.R`](https://github.com/abdullahau/customer-analytics/blob/main/notebooks/models/brand-choice/nbd-dirichlet-panel.R)
-from the repository root:
-
-```bash
-Rscript notebooks/models/brand-choice/nbd-dirichlet-panel.R
-```
-
-It sources `references/implementations/NBDdirichlet/R/` directly — the vendored v1.4,
-not whatever CRAN currently ships — builds the same inputs from the same CSV, and
-prints the parameters and all four summary tables.
-
-```{python}
-#| code-fold: false
-r_buy = pd.DataFrame(
-    {"pen.brand": [0.54, 0.50, 0.14, 0.06, 0.03],
-     "pur.brand": [3.27, 3.20, 2.70, 2.63, 2.60],
-     "pur.cat":   [4.75, 4.78, 5.01, 5.05, 5.07]},
-    index=brand_name)
-
-r_dup = pd.DataFrame(
-    [[1.00, 0.39, 0.10, 0.05, 0.02],
-     [0.41, 1.00, 0.10, 0.05, 0.02],
-     [0.40, 0.37, 1.00, 0.05, 0.02],
-     [0.40, 0.37, 0.10, 1.00, 0.02],
-     [0.40, 0.37, 0.10, 0.05, 1.00]],
-    index=brand_name, columns=brand_name)
-
-checks = {
-    "M":   (round(M0, 2), 3.99),
-    "K":   (round(K, 2), 2.60),
-    "S":   (round(S, 2), 0.62),
-    "buy table (max abs diff)":  ((buy.round(2) - r_buy).abs().values.max(), 0.0),
-    "dup table (max abs diff)":  ((theo_dup.round(2) - r_dup).abs().values.max(), 0.0),
-}
-pd.DataFrame([{"quantity": k, "python": v[0], "R": v[1], "match": v[0] == v[1]}
-              for k, v in checks.items()]).set_index("quantity")
-```
-
-Both implementations also agree that the per-brand $S_j$ are
-`0.5016, 0.6800, 1.1698, 1.1076, 0.8667` and that **Charlie is dropped by the notch
-test** (upper notch 1.1689) — the second half of the two-part outlier rule that the
-R package inherits from `boxplot.stats()` rather than implementing itself.
-
 ## What this application shows
 
 Running the model on a category it was not chosen to flatter is more instructive than
@@ -598,12 +876,18 @@ another clean reproduction:
    category; $S = 0.62$ (vs 1.30) says a polarised one. Both match what the
    descriptive analysis found independently.
 2. **Double Jeopardy survives.** $w(1-b)$ is far flatter than $b$ or $w$ across a
-   twenty-fold share range, in the observed data as well as the fit.
-3. **The duplication residuals diagnose a partition.** Structured, signed residuals —
-   leaders under-duplicating, followers over-duplicating with leaders — are not a
-   failed fit but a **finding**, and one corroborated by the negative weekly share
-   correlation between Alpha and Bravo.
-4. **`nstar` is not a set-and-forget default.** The package ships 50; this category
+   twenty-fold share range, in the observed data as well as the fit. The empirical
+   generalisation outlives the model that predicts it — which is Ehrenberg's whole
+   methodological point.
+3. **The misfit is a finding, not a failure.** Four independent measures agree that
+   the small brands are repertoire add-ons rather than scaled-down leaders, and that
+   Alpha and Bravo are near-mutually-exclusive. Assumption **A2** is what breaks: the
+   consumer base is segmented into two camps, which no single Dirichlet can represent.
+4. **Measure duplication on the symmetric scale.** Against the Dirichlet's own
+   $b_{j\mid k}$ the anomaly looked broad; against $D\,b_j b_k$ with observed
+   penetrations it collapses to one dominant residual. Choosing the homoscedastic
+   form changed the conclusion.
+5. **`nstar` is not a set-and-forget default.** The package ships 50; this category
    needs ~170. The check is one line and belongs in any application.
 
 The caveats from the [main essay](nbd-dirichlet) all still apply — stationarity,
@@ -611,3 +895,8 @@ short periods, the heavy-buyer tail, the instability of $S$ across period length
 those, this data set adds the multi-brand-trip wrinkle: 2.2% of occasions here
 allocate to more than one brand, which the model's $\sum_j r_j = n$ arithmetic does
 not admit.
+
+The constructive close is that the tradition already has the tool for this: three
+partitioned duplication coefficients cut the residuals by 61% and say something
+usable about the market — the leaders avoid each other, the followers cluster. That
+is a better outcome than a better-fitting black box.

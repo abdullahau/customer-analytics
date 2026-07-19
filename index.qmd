@@ -162,6 +162,35 @@ base before fitting anything to it.
 
 - [CDNOW Data Set & Summaries](https://abdullahau.github.io/customer-analytics/notebooks/data-prep/cdnow-dataset) — building the CDNOW dataset used throughout.
 
+## Planned — Ehrenberg–Bass Branch
+
+The [panel application](https://abdullahau.github.io/customer-analytics/notebooks/models/brand-choice/nbd-dirichlet-panel)
+of the Dirichlet misfits, and the diagnosis — Assumption A2, a segmented consumer
+base rather than a single Dirichlet — sets most of this agenda.
+
+**Handling the diagnosed failure**
+
+- **Hierarchical / nested Dirichlet** — fit within partition, then across; the direct answer to the segmentation found in the grocery data (1984 paper §5.3; Kau & Ehrenberg 1984 for store choice).
+- **Empirical Dirichlet** — substitute the observed $P_n$ for the fitted NBD (1984 paper §2.4); better base-period fit, no time extrapolation.
+- **Finite-mixture Dirichlet** — a two-camp mixture on $\mathbf{p}$, the natural formalisation of what the duplication residuals show.
+
+**Non-stationarity**
+
+- **Conditional trend analysis** (Goodhardt & Ehrenberg 1967) — repeat-buying split by *previous* purchase level; separates a genuine loyalty failure from an excess of occasional buyers, two cases that look identical in the aggregate.
+
+**Incidence-side alternatives**
+
+- **NBD penetration-growth curves** — project $b$ and $w$ across period lengths from one base period, via $k$-invariance.
+- **LSD** repeat-buying formulae — the one-parameter $q$ shortcuts, where the full Dirichlet has no closed form.
+- **Beta-binomial** brand-vs-not conditional on category purchases (Chatfield & Goodhardt 1970).
+- **Poisson-generalised inverse Gaussian** (Sichel 1982) — heavier-tailed than gamma mixing.
+- **Erlang interpurchase times** (Chatfield & Goodhardt 1973) — for buying more regular than Poisson.
+
+**Observed side**
+
+- **Brand performance measures** — the "observeds" audit the Dirichlet is benchmarked against; partly covered by the panel notebook, deserves standalone treatment.
+- **Availability-constrained penetration** — the standard explanation for Double Jeopardy deviations; needs store-level data the current panel lacks.
+
 ## Source Files
 
 GitHub repository: [https://github.com/abdullahau/customer-analytics](https://github.com/abdullahau/customer-analytics)

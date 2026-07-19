@@ -11,7 +11,7 @@ Each topic is a self-contained [Quarto](https://quarto.org) essay (mathematical 
 
 ------------------------------------------------------------------------
 
-## The big idea: probability models for buyer behavior {#the-big-idea-probability-models-for-buyer-behavior}
+## The big idea: probability models for buyer behavior
 
 We only ever get a *"foggy window"* onto a customer's true tendencies: someone who bought twice last year is not necessarily a "two per year" buyer. So instead of extrapolating the observed numbers, we model the **latent process** that generated them. Two ingredients:
 
@@ -90,7 +90,7 @@ The claims above are not stylistic preferences — they were argued and measured
 
 **More data can make things worse.** In [`methods/`](references/papers/methods/methods-summary.md), a 3-million-member credit-card panel used *without* selection correction produces holdout MAPE of **481–860%** — dramatically worse than ignoring the panel entirely. Granular data is not automatically an improvement over coarse but representative data.
 
-## The Ehrenberg–Bass tradition and the NBD-Dirichlet {#the-ehrenbergbass-tradition-and-the-nbd-dirichlet}
+## The Ehrenberg–Bass tradition and the NBD-Dirichlet
 
 > **Status: source material collected, essays not yet written.** This section describes what the literature says and where the work will live. Nothing in `notebooks/` implements it yet.
 
@@ -276,14 +276,32 @@ What the analysis summarize:
 
 ## Models to Implement
 
-**Ehrenberg–Bass branch** (source material collected, nothing implemented):
+**Ehrenberg–Bass branch.** Done: the [NBD-Dirichlet](notebooks/models/brand-choice/nbd-dirichlet.qmd) (toothpaste, 1984 paper) and its [panel application](notebooks/models/brand-choice/nbd-dirichlet-panel.qmd) (edible grocery), both validated against the R package; "mean and zeros" estimation; Double Jeopardy and Duplication of Purchase benchmark tables; partitioned duplication coefficients.
 
-- NBD-Dirichlet (category-level brand choice) + brand performance measures
-- Duplication of Purchase / Double Jeopardy benchmark tables
-- **Conditional trend analysis** — repeat-buying split by *previous* purchase level. Distinguishes a real loyalty failure (heavy buyers below norm) from an excess of occasional buyers (light buyers below norm, heavy on norm) — opposite implications, identical in the aggregate
+The panel application **misfits**, and the diagnosis (Assumption A2 — a segmented consumer base, not a single Dirichlet) sets the agenda for most of what follows:
+
+*Handling the diagnosed failure*
+
+- **Hierarchical / nested Dirichlet** — fit within partition, then across. The direct answer to the segmentation found in the grocery data. Sketched in the 1984 paper §5.3; store-choice variant in Kau & Ehrenberg (1984)
+- **Empirical Dirichlet** — substitute the *observed* `Pₙ` for the fitted NBD, the paper's own fallback for saturated categories (1984 §2.4). Better base-period fit, at the cost of time extrapolation
+- **Finite-mixture Dirichlet** — a two-camp mixture on **p**, which is what the grocery data actually looks like. Outside the classical tradition but the natural formalisation of what the residuals show
+
+*Non-stationarity*
+
+- **Conditional trend analysis** (Goodhardt & Ehrenberg 1967) — repeat-buying split by *previous* purchase level. Distinguishes a real loyalty failure (heavy buyers below norm) from an excess of occasional buyers (light buyers below norm, heavy on norm) — opposite implications, identical in the aggregate. The tradition's actual answer to change
+
+*Incidence-side alternatives*
+
 - **NBD penetration-growth curves** — project `b` and `w` across period lengths from one base period, via `k`-invariance
-- **LSD** repeat-buying formulae (the one-parameter `q` shortcuts)
-- **"Mean and zeros" estimation** — fit the NBD from just `m` and `p₀`; ≥90% efficient on typical purchase data and the same method used to fit the Dirichlet's `K`
+- **LSD** repeat-buying formulae (the one-parameter `q` shortcuts) — where the full Dirichlet has no closed form
+- **Beta-binomial** brand-vs-not conditional on category purchases (Chatfield & Goodhardt 1970) — cheaper, often sufficient
+- **Poisson-generalised inverse Gaussian** (Sichel 1982) — heavier-tailed than gamma mixing, for the understated heavy-buyer tail
+- **Erlang interpurchase times** (Chatfield & Goodhardt 1973) — for buying more regular than Poisson
+
+*Observed side*
+
+- `analyses/brand-performance-measures` — the "observeds" audit (penetration, `w`, `w_p`, SCR, sole buyers, duplication) the Dirichlet is benchmarked against. Partly covered by the panel notebook; deserves standalone treatment
+- **Availability-constrained penetration** — the standard explanation for Double Jeopardy deviations. Needs store-level data the current panel lacks
 
 **Gaps identified while reading the Fader–Hardie source papers** (each has a documented method and public data):
 
@@ -307,7 +325,7 @@ What the analysis summarize:
 
 ------------------------------------------------------------------------
 
-## Getting started {#getting-started}
+## Getting started
 
 Prerequisites: [**uv**](https://docs.astral.sh/uv/) (Python 3.14 is pinned via `.python-version`).
 
@@ -337,7 +355,7 @@ A full render executes every notebook, including the Stan/Bayesian fits, so it i
 | `assets/`, `docs/` | shared Quarto style; rendered HTML output (GitHub Pages) |
 | `references/` | source papers, tutorials, spreadsheets & figures (see the reading map below) |
 
-## Reading map (source material) {#reading-map-source-material}
+## Reading map (source material)
 
 Everything lives under [`references/`](references/), organized so a file sits near what it teaches:
 

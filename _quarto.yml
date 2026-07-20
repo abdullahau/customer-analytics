@@ -16,8 +16,8 @@ date: last-modified
 
 format:
   html:
-    theme: [cosmo, assets/quarto-style/custom.scss]
-    css: assets/quarto-style/style.css
+    theme: [cosmo, assets/quarto-style/notebook.scss]
+    css: assets/quarto-style/notebook-style.css
     highlight-style: atom-one
     mainfont: Palatino
     fontcolor: black

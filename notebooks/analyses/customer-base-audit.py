@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.15"
+__generated_with = "0.23.16"
 app = marimo.App(width="medium")
 
 
@@ -63,7 +63,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, pd):
+def _(GT, pd, style_table):
     def customer_descriptives(df, metric):
         s = df[metric]
         mean = s.mean()
@@ -97,11 +97,7 @@ def _(GT, pd):
                 ],
             }
         )
-        return (
-            GT(t)
-            .cols_align("right", columns=label)
-            .tab_options(table_font_size="12px", data_row_padding="4px")
-        )
+        return GT(t).cols_align("right", columns=label).pipe(style_table)
 
     def create_percentile_table(stats, column, title, subtitle=None, fmt=None):
         t = (
@@ -110,11 +106,7 @@ def _(GT, pd):
             .rename(columns={"index": "Percentile", column: "Value"})
         )
         t["Percentile"] = (t["Percentile"] * 100).astype(int).astype(str) + "%"
-        gt = (
-            GT(t)
-            .tab_header(title=title, subtitle=subtitle)
-            .tab_options(table_font_size="12px", data_row_padding="4px")
-        )
+        gt = GT(t).tab_header(title=title, subtitle=subtitle).pipe(style_table)
         if fmt == "currency":
             gt = gt.fmt_currency(columns="Value", decimals=2)
         elif fmt == "pct":
@@ -122,7 +114,6 @@ def _(GT, pd):
         elif fmt == "float":
             gt = gt.fmt_number(columns="Value", decimals=2)
         return gt
-
 
     return create_percentile_table, customer_descriptives, stat_badges
 
@@ -136,7 +127,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, np):
+def _(GT, np, style_table):
     DECILE_FIELDS = [
         "Decile",
         "% Cust.",
@@ -195,7 +186,7 @@ def _(GT, np):
             .fmt_percent(columns=fields[1:5] + [fields[-1]], decimals=pct_decimals)
             .fmt_currency(columns=fields[5:7] + [fields[8]])
             .fmt_number(columns=fields[7])
-            .tab_options(table_font_size="12px", data_row_padding="4px")
+            .pipe(style_table)
         )
 
     return DECILE_FIELDS, decile_labels, decile_report, decile_report_gt
@@ -252,16 +243,30 @@ def _(mo):
 
 @app.cell
 def _(go, pio):
-    INK = "#1f2328"
-    MUTED = "#6b7280"
-    GRID = "#ececec"
-    ACCENT = "#3b6fb0"  # primary
-    ACCENT2 = "#c4703a"  # secondary
-    SEQ = ["#e3ecf5", "#c2d6ea", "#9dbadb", "#7295c6", "#4a72ad", "#2b5088"]
-    CAT = [ACCENT, ACCENT2, "#4c8b6f", "#8a6bb0", "#b0563b", "#6b7280", "#c9a227"]
+    # Consultant / academic palette: navy primary, ochre secondary.
+    INK, MUTED, GRID = "#1f2328", "#6b7280", "#ececec"
+    ACCENT, ACCENT2 = "#1f3a5f", "#c4703a"
+    CAT = ["#1f3a5f", "#c4703a", "#4c8b6f", "#6b7280", "#8a6bb0", "#b0563b", "#c9a227"]
+    SEQ = ["#0d3b66", "#2b5f8f", "#4a86b8", "#7aa9d0", "#a3c7e8"]  # dark→light blue
     FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
     W, H = 820, 400
 
+    # Shared axis styling; `fixedrange` bakes in "no zoom / no pan" for every figure.
+    _axis = dict(
+        showline=True,
+        linecolor=MUTED,
+        linewidth=1,
+        ticks="outside",
+        tickcolor=MUTED,
+        ticklen=4,
+        tickfont=dict(size=11, color=MUTED),
+        # standoff adds breathing room between the tick labels and the axis
+        # title; automargin then grows the outer margin to fit both.
+        title=dict(font=dict(size=12, color=MUTED), standoff=16),
+        zeroline=False,
+        fixedrange=True,
+        automargin=True,
+    )
     _tpl = go.layout.Template()
     _tpl.layout = go.Layout(
         font=dict(family=FONT, size=13, color=INK),
@@ -270,30 +275,14 @@ def _(go, pio):
         plot_bgcolor="white",
         colorway=CAT,
         margin=dict(l=66, r=26, t=54, b=58),
-        xaxis=dict(
-            showgrid=False,
-            showline=True,
-            linecolor=MUTED,
-            linewidth=1,
-            ticks="outside",
-            tickcolor=MUTED,
-            ticklen=4,
-            tickfont=dict(size=11, color=MUTED),
-            title=dict(font=dict(size=12, color=MUTED)),
-            zeroline=False,
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridcolor=GRID,
-            gridwidth=1,
-            showline=False,
-            ticks="outside",
-            tickcolor=MUTED,
-            ticklen=4,
-            tickfont=dict(size=11, color=MUTED),
-            title=dict(font=dict(size=12, color=MUTED)),
-            zeroline=False,
-        ),
+        xaxis={**_axis, "showgrid": False},
+        yaxis={
+            **_axis,
+            "showline": False,
+            "showgrid": True,
+            "gridcolor": GRID,
+            "gridwidth": 1,
+        },
         legend=dict(
             title=dict(font=dict(size=11)), font=dict(size=11), bgcolor="rgba(0,0,0,0)"
         ),
@@ -301,7 +290,64 @@ def _(go, pio):
     )
     pio.templates["cba"] = _tpl
     pio.templates.default = "cba"
-    return ACCENT, ACCENT2, GRID, H, INK, MUTED, SEQ, W
+
+    # Hide the modebar, scroll/pinch-zoom and the plotly logo for every bare figure.
+    # marimo reads a figure's render config from the default renderer (forced to
+    # "browser" in-session), so setting it there locks down all charts at once.
+    _LOCK = {"displayModeBar": False, "scrollZoom": False, "displaylogo": False}
+    for _r in ("browser", "notebook", "notebook_connected", "plotly_mimetype"):
+        if _r in pio.renderers:
+            pio.renderers[_r].config = _LOCK
+    return ACCENT, ACCENT2, FONT, GRID, H, INK, MUTED, SEQ, W
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Table & text style
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    # Unify the notebook's text/dashboard font with the charts and tables via
+    # marimo's font CSS variables.
+    mo.Html(
+        "<style>:root{"
+        "--marimo-text-font:'Helvetica Neue',Helvetica,Arial,sans-serif;"
+        "--marimo-heading-font:'Helvetica Neue',Helvetica,Arial,sans-serif;"
+        "}</style>"
+    )
+    return
+
+
+@app.cell
+def _(ACCENT, FONT, INK, MUTED, loc, style):
+    def style_table(gt, font_size="12px", row_padding="4px"):
+        # One consultant look for every great-tables table: navy header with
+        # white labels, the chart font, light row striping, hairline borders.
+        return gt.tab_style(
+            style=style.text(color="white", weight="bold"),
+            locations=loc.column_labels(),
+        ).tab_options(
+            table_font_names=[s.strip() for s in FONT.split(",")],
+            table_font_size=font_size,
+            table_font_color=INK,
+            data_row_padding=row_padding,
+            column_labels_background_color=ACCENT,
+            column_labels_border_bottom_color=ACCENT,
+            column_labels_border_bottom_width="2px",
+            heading_background_color="white",
+            heading_border_bottom_color=MUTED,
+            row_striping_include_table_body=True,
+            row_striping_background_color="#f3f6fa",
+            table_border_top_style="none",
+            table_border_bottom_color=MUTED,
+            table_border_bottom_width="1px",
+        )
+
+    return (style_table,)
 
 
 @app.cell(hide_code=True)
@@ -319,6 +365,18 @@ def _(ACCENT, ACCENT2, H, W, go):
         col = next(c for c in dist.columns if str(c).endswith("Range"))
         return dist.rename(columns={col: "Range"}).astype({"Range": str})
 
+    def _thin_ticks(order, max_ticks=12):
+        # With 20-40 bins the axis crowds; label only ~max_ticks of them (the
+        # tooltip carries every bar's exact range). Always keep the last bucket.
+        n = len(order)
+        if n <= max_ticks:
+            return {}
+        stride = -(-n // max_ticks)
+        shown = list(order[::stride])
+        if order[-1] not in shown:
+            shown.append(order[-1])
+        return {"tickmode": "array", "tickvals": shown, "ticktext": shown}
+
     def bar_distribution(
         dist,
         title="Customer distribution",
@@ -328,6 +386,7 @@ def _(ACCENT, ACCENT2, H, W, go):
         height=H,
     ):
         d = _range_col(dist)
+        order = list(d["Range"])
         fig = go.Figure(
             go.Bar(
                 x=d["Range"],
@@ -338,14 +397,18 @@ def _(ACCENT, ACCENT2, H, W, go):
                 hovertemplate="%{x}<br>Customers: %{customdata[0]:,}<br>Share: %{y:.1%}<extra></extra>",
             )
         )
-        fig.update_layout(title=title, width=width, height=height, bargap=0.12)
+        fig.update_layout(
+            template="cba", title=title, width=width, height=height, bargap=0.12
+        )
         fig.update_xaxes(
             title=x_title,
             tickangle=-45,
+            automargin=True,
             categoryorder="array",
-            categoryarray=list(d["Range"]),
+            categoryarray=order,
+            **_thin_ticks(order),
         )
-        fig.update_yaxes(title="Customers (%)", tickformat=".0%")
+        fig.update_yaxes(title="Customers (%)", tickformat=".0%", automargin=True)
         return fig
 
     def overlay_bar_distribution(
@@ -369,24 +432,32 @@ def _(ACCENT, ACCENT2, H, W, go):
                 name=str(label),
                 marker_color=col,
                 marker_line_width=0,
-                opacity=0.55,
                 customdata=d[["Customers"]],
                 hovertemplate=f"{label} · %{{x}}<br>Customers: %{{customdata[0]:,}}<br>Share: %{{y:.1%}}<extra></extra>",
             )
+        # Grouped (dodged) bars offset left/right of each range — no opacity, so
+        # the look matches every other chart in the notebook.
         fig.update_layout(
+            template="cba",
             title=title,
             width=width,
             height=height,
-            barmode="overlay",
-            bargap=0.12,
+            barmode="group",
+            bargap=0.2,
+            bargroupgap=0.05,
             legend=dict(
                 orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
             ),
         )
         fig.update_xaxes(
-            title=x_title, tickangle=-45, categoryorder="array", categoryarray=order
+            title=x_title,
+            tickangle=-45,
+            automargin=True,
+            categoryorder="array",
+            categoryarray=order,
+            **_thin_ticks(order),
         )
-        fig.update_yaxes(title="Customers (%)", tickformat=".0%")
+        fig.update_yaxes(title="Customers (%)", tickformat=".0%", automargin=True)
         return fig
 
     def line_chart(
@@ -412,7 +483,7 @@ def _(ACCENT, ACCENT2, H, W, go):
                 hovertemplate="%{x}<br>%{y}<extra></extra>",
             )
         )
-        fig.update_layout(title=title, width=width, height=height)
+        fig.update_layout(template="cba", title=title, width=width, height=height)
         if x_categorical:
             fig.update_xaxes(title=x_title, type="category", tickangle=-45)
         else:
@@ -432,7 +503,7 @@ def _(mo):
 
 
 @app.cell
-def _(ACCENT, ACCENT2, INK, brentq, go, np):
+def _(ACCENT, ACCENT2, brentq, go, np):
     def venn_two(n_a, n_b, n_both, label_a, label_b, title, width=560, height=460):
         R = 1.0
         r = np.sqrt(n_b / n_a)
@@ -463,7 +534,6 @@ def _(ACCENT, ACCENT2, INK, brentq, go, np):
             y1=cy + R,
             line_color=ACCENT,
             fillcolor=ACCENT,
-            opacity=0.40,
             layer="below",
         )
         fig.add_shape(
@@ -474,8 +544,29 @@ def _(ACCENT, ACCENT2, INK, brentq, go, np):
             y1=cy + r,
             line_color=ACCENT2,
             fillcolor=ACCENT2,
-            opacity=0.40,
             layer="below",
+        )
+
+        _th = np.linspace(0, 2 * np.pi, 361)
+        _c1 = np.column_stack([cx1 + R * np.cos(_th), cy + R * np.sin(_th)])
+        _c1 = _c1[(_c1[:, 0] - cx2) ** 2 + (_c1[:, 1] - cy) ** 2 <= r**2]
+        _c2 = np.column_stack([cx2 + r * np.cos(_th), cy + r * np.sin(_th)])
+        _c2 = _c2[(_c2[:, 0] - cx1) ** 2 + (_c2[:, 1] - cy) ** 2 <= R**2]
+        _lens = np.vstack([_c1, _c2])
+        _ctr = _lens.mean(axis=0)
+        _lens = _lens[
+            np.argsort(np.arctan2(_lens[:, 1] - _ctr[1], _lens[:, 0] - _ctr[0]))
+        ]
+        _rgb = tuple(int(ACCENT[k : k + 2], 16) for k in (1, 3, 5))
+        fig.add_scatter(
+            x=_lens[:, 0],
+            y=_lens[:, 1],
+            fill="toself",
+            mode="lines",
+            line=dict(width=0),
+            fillcolor=f"rgba{(*_rgb, 0.55)}",
+            hoverinfo="skip",
+            showlegend=False,
         )
         for x, txt in [
             (cx1 - 0.45 * R, f"{label_a}<br>{n_a - n_both:,}"),
@@ -487,10 +578,11 @@ def _(ACCENT, ACCENT2, INK, brentq, go, np):
                 y=cy,
                 text=txt,
                 showarrow=False,
-                font=dict(size=13, color=INK),
+                font=dict(size=13, color="white"),
                 align="center",
             )
         fig.update_layout(
+            template="cba",
             title=title,
             width=width,
             height=height,
@@ -530,13 +622,12 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
         lo = min(both18, both19)
         money = lambda v: f"${v:,.0f}K"
         fig = go.Figure()
-        _both = dict(marker_color="white", marker_line=dict(color=INK, width=1))
-        _b18 = dict(
-            marker_color=ACCENT, marker_line=dict(color=INK, width=1), opacity=0.55
-        )
-        _b19 = dict(
-            marker_color=ACCENT2, marker_line=dict(color=INK, width=1), opacity=0.55
-        )
+        # Solid consultant fills (no borders, no opacity): slate for the
+        # carried-over base, navy for the 2018 flow, ochre for the 2019 flow.
+        # All three are dark enough for white in-bar labels.
+        _both = dict(marker_color="#64748b")
+        _b18 = dict(marker_color=ACCENT, marker_line=dict(color="white", width=1))
+        _b19 = dict(marker_color=ACCENT2, marker_line=dict(color="white", width=1))
         w = 0.62
         fig.add_bar(x=[0], y=[both18], base=0, width=w, showlegend=False, **_both)
         fig.add_bar(x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18)
@@ -553,7 +644,7 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
                 x1=x1,
                 y0=y,
                 y1=y,
-                line=dict(color=INK, width=1, dash="dot"),
+                line=dict(color=MUTED, width=1, dash="dot"),
             )
 
         hline(0 + w / 2, 1 - w / 2, tot18)
@@ -561,7 +652,7 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
         hline(0 + w / 2, 2 - w / 2, both18)
         hline(2 + w / 2, 4 - w / 2, both19)
 
-        def ann(x, y, t, yshift=0, yanchor="middle"):
+        def ann(x, y, t, yshift=0, yanchor="middle", color="white"):
             fig.add_annotation(
                 x=x,
                 y=y,
@@ -569,19 +660,22 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
                 showarrow=False,
                 yshift=yshift,
                 yanchor=yanchor,
-                font=dict(size=12, color=INK),
+                font=dict(size=12, color=color),
             )
 
-        ann(0, tot18, money(tot18), yshift=10, yanchor="bottom")
-        ann(4, tot19, money(tot19), yshift=10, yanchor="bottom")
+        # In-bar labels are white; the three that float over the white canvas
+        # (the two year totals and the delta) stay dark so they stay readable.
+        ann(0, tot18, money(tot18), yshift=10, yanchor="bottom", color=INK)
+        ann(4, tot19, money(tot19), yshift=10, yanchor="bottom", color=INK)
         ann(0, both18 / 2, "Both<br>years")
         ann(0, both18 + only18 / 2, "2018<br>only")
         ann(4, both19 / 2, "Both<br>years")
         ann(4, both19 + only19 / 2, "2019<br>only")
         ann(1, both18 + only18 / 2, money(only18))
-        ann(2, lo, f"−{money(abs(delta))}", yshift=-8, yanchor="top")
+        ann(2, lo, f"−{money(abs(delta))}", yshift=-8, yanchor="top", color=INK)
         ann(3, both19 + only19 / 2, money(only19))
         fig.update_layout(
+            template="cba",
             title="Decomposition of annual customer profit",
             width=width,
             height=height,
@@ -601,27 +695,23 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
     return (profit_bridge_chart,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Second-purchase chart
+    """)
+    return
+
+
 @app.cell
-def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
-    def _sample_colorscale(n, scale="Viridis"):
-        import plotly.colors as pc
-
-        if n == 1:
-            return [pc.sample_colorscale(scale, [0.15])[0]]
-        return pc.sample_colorscale(scale, [i / (n - 1) for i in range(n)])
-
-    def _q_index(s, base_year, pattern=r"y(\d{4})_q([1-4])"):
-        parts = s.str.extract(pattern)
-        year, qtr = parts[0].astype("float"), parts[1].astype("float")
-        return (year - base_year) * 4 + qtr - 1
-
-    def second_purchase_chart(sp, width=780, height=340):
+def _(ACCENT, ACCENT2, GRID, go):
+    def second_purchase_chart(sp, width=None, height=360):
         fig = go.Figure()
         fig.add_bar(
             x=sp["Period"],
             y=sp["inc_pct"],
             name="Incremental",
-            marker_color=SEQ[2],
+            marker_color=ACCENT,
             marker_line_width=0,
             yaxis="y",
             hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
@@ -636,8 +726,13 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
             yaxis="y2",
             hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
         )
+        # width=None + autosize lets the figure fill the cell; automargin keeps
+        # each axis title clear of its tick labels as the width changes. Axis
+        # titles are tinted to match their series (navy bars, ochre line).
         fig.update_layout(
+            template="cba",
             title="Percent of cohort making a second purchase, by quarter",
+            autosize=True,
             width=width,
             height=height,
             bargap=0.25,
@@ -645,19 +740,54 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
                 orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
             ),
             yaxis=dict(
-                title="Incremental", tickformat=".0%", showgrid=True, gridcolor=GRID
+                title=dict(text="Incremental", font=dict(color=ACCENT)),
+                tickformat=".0%",
+                tickfont=dict(color=ACCENT),
+                showgrid=True,
+                gridcolor=GRID,
+                fixedrange=True,
+                automargin=True,
             ),
             yaxis2=dict(
-                title="Cumulative",
+                title=dict(text="Cumulative", font=dict(color=ACCENT2)),
                 tickformat=".0%",
+                tickfont=dict(color=ACCENT2),
                 overlaying="y",
                 side="right",
                 showgrid=False,
                 range=[0, 1],
+                fixedrange=True,
+                automargin=True,
             ),
         )
-        fig.update_xaxes(type="category", tickangle=-45)
+        fig.update_xaxes(type="category", tickangle=-45, automargin=True)
         return fig
+
+    return (second_purchase_chart,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Cohort trajectory lines
+    """)
+    return
+
+
+@app.cell
+def _(go):
+    def _sample_colorscale(n, scale=("#0d3b66", "#6aa5d9")):
+        # Consultant blue ramp (navy → medium blue) for ordinal cohort series.
+        import plotly.colors as pc
+
+        if n == 1:
+            return [pc.sample_colorscale(scale, [0.0])[0]]
+        return pc.sample_colorscale(scale, [i / (n - 1) for i in range(n)])
+
+    def _q_index(s, base_year, pattern=r"y(\d{4})_q([1-4])"):
+        parts = s.str.extract(pattern)
+        year, qtr = parts[0].astype("float"), parts[1].astype("float")
+        return (year - base_year) * 4 + qtr - 1
 
     def cohort_lines(
         df,
@@ -712,6 +842,7 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
                 hovertemplate=f"{c} · %{{x}}<br>%{{y}}<extra></extra>",
             )
         fig.update_layout(
+            template="cba",
             title=title,
             width=width,
             height=height,
@@ -724,8 +855,19 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
         fig.update_yaxes(title=y_title, tickformat=tickformat)
         return fig
 
-    ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
+    return (cohort_lines,)
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Annual summary bars
+    """)
+    return
+
+
+@app.cell
+def _(ACCENT, ACCENT2, go):
     def acquisitions_by_year(df, width=520, height=340):
         d = df.reset_index()
         d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
@@ -738,7 +880,11 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
             )
         )
         fig.update_layout(
-            title="Acquisitions by year", width=width, height=height, bargap=0.4
+            template="cba",
+            title="Acquisitions by year",
+            width=width,
+            height=height,
+            bargap=0.4,
         )
         fig.update_yaxes(title="New customers", tickformat=",.0f")
         fig.update_xaxes(type="category")
@@ -755,7 +901,11 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
             )
         )
         fig.update_layout(
-            title="Active customers by year", width=width, height=height, bargap=0.4
+            template="cba",
+            title="Active customers by year",
+            width=width,
+            height=height,
+            bargap=0.4,
         )
         fig.update_yaxes(title="Active customers", tickformat=",.0f")
         fig.update_xaxes(type="category")
@@ -788,6 +938,7 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
                 hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>",
             )
         fig.update_layout(
+            template="cba",
             title="Spend and profit by year",
             barmode="group",
             width=width,
@@ -799,69 +950,76 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
         fig.update_xaxes(type="category")
         return fig
 
-    def stacked_by_cohort(
-        df,
-        metric,
-        y_title,
-        tickformat="$,.0f",
-        width=560,
-        height=380,
-        order=tuple(ANNUAL_ORDER),
-    ):
-        d = df.reset_index()
-        d["Year"] = d["Year"].astype(str)
-        colors = dict(zip(order, SEQ[: len(order)]))
-        fig = go.Figure()
-        for c in order:
-            dc = (
-                d[d["CohortYear"].astype(str) == c]
-                .set_index("Year")
-                .reindex(sorted(d["Year"].unique()))
-            )
-            fig.add_bar(
-                x=dc.index,
-                y=dc[metric],
-                name=c.replace("_", " "),
-                marker_color=colors[c],
-                marker_line=dict(color="white", width=0.5),
-                hovertemplate=f"{c} · %{{x}}<br>%{{y:,.0f}}<extra></extra>",
-            )
-        fig.update_layout(
-            title=f"{y_title} by acquisition cohort",
-            barmode="stack",
-            width=width,
-            height=height,
-            bargap=0.35,
-            legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)),
-        )
-        fig.update_yaxes(title=y_title, tickformat=tickformat)
-        fig.update_xaxes(type="category")
-        return fig
+    return acquisitions_by_year, active_by_year, spend_profit_by_year
 
-    def cohort_profit_annotated(
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Cohort stack and flow
+    """)
+    return
+
+
+@app.cell
+def _(SEQ, go, pd):
+    ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
+
+    def _hex_rgba(hexc, a):
+        h = hexc.lstrip("#")
+        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+        return f"rgba({r},{g},{b},{a})"
+
+    def cohort_flow_stack(
         df,
         metric="TotalProfit",
+        y_title="Profit ($ MM)",
         scale=1e6,
-        width=780,
+        total_fmt="{:.2f}",
+        flows=True,
+        width=820,
         height=520,
         order=tuple(ANNUAL_ORDER),
     ):
+        # Stacked bars of `metric` by acquisition cohort per year, with:
+        #   • Sankey-style ribbons linking each cohort's segment across adjacent
+        #     years (the retention flow — how a cohort's contribution decays);
+        #   • in-segment share-of-year labels and per-year totals on top.
+        # Generalised: pass metric/y_title/scale/total_fmt for profit, active
+        # customers, spend, etc.
         P = df[metric].unstack("Year").reindex(list(order)).div(scale)
         P.columns = P.columns.astype(str)
         years = list(P.columns)
         year_tot = P.sum(axis=0)
         share = P.div(year_tot, axis=1)
         bottoms = P.cumsum(axis=0) - P
-        # Solid, clearly-visible colours (the pale end of SEQ washes out on a
-        # white background). Darkest cohort at the bottom of the stack.
-        solid = ["#0d3b66", "#1f5c99", "#3b82c4", "#6aa5d9", "#a3c7e8"]
-        colors = dict(zip(order, solid[: len(order)]))
-        # Numeric x positions with tick labels — the same axis strategy the
-        # working waterfall uses. Annotations reference these numeric positions,
-        # NOT category strings; a category-string annotation ref on a
-        # type="category" axis fails to resolve and blanks the whole plot.
+        # Darkest cohort at the bottom of the stack; light text on the dark
+        # lower segments, dark text on the two lightest upper ones.
+        colors = dict(zip(order, SEQ[: len(order)]))
+        text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
+        # Numeric x positions (annotations must reference these, not category
+        # strings — a string ref on a category axis blanks the plot).
         xpos = list(range(len(years)))
+        hw = (1 - 0.45) / 2  # half bar width in x-units (bargap=0.45)
         fig = go.Figure()
+        # Ribbons first, so the bars render on top of them.
+        if flows:
+            for c in order:
+                for i in range(len(years) - 1):
+                    v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
+                    if pd.isna(v1) or pd.isna(v2) or v1 == 0 or v2 == 0:
+                        continue
+                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
+                    fig.add_scatter(
+                        x=[i + hw, i + 1 - hw, i + 1 - hw, i + hw],
+                        y=[b1 + v1, b2 + v2, b2, b1],
+                        fill="toself",
+                        mode="lines",
+                        line=dict(width=0),
+                        fillcolor=_hex_rgba(colors[c], 0.22),
+                        hoverinfo="skip",
+                        showlegend=False,
+                    )
         for c in order:
             y_vals = [None if pd.isna(v) else float(v) for v in P.loc[c]]
             fig.add_bar(
@@ -869,11 +1027,14 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
                 x=xpos,
                 y=y_vals,
                 marker=dict(color=colors[c], line=dict(color="white", width=1)),
+                hovertemplate=f"{c.replace('_', ' ')} · %{{x}}<br>{y_title}: %{{y:,.2f}}<extra></extra>",
             )
         fig.update_layout(
+            template="cba",
             barmode="stack",
             bargap=0.45,
-            title="Profit by acquisition cohort",
+            title=f"{y_title.split(' (')[0]} by acquisition cohort",
+            autosize=True,
             width=width,
             height=height,
             legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)),
@@ -881,37 +1042,55 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
         for c in order:
             for i, yr in enumerate(years):
                 v = P.loc[c, yr]
-                if pd.isna(v) or v == 0:
+                if pd.isna(v) or v == 0 or share.loc[c, yr] < 0.03:
                     continue
                 fig.add_annotation(
                     x=i,
                     y=float(bottoms.loc[c, yr] + v / 2),
                     text=f"{share.loc[c, yr]:.0%}",
                     showarrow=False,
-                    font=dict(size=10, color="white"),
+                    font=dict(size=10, color=text_color[c]),
                 )
         for i, yr in enumerate(years):
             fig.add_annotation(
                 x=i,
                 y=float(year_tot[yr]),
                 yshift=12,
-                text=f"{year_tot[yr]:.2f}",
+                text=total_fmt.format(year_tot[yr]),
                 showarrow=False,
                 font=dict(size=12),
             )
-        fig.update_yaxes(title="Profit ($ MM)", rangemode="tozero")
-        fig.update_xaxes(tickvals=xpos, ticktext=years)
+        # Retention of the existing base between adjacent years (TCBA §6.2):
+        # the share of a year's value that the cohorts present that year
+        # still deliver the next year. `new_next` is the value from the
+        # newest cohort in the next year, so it is left out of the base.
+        if flows:
+            for i in range(len(years) - 1):
+                base = year_tot[years[i]]
+                new_next = (
+                    P.loc[years[i + 1], years[i + 1]]
+                    if years[i + 1] in P.index
+                    else 0.0
+                )
+                new_next = 0.0 if pd.isna(new_next) else new_next
+                retained = year_tot[years[i + 1]] - new_next
+                if base <= 0:
+                    continue
+                fig.add_annotation(
+                    x=i + 0.5,
+                    y=float(0.5 * (base + retained)),
+                    text=f"{retained / base:.0%}",
+                    showarrow=False,
+                    font=dict(size=11, color="#374151"),
+                    bgcolor="rgba(255,255,255,0.72)",
+                    bordercolor="#c9d3df",
+                    borderpad=2,
+                )
+        fig.update_yaxes(title=y_title, rangemode="tozero", automargin=True)
+        fig.update_xaxes(tickvals=xpos, ticktext=years, automargin=True)
         return fig
 
-    return (
-        acquisitions_by_year,
-        active_by_year,
-        cohort_lines,
-        cohort_profit_annotated,
-        second_purchase_chart,
-        spend_profit_by_year,
-        stacked_by_cohort,
-    )
+    return (cohort_flow_stack,)
 
 
 @app.cell(hide_code=True)
@@ -954,16 +1133,22 @@ def _(mo):
     \;=\; N_c \times \frac{\text{trans}}{\text{cust}} \times \frac{\text{spend}}{\text{trans}} \times \frac{\text{profit}}{\text{spend}}
     $$
 
-    where $N_c$ is the number of active customers. For a cohort in a period, add
-    the fraction of the cohort that is active:
+    where $N_c$ is the number of active customers. For a cohort in a period,
+    decompose number of active customers into cohort size and fraction of the cohort that is active:
 
     $$
     \text{Cohort profit} \;=\; (\text{cohort size}) \times (\%\,\text{active}) \times \text{AOF} \times \text{AOV} \times \text{Margin}
     $$
 
-    This structure lets you trace any change in profit to a specific cause: fewer
-    customers, less frequent orders, smaller orders, or thinner margins.
+    This structure lets you trace any change in profit to a specific cause: **fewer
+    customers**, **less frequent orders**, **smaller orders**, or **thinner margins**.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Binning rules for the distributions
 
     Most behavioural quantities are heavily right-skewed. The maximum is often 10
@@ -1046,7 +1231,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_data, pd, with_derived, yearly_cust_data):
+def _(GT, cust_data, pd, style_table, with_derived, yearly_cust_data):
     cust_data_2019 = with_derived(yearly_cust_data(cust_data, 2019))
     cust_data_2018 = with_derived(yearly_cust_data(cust_data, 2018))
 
@@ -1079,7 +1264,7 @@ def _(GT, cust_data, pd, with_derived, yearly_cust_data):
         .fmt_currency(columns="Value", rows=[2, 3], decimals=0)
         .fmt_number(columns="Value", rows=[4], decimals=2)
         .fmt_currency(columns="Value", rows=[5, 6], decimals=2)
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return cust_data_2018, cust_data_2019
 
@@ -1177,7 +1362,6 @@ def _(profit_stats, stat_badges):
 
 @app.cell
 def _(
-    ACCENT2,
     bar_distribution,
     create_bins_labels,
     create_distribution,
@@ -1187,7 +1371,6 @@ def _(
         create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)),
         title="Customer profit distribution (2019)",
         x_title="Annual profit ($)",
-        color=ACCENT2,
     )
     return
 
@@ -1316,7 +1499,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_data_2019, np, pd):
+def _(GT, cust_data_2019, np, pd, style_table):
     _bins = list(range(1, 11)) + [np.inf]
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     _binned = cust_data_2019.assign(
@@ -1337,7 +1520,7 @@ def _(GT, cust_data_2019, np, pd):
         GT(aspt_by_level.rename(columns={"TransBin": "Transactions"}))
         .tab_header(title="Average spend per transaction, by transaction level")
         .fmt_currency(columns=list(aspt_by_level.columns[1:]), decimals=2)
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return
 
@@ -1367,7 +1550,6 @@ def _(avg_margin_stats, stat_badges):
 
 @app.cell
 def _(
-    ACCENT2,
     bar_distribution,
     create_bins_labels,
     create_distribution,
@@ -1379,7 +1561,6 @@ def _(
         ),
         title="Average margin distribution (2019)",
         x_title="Margin (%)",
-        color=ACCENT2,
     )
     return
 
@@ -1509,7 +1690,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_2018_2019, cust_data_2018, cust_data_2019, pd):
+def _(GT, cust_2018_2019, cust_data_2018, cust_data_2019, pd, style_table):
     _yoy = pd.concat(
         [
             (
@@ -1540,7 +1721,7 @@ def _(GT, cust_2018_2019, cust_data_2018, cust_data_2019, pd):
         .fmt_percent(columns=["Δ"], decimals=1)
         .fmt_currency(columns=["2018", "2019"], decimals=0)
         .fmt_number(columns=["2018", "2019"], rows=[2], decimals=0)
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return
 
@@ -1697,7 +1878,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_2018_2019):
+def _(GT, cust_2018_2019, style_table):
     overlap = cust_2018_2019.groupby("Status").agg(Customers=("CustomerID", "count"))
     overlap.loc["Active 2018"] = (
         overlap.loc["2018 Only (Lapsed)"] + overlap.loc["Active Both Years"]
@@ -1709,7 +1890,7 @@ def _(GT, cust_2018_2019):
         GT(overlap.reset_index(names="Group"))
         .tab_header(title="Customer overlap")
         .fmt_number(columns="Customers", decimals=0)
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return (overlap,)
 
@@ -1748,7 +1929,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_2018_2019):
+def _(GT, cust_2018_2019, style_table):
     profit_by_group = cust_2018_2019.groupby("Status").agg(
         Y2018=("Profit_2018", lambda s: s.sum(min_count=1)),
         Y2019=("Profit_2019", lambda s: s.sum(min_count=1)),
@@ -1759,7 +1940,7 @@ def _(GT, cust_2018_2019):
         .tab_header(title="Profit by activity group")
         .fmt_currency(columns=["Y2018", "Y2019"], decimals=0)
         .cols_label(Y2018="2018 profit", Y2019="2019 profit")
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return (profit_by_group,)
 
@@ -1785,7 +1966,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_2018_2019):
+def _(GT, cust_2018_2019, style_table):
     _flows = cust_2018_2019.melt(
         id_vars=["CustomerID", "Status"],
         value_vars=[
@@ -1846,7 +2027,7 @@ def _(GT, cust_2018_2019):
             decimals=1,
         )
         .sub_missing(missing_text="")
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return
 
@@ -1884,6 +2065,7 @@ def _(
     np,
     pd,
     style,
+    style_table,
 ):
     _, _t18, _b18 = decile_labels(cust_data_2018, "Profit", n=10)
     _, _t19, _b19 = decile_labels(cust_data_2019, "Profit", n=10)
@@ -1932,7 +2114,7 @@ def _(
         .tab_style(
             style=style.text(weight="bold"), locations=loc.body(columns=["Total"])
         )
-        .tab_options(table_font_size="11px", data_row_padding="3px")
+        .pipe(style_table, font_size="11px", row_padding="3px")
     )
     return
 
@@ -1969,7 +2151,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_2018_2019, np, pd):
+def _(GT, cust_2018_2019, np, pd, style_table):
     _both = (
         cust_2018_2019.query("Status == 'Active Both Years'")
         .query("Spend_2018 > 0 and Spend_2019 > 0")
@@ -2075,7 +2257,7 @@ def _(GT, cust_2018_2019, np, pd):
         .fmt_currency(columns=["2018", "2019", "Change"], currency="USD", decimals=0)
         .sub_missing(missing_text="")
         .cols_align(align="center", columns=["Profit", "# Trans", "ASPT", "Avg Marg"])
-        .tab_options(table_font_size="11px", data_row_padding="3px")
+        .pipe(style_table, font_size="11px", row_padding="3px")
     )
     return
 
@@ -2209,7 +2391,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_data, pd):
+def _(GT, cust_data, pd, style_table):
     _m = cust_data.query("Cohort == 'y2016_q1'").pivot_table(
         index="CustomerID",
         columns="Year",
@@ -2254,7 +2436,7 @@ def _(GT, cust_data, pd):
         .fmt_percent(columns="Pct", decimals=1)
         .cols_label(NumCust="# Customers", Pct="% of cohort")
         .cols_align(align="center", columns=_years)
-        .tab_options(table_font_size="11px", data_row_padding="3px")
+        .pipe(style_table, font_size="11px", row_padding="3px")
     )
     return
 
@@ -2410,7 +2592,7 @@ def _(bar_distribution, create_bins_labels, create_distribution, cust_data):
 
 
 @app.cell
-def _(GT, decile_labels, vtd_df):
+def _(GT, decile_labels, style_table, vtd_df):
     vtd_decile = decile_labels(vtd_df, "TotalProfit")[0].reset_index()
     _rep = (
         vtd_decile.groupby("ProfitDecile", as_index=False)
@@ -2452,13 +2634,13 @@ def _(GT, decile_labels, vtd_df):
         .fmt_percent(columns=_fields[1:5] + [_fields[-1]], decimals=2)
         .fmt_currency(columns=_fields[5:7] + [_fields[8]])
         .fmt_number(columns=_fields[7])
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return (vtd_decile,)
 
 
 @app.cell
-def _(GT, cust_data, vtd_decile):
+def _(GT, cust_data, style_table, vtd_decile):
     _a = (
         cust_data.query("Cohort == 'y2016_q1'")
         .pivot_table(
@@ -2495,7 +2677,7 @@ def _(GT, cust_data, vtd_decile):
         .tab_spanner(label="% active", columns=_yr)
         .fmt_percent(columns=["% Cohort"] + _yr, decimals=1)
         .sub_missing(missing_text="")
-        .tab_options(table_font_size="12px", data_row_padding="4px")
+        .pipe(style_table)
     )
     return
 
@@ -2522,7 +2704,7 @@ def _(mo):
 
 
 @app.cell
-def _(GT, cust_data, np, pd):
+def _(GT, cust_data, np, pd, style_table):
     _r = (
         cust_data.query("Cohort == 'y2016_q1'")
         .assign(Period=lambda d: (d["Year"] - 2016) * 4 + d["Quarter"])
@@ -2580,7 +2762,7 @@ def _(GT, cust_data, np, pd):
         .fmt_number(columns=_fo, decimals=0)
         .sub_missing(missing_text="")
         .cols_align(align="right", columns=_fo)
-        .tab_options(table_font_size="12px", data_row_padding="3px")
+        .pipe(style_table, row_padding="3px")
     )
     return
 
@@ -2745,10 +2927,30 @@ def _(mo):
 
     ### Annual performance
 
-    The single most important picture is annual profit **stacked by acquisition
-    cohort**. It shows how much of each year's profit comes from customers acquired
-    in each earlier year. Read together with the acquisition and active-customer
-    charts, it shows whether the firm is building a durable base or renting one.
+    The three charts below use the same function, `cohort_flow_stack`. One chart
+    shows active customers. One chart shows profit. One chart shows spend.
+
+    Each chart has one bar for each year. Each bar is a stack of colored bands.
+    Each band is one acquisition cohort. The height of a band is the part of the
+    year total that comes from that cohort. The dark band at the bottom is the
+    oldest cohort.
+
+    A ribbon connects each cohort band to the same cohort band in the next year.
+    The left end of a ribbon has the height of the cohort in the first year. The
+    right end has the height in the next year. The ribbon becomes narrow when the
+    cohort gives less value. A narrow ribbon shows a fast fall in the value from
+    that cohort.
+
+    The label in each band is the share of that year from the cohort. The label
+    above each bar is the year total. The number between two bars is the
+    retention of the base. It is the part of one year's value that the cohorts
+    from that year still give in the next year. It leaves out the customers who
+    join in the next year.
+
+    Read the three charts with the acquisition bar chart and the active-customer
+    bar chart above. The charts show one fact. A healthy firm keeps profit and
+    customers from old cohorts. A weak firm replaces lost customers with new
+    customers each year.
     """)
     return
 
@@ -2791,28 +2993,38 @@ def _(annual_cohort_combined, spend_profit_by_year):
 
 
 @app.cell
-def _(annual_cohort_combined, stacked_by_cohort):
-    stacked_by_cohort(
-        annual_cohort_combined, "NumActive", "Active customers", tickformat=",.0f"
+def _(annual_cohort_combined, cohort_flow_stack):
+    cohort_flow_stack(
+        annual_cohort_combined,
+        metric="NumActive",
+        y_title="Active customers (000s)",
+        scale=1e3,
+        total_fmt="{:.1f}",
     )
     return
 
 
 @app.cell
-def _(annual_cohort_combined, stacked_by_cohort):
-    stacked_by_cohort(annual_cohort_combined, "TotalProfit", "Total profit")
+def _(annual_cohort_combined, cohort_flow_stack):
+    cohort_flow_stack(
+        annual_cohort_combined,
+        metric="TotalProfit",
+        y_title="Profit ($ MM)",
+        scale=1e6,
+        total_fmt="{:.2f}",
+    )
     return
 
 
 @app.cell
-def _(annual_cohort_combined, stacked_by_cohort):
-    stacked_by_cohort(annual_cohort_combined, "TotalSpend", "Total spend")
-    return
-
-
-@app.cell
-def _(annual_cohort_combined, cohort_profit_annotated):
-    cohort_profit_annotated(annual_cohort_combined)
+def _(annual_cohort_combined, cohort_flow_stack):
+    cohort_flow_stack(
+        annual_cohort_combined,
+        metric="TotalSpend",
+        y_title="Spend ($ MM)",
+        scale=1e6,
+        total_fmt="{:.2f}",
+    )
     return
 
 

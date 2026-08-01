@@ -34,6 +34,14 @@ def _(mo):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Imports & Helper Functions
+    """)
+    return
+
+
 @app.cell
 def _():
     import numpy as np
@@ -43,11 +51,211 @@ def _():
     from great_tables import GT, loc, style
     from scipy.optimize import brentq
 
-    # --- academic-minimal Plotly theme, registered once ---------------------
+    return GT, brentq, go, loc, np, pd, pio, style
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data Descriptive Helpers
+    """)
+    return
+
+
+@app.cell
+def _(GT, pd):
+    def customer_descriptives(df, metric):
+        s = df[metric]
+        mean = s.mean()
+        return {
+            "count": s.count(),
+            "mean": mean,
+            "median": s.median(),
+            "std": s.std(),
+            "min": s.min(),
+            "max": s.max(),
+            "pct_below_mean": (s < mean).mean(),
+            "percentiles": s.quantile([i / 100 for i in range(5, 100, 5)]),
+        }
+
+    def stat_badges(stats, label, money=True, pct=False):
+        if money:
+            fmt = lambda v: f"${v:,.2f}"
+        elif pct:
+            fmt = lambda v: f"{v:.2f}%"
+        else:
+            fmt = lambda v: f"{v:,.2f}"
+        t = pd.DataFrame(
+            {
+                "Statistic": ["Minimum", "Maximum", "Mean", "Median", "% below mean"],
+                label: [
+                    fmt(stats["min"]),
+                    fmt(stats["max"]),
+                    fmt(stats["mean"]),
+                    fmt(stats["median"]),
+                    f"{stats['pct_below_mean']:.1%}",
+                ],
+            }
+        )
+        return (
+            GT(t)
+            .cols_align("right", columns=label)
+            .tab_options(table_font_size="12px", data_row_padding="4px")
+        )
+
+    def create_percentile_table(stats, column, title, subtitle=None, fmt=None):
+        t = (
+            stats["percentiles"]
+            .reset_index()
+            .rename(columns={"index": "Percentile", column: "Value"})
+        )
+        t["Percentile"] = (t["Percentile"] * 100).astype(int).astype(str) + "%"
+        gt = (
+            GT(t)
+            .tab_header(title=title, subtitle=subtitle)
+            .tab_options(table_font_size="12px", data_row_padding="4px")
+        )
+        if fmt == "currency":
+            gt = gt.fmt_currency(columns="Value", decimals=2)
+        elif fmt == "pct":
+            gt = gt.fmt_percent(columns="Value", decimals=2)
+        elif fmt == "float":
+            gt = gt.fmt_number(columns="Value", decimals=2)
+        return gt
+
+
+    return create_percentile_table, customer_descriptives, stat_badges
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Decile Summary Table
+    """)
+    return
+
+
+@app.cell
+def _(GT, np):
+    DECILE_FIELDS = [
+        "Decile",
+        "% Cust.",
+        "% Trans.",
+        "% Spend",
+        "% Profit",
+        "Avg Spend/Cust.",
+        "Avg. Profit/Cust.",
+        "AOF",
+        "AOV",
+        "Avg. Margin",
+    ]
+
+    def decile_labels(df, value_col="Profit", n=10):
+        d = df.sort_values(value_col, ascending=False, kind="stable")
+        cents = np.round(d[value_col].to_numpy() * 100).astype(np.int64)
+        cum = cents.cumsum()
+        total = cum[-1]
+        thresholds = np.arange(1, n) * total / n
+        boundaries = cents[np.searchsorted(cum, thresholds, side="right")]
+        d["ProfitDecile"] = (
+            n - np.searchsorted(boundaries[::-1], cents, side="left")
+        ).astype("int8")
+        return d, thresholds / 100, boundaries / 100
+
+    def decile_report(df, decile_col, profit_pct_name="% Profit"):
+        rep = (
+            df.groupby(decile_col, as_index=False)
+            .agg(
+                Customers=("CustomerID", "count"),
+                Transactions=("NumTrans", "sum"),
+                Spend=("Spend", "sum"),
+                Profit=("Profit", "sum"),
+            )
+            .assign(
+                PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
+                PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
+                PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
+                PctProfit=lambda x: x["Profit"] / x["Profit"].sum(),
+                AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
+                AvgProfitCust=lambda x: x["Profit"] / x["Customers"],
+                AOF=lambda x: x["Transactions"] / x["Customers"],
+                AOV=lambda x: x["Spend"] / x["Transactions"],
+                AvgMargin=lambda x: x["Profit"] / x["Spend"],
+            )
+            .drop(columns=["Customers", "Transactions", "Spend", "Profit"])
+        )
+        fields = [f if f != "% Profit" else profit_pct_name for f in DECILE_FIELDS]
+        rep.columns = fields
+        return rep, fields
+
+    def decile_report_gt(rep, fields, title, pct_decimals=1):
+        return (
+            GT(rep)
+            .tab_header(title=title)
+            .fmt_percent(columns=fields[1:5] + [fields[-1]], decimals=pct_decimals)
+            .fmt_currency(columns=fields[5:7] + [fields[8]])
+            .fmt_number(columns=fields[7])
+            .tab_options(table_font_size="12px", data_row_padding="4px")
+        )
+
+    return DECILE_FIELDS, decile_labels, decile_report, decile_report_gt
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Binning & Distribution
+    """)
+    return
+
+
+@app.cell
+def _(np, pd):
+    def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
+        if min_cutoff is None:
+            min_cutoff, lower_bins, lower_labels = 0, [], []
+        else:
+            lower_bins, lower_labels = [-np.inf], [f"<{min_cutoff}"]
+        bins = (
+            lower_bins
+            + list(range(min_cutoff, max_cutoff + bin_width, bin_width))
+            + [np.inf]
+        )
+        labels = (
+            lower_labels
+            + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
+            + [f"{max_cutoff}+"]
+        )
+        return {"bins": bins, "labels": labels}
+
+    def create_distribution(df, column, bins, labels):
+        dist = (
+            pd.cut(df[column], bins=bins, labels=labels, right=False)
+            .value_counts()
+            .sort_index()
+            .reset_index()
+            .rename(columns={"count": "Customers", column: f"{column} Range"})
+        )
+        dist["Percent"] = dist["Customers"] / dist["Customers"].sum()
+        return dist
+
+    return create_bins_labels, create_distribution
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Plotly Theme
+    """)
+    return
+
+
+@app.cell
+def _(go, pio):
     INK = "#1f2328"
     MUTED = "#6b7280"
     GRID = "#ececec"
-    ACCENT = "#3b6fb0"   # primary
+    ACCENT = "#3b6fb0"  # primary
     ACCENT2 = "#c4703a"  # secondary
     SEQ = ["#e3ecf5", "#c2d6ea", "#9dbadb", "#7295c6", "#4a72ad", "#2b5088"]
     CAT = [ACCENT, ACCENT2, "#4c8b6f", "#8a6bb0", "#b0563b", "#6b7280", "#c9a227"]
@@ -63,123 +271,92 @@ def _():
         colorway=CAT,
         margin=dict(l=66, r=26, t=54, b=58),
         xaxis=dict(
-            showgrid=False, showline=True, linecolor=MUTED, linewidth=1,
-            ticks="outside", tickcolor=MUTED, ticklen=4,
+            showgrid=False,
+            showline=True,
+            linecolor=MUTED,
+            linewidth=1,
+            ticks="outside",
+            tickcolor=MUTED,
+            ticklen=4,
             tickfont=dict(size=11, color=MUTED),
-            title=dict(font=dict(size=12, color=MUTED)), zeroline=False,
+            title=dict(font=dict(size=12, color=MUTED)),
+            zeroline=False,
         ),
         yaxis=dict(
-            showgrid=True, gridcolor=GRID, gridwidth=1, showline=False,
-            ticks="outside", tickcolor=MUTED, ticklen=4,
+            showgrid=True,
+            gridcolor=GRID,
+            gridwidth=1,
+            showline=False,
+            ticks="outside",
+            tickcolor=MUTED,
+            ticklen=4,
             tickfont=dict(size=11, color=MUTED),
-            title=dict(font=dict(size=12, color=MUTED)), zeroline=False,
+            title=dict(font=dict(size=12, color=MUTED)),
+            zeroline=False,
         ),
-        legend=dict(title=dict(font=dict(size=11)), font=dict(size=11),
-                    bgcolor="rgba(0,0,0,0)"),
+        legend=dict(
+            title=dict(font=dict(size=11)), font=dict(size=11), bgcolor="rgba(0,0,0,0)"
+        ),
         hoverlabel=dict(font=dict(family=FONT, size=12), bgcolor="white"),
     )
     pio.templates["cba"] = _tpl
     pio.templates.default = "cba"
-    return (
-        ACCENT,
-        ACCENT2,
-        GRID,
-        GT,
-        H,
-        INK,
-        MUTED,
-        SEQ,
-        W,
-        brentq,
-        go,
-        loc,
-        np,
-        pd,
-        style,
-    )
+    return ACCENT, ACCENT2, GRID, H, INK, MUTED, SEQ, W
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Plotly Charts
+    """)
+    return
 
 
 @app.cell
-def _(ACCENT, ACCENT2, GT, H, W, go, np, pd):
-    # ==================================================== descriptive helpers
-    def customer_descriptives(df, metric):
-        s = df[metric]
-        mean = s.mean()
-        return {
-            "count": s.count(), "mean": mean, "median": s.median(), "std": s.std(),
-            "min": s.min(), "max": s.max(), "pct_below_mean": (s < mean).mean(),
-            "percentiles": s.quantile([i / 100 for i in range(5, 100, 5)]),
-        }
-
-    def stat_badges(stats, label, money=True, pct=False):
-        if money:
-            fmt = lambda v: f"${v:,.2f}"
-        elif pct:
-            fmt = lambda v: f"{v:.2f}%"
-        else:
-            fmt = lambda v: f"{v:,.2f}"
-        t = pd.DataFrame({
-            "Statistic": ["Minimum", "Maximum", "Mean", "Median", "% below mean"],
-            label: [fmt(stats["min"]), fmt(stats["max"]), fmt(stats["mean"]),
-                    fmt(stats["median"]), f"{stats['pct_below_mean']:.1%}"],
-        })
-        return (GT(t).cols_align("right", columns=label)
-                .tab_options(table_font_size="12px", data_row_padding="4px"))
-
-    def create_percentile_table(stats, column, title, subtitle=None, fmt=None):
-        t = (stats["percentiles"].reset_index()
-             .rename(columns={"index": "Percentile", column: "Value"}))
-        t["Percentile"] = (t["Percentile"] * 100).astype(int).astype(str) + "%"
-        gt = (GT(t).tab_header(title=title, subtitle=subtitle)
-              .tab_options(table_font_size="12px", data_row_padding="4px"))
-        if fmt == "currency":
-            gt = gt.fmt_currency(columns="Value", decimals=2)
-        elif fmt == "pct":
-            gt = gt.fmt_percent(columns="Value", decimals=2)
-        elif fmt == "float":
-            gt = gt.fmt_number(columns="Value", decimals=2)
-        return gt
-
-    # ==================================================== binning / distribution
-    def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
-        if min_cutoff is None:
-            min_cutoff, lower_bins, lower_labels = 0, [], []
-        else:
-            lower_bins, lower_labels = [-np.inf], [f"<{min_cutoff}"]
-        bins = lower_bins + list(range(min_cutoff, max_cutoff + bin_width, bin_width)) + [np.inf]
-        labels = (lower_labels
-                  + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
-                  + [f"{max_cutoff}+"])
-        return {"bins": bins, "labels": labels}
-
-    def create_distribution(df, column, bins, labels):
-        dist = (pd.cut(df[column], bins=bins, labels=labels, right=False)
-                .value_counts().sort_index().reset_index()
-                .rename(columns={"count": "Customers", column: f"{column} Range"}))
-        dist["Percent"] = dist["Customers"] / dist["Customers"].sum()
-        return dist
-
+def _(ACCENT, ACCENT2, H, W, go):
+    # ==================================================== Plotly chart helpers
     def _range_col(dist):
         col = next(c for c in dist.columns if str(c).endswith("Range"))
         return dist.rename(columns={col: "Range"}).astype({"Range": str})
 
-    # ==================================================== Plotly chart helpers
-    def bar_distribution(dist, title="Customer distribution", x_title="Range",
-                         color=ACCENT, width=W, height=H):
+    def bar_distribution(
+        dist,
+        title="Customer distribution",
+        x_title="Range",
+        color=ACCENT,
+        width=W,
+        height=H,
+    ):
         d = _range_col(dist)
-        fig = go.Figure(go.Bar(
-            x=d["Range"], y=d["Percent"], marker_color=color, marker_line_width=0,
-            customdata=d[["Customers"]],
-            hovertemplate="%{x}<br>Customers: %{customdata[0]:,}<br>Share: %{y:.1%}<extra></extra>",
-        ))
+        fig = go.Figure(
+            go.Bar(
+                x=d["Range"],
+                y=d["Percent"],
+                marker_color=color,
+                marker_line_width=0,
+                customdata=d[["Customers"]],
+                hovertemplate="%{x}<br>Customers: %{customdata[0]:,}<br>Share: %{y:.1%}<extra></extra>",
+            )
+        )
         fig.update_layout(title=title, width=width, height=height, bargap=0.12)
-        fig.update_xaxes(title=x_title, tickangle=-45,
-                         categoryorder="array", categoryarray=list(d["Range"]))
+        fig.update_xaxes(
+            title=x_title,
+            tickangle=-45,
+            categoryorder="array",
+            categoryarray=list(d["Range"]),
+        )
         fig.update_yaxes(title="Customers (%)", tickformat=".0%")
         return fig
 
-    def overlay_bar_distribution(dists, labels, title="Customer distribution",
-                                 x_title="Range", colors=(ACCENT, ACCENT2), width=W, height=H):
+    def overlay_bar_distribution(
+        dists,
+        labels,
+        title="Customer distribution",
+        x_title="Range",
+        colors=(ACCENT, ACCENT2),
+        width=W,
+        height=H,
+    ):
         fig = go.Figure()
         order = None
         for dist, label, col in zip(dists, labels, colors):
@@ -187,22 +364,54 @@ def _(ACCENT, ACCENT2, GT, H, W, go, np, pd):
             if order is None:
                 order = list(d["Range"])
             fig.add_bar(
-                x=d["Range"], y=d["Percent"], name=str(label), marker_color=col,
-                marker_line_width=0, opacity=0.55, customdata=d[["Customers"]],
+                x=d["Range"],
+                y=d["Percent"],
+                name=str(label),
+                marker_color=col,
+                marker_line_width=0,
+                opacity=0.55,
+                customdata=d[["Customers"]],
                 hovertemplate=f"{label} · %{{x}}<br>Customers: %{{customdata[0]:,}}<br>Share: %{{y:.1%}}<extra></extra>",
             )
-        fig.update_layout(title=title, width=width, height=height, barmode="overlay", bargap=0.12,
-                          legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0))
-        fig.update_xaxes(title=x_title, tickangle=-45, categoryorder="array", categoryarray=order)
+        fig.update_layout(
+            title=title,
+            width=width,
+            height=height,
+            barmode="overlay",
+            bargap=0.12,
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
+            ),
+        )
+        fig.update_xaxes(
+            title=x_title, tickangle=-45, categoryorder="array", categoryarray=order
+        )
         fig.update_yaxes(title="Customers (%)", tickformat=".0%")
         return fig
 
-    def line_chart(df, x, y, title, y_title, x_title="Quarters since acquisition",
-                   tickformat=None, x_categorical=False, color=ACCENT, width=760, height=320):
-        fig = go.Figure(go.Scatter(
-            x=df[x], y=df[y], mode="lines+markers",
-            line=dict(width=1.8, color=color), marker=dict(size=6, color=color),
-            hovertemplate="%{x}<br>%{y}<extra></extra>"))
+    def line_chart(
+        df,
+        x,
+        y,
+        title,
+        y_title,
+        x_title="Quarters since acquisition",
+        tickformat=None,
+        x_categorical=False,
+        color=ACCENT,
+        width=760,
+        height=320,
+    ):
+        fig = go.Figure(
+            go.Scatter(
+                x=df[x],
+                y=df[y],
+                mode="lines+markers",
+                line=dict(width=1.8, color=color),
+                marker=dict(size=6, color=color),
+                hovertemplate="%{x}<br>%{y}<extra></extra>",
+            )
+        )
         fig.update_layout(title=title, width=width, height=height)
         if x_categorical:
             fig.update_xaxes(title=x_title, type="category", tickangle=-45)
@@ -211,61 +420,19 @@ def _(ACCENT, ACCENT2, GT, H, W, go, np, pd):
         fig.update_yaxes(title=y_title, tickformat=tickformat)
         return fig
 
-    return (
-        bar_distribution,
-        create_bins_labels,
-        create_distribution,
-        create_percentile_table,
-        customer_descriptives,
-        line_chart,
-        overlay_bar_distribution,
-        stat_badges,
-    )
+    return bar_distribution, line_chart, overlay_bar_distribution
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Venn Diagram
+    """)
+    return
 
 
 @app.cell
-def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
-    # ==================================================== decile helpers
-    DECILE_FIELDS = ["Decile", "% Cust.", "% Trans.", "% Spend", "% Profit",
-                     "Avg Spend/Cust.", "Avg. Profit/Cust.", "AOF", "AOV", "Avg. Margin"]
-
-    def decile_labels(df, value_col="Profit", n=10):
-        d = df.sort_values(value_col, ascending=False, kind="stable")
-        cents = np.round(d[value_col].to_numpy() * 100).astype(np.int64)
-        cum = cents.cumsum()
-        total = cum[-1]
-        thresholds = np.arange(1, n) * total / n
-        boundaries = cents[np.searchsorted(cum, thresholds, side="right")]
-        d["ProfitDecile"] = (n - np.searchsorted(boundaries[::-1], cents, side="left")).astype("int8")
-        return d, thresholds / 100, boundaries / 100
-
-    def decile_report(df, decile_col, profit_pct_name="% Profit"):
-        rep = (df.groupby(decile_col, as_index=False)
-               .agg(Customers=("CustomerID", "count"), Transactions=("NumTrans", "sum"),
-                    Spend=("Spend", "sum"), Profit=("Profit", "sum"))
-               .assign(
-                   PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
-                   PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
-                   PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
-                   PctProfit=lambda x: x["Profit"] / x["Profit"].sum(),
-                   AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
-                   AvgProfitCust=lambda x: x["Profit"] / x["Customers"],
-                   AOF=lambda x: x["Transactions"] / x["Customers"],
-                   AOV=lambda x: x["Spend"] / x["Transactions"],
-                   AvgMargin=lambda x: x["Profit"] / x["Spend"])
-               .drop(columns=["Customers", "Transactions", "Spend", "Profit"]))
-        fields = [f if f != "% Profit" else profit_pct_name for f in DECILE_FIELDS]
-        rep.columns = fields
-        return rep, fields
-
-    def decile_report_gt(rep, fields, title, pct_decimals=1):
-        return (GT(rep).tab_header(title=title)
-                .fmt_percent(columns=fields[1:5] + [fields[-1]], decimals=pct_decimals)
-                .fmt_currency(columns=fields[5:7] + [fields[8]])
-                .fmt_number(columns=fields[7])
-                .tab_options(table_font_size="12px", data_row_padding="4px"))
-
-    # ==================================================== area-proportional Venn
+def _(ACCENT, ACCENT2, INK, brentq, go, np):
     def venn_two(n_a, n_b, n_both, label_a, label_b, title, width=560, height=460):
         R = 1.0
         r = np.sqrt(n_b / n_a)
@@ -278,7 +445,9 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
                 return np.pi * min(R, r) ** 2
             p1 = R**2 * np.arccos(np.clip((d**2 + R**2 - r**2) / (2 * d * R), -1, 1))
             p2 = r**2 * np.arccos(np.clip((d**2 + r**2 - R**2) / (2 * d * r), -1, 1))
-            p3 = 0.5 * np.sqrt(max((-d + r + R) * (d - r + R) * (d + r - R) * (d + r + R), 0.0))
+            p3 = 0.5 * np.sqrt(
+                max((-d + r + R) * (d - r + R) * (d + r - R) * (d + r + R), 0.0)
+            )
             return p1 + p2 - p3
 
         d = brentq(lambda x: lens(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
@@ -286,23 +455,70 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
         cx1, cx2 = R, R + d
         xlens = R + (d**2 + R**2 - r**2) / (2 * d)
         fig = go.Figure()
-        fig.add_shape(type="circle", x0=cx1 - R, y0=cy - R, x1=cx1 + R, y1=cy + R,
-                      line_color=ACCENT, fillcolor=ACCENT, opacity=0.40, layer="below")
-        fig.add_shape(type="circle", x0=cx2 - r, y0=cy - r, x1=cx2 + r, y1=cy + r,
-                      line_color=ACCENT2, fillcolor=ACCENT2, opacity=0.40, layer="below")
-        for x, txt in [(cx1 - 0.45 * R, f"{label_a}<br>{n_a - n_both:,}"),
-                       (xlens, f"Both<br>{n_both:,}"),
-                       (cx2 + 0.45 * r, f"{label_b}<br>{n_b - n_both:,}")]:
-            fig.add_annotation(x=x, y=cy, text=txt, showarrow=False,
-                               font=dict(size=13, color=INK), align="center")
-        fig.update_layout(title=title, width=width, height=height, plot_bgcolor="white",
-                          margin=dict(l=10, r=10, t=54, b=10))
+        fig.add_shape(
+            type="circle",
+            x0=cx1 - R,
+            y0=cy - R,
+            x1=cx1 + R,
+            y1=cy + R,
+            line_color=ACCENT,
+            fillcolor=ACCENT,
+            opacity=0.40,
+            layer="below",
+        )
+        fig.add_shape(
+            type="circle",
+            x0=cx2 - r,
+            y0=cy - r,
+            x1=cx2 + r,
+            y1=cy + r,
+            line_color=ACCENT2,
+            fillcolor=ACCENT2,
+            opacity=0.40,
+            layer="below",
+        )
+        for x, txt in [
+            (cx1 - 0.45 * R, f"{label_a}<br>{n_a - n_both:,}"),
+            (xlens, f"Both<br>{n_both:,}"),
+            (cx2 + 0.45 * r, f"{label_b}<br>{n_b - n_both:,}"),
+        ]:
+            fig.add_annotation(
+                x=x,
+                y=cy,
+                text=txt,
+                showarrow=False,
+                font=dict(size=13, color=INK),
+                align="center",
+            )
+        fig.update_layout(
+            title=title,
+            width=width,
+            height=height,
+            plot_bgcolor="white",
+            margin=dict(l=10, r=10, t=54, b=10),
+        )
         fig.update_xaxes(visible=False, range=[-0.25, R + d + r + 0.25])
-        fig.update_yaxes(visible=False, range=[cy - r - 0.25, cy + r + 0.25],
-                         scaleanchor="x", scaleratio=1)
+        fig.update_yaxes(
+            visible=False,
+            range=[cy - r - 0.25, cy + r + 0.25],
+            scaleanchor="x",
+            scaleratio=1,
+        )
         return fig
 
-    # ==================================================== profit bridge (waterfall)
+    return (venn_two,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Waterfall Chart
+    """)
+    return
+
+
+@app.cell
+def _(ACCENT, ACCENT2, INK, MUTED, go):
     def profit_bridge_chart(pbg, width=760, height=460, scale=1_000):
         both18 = pbg.loc["Active Both Years", "Y2018"] / scale
         both19 = pbg.loc["Active Both Years", "Y2019"] / scale
@@ -315,8 +531,12 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
         money = lambda v: f"${v:,.0f}K"
         fig = go.Figure()
         _both = dict(marker_color="white", marker_line=dict(color=INK, width=1))
-        _b18 = dict(marker_color=ACCENT, marker_line=dict(color=INK, width=1), opacity=0.55)
-        _b19 = dict(marker_color=ACCENT2, marker_line=dict(color=INK, width=1), opacity=0.55)
+        _b18 = dict(
+            marker_color=ACCENT, marker_line=dict(color=INK, width=1), opacity=0.55
+        )
+        _b19 = dict(
+            marker_color=ACCENT2, marker_line=dict(color=INK, width=1), opacity=0.55
+        )
         w = 0.62
         fig.add_bar(x=[0], y=[both18], base=0, width=w, showlegend=False, **_both)
         fig.add_bar(x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18)
@@ -327,8 +547,14 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
         fig.add_bar(x=[4], y=[only19], base=both19, width=w, showlegend=False, **_b19)
 
         def hline(x0, x1, y):
-            fig.add_shape(type="line", x0=x0, x1=x1, y0=y, y1=y,
-                          line=dict(color=INK, width=1, dash="dot"))
+            fig.add_shape(
+                type="line",
+                x0=x0,
+                x1=x1,
+                y0=y,
+                y1=y,
+                line=dict(color=INK, width=1, dash="dot"),
+            )
 
         hline(0 + w / 2, 1 - w / 2, tot18)
         hline(3 + w / 2, 4 - w / 2, tot19)
@@ -336,8 +562,15 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
         hline(2 + w / 2, 4 - w / 2, both19)
 
         def ann(x, y, t, yshift=0, yanchor="middle"):
-            fig.add_annotation(x=x, y=y, text=t, showarrow=False, yshift=yshift,
-                               yanchor=yanchor, font=dict(size=12, color=INK))
+            fig.add_annotation(
+                x=x,
+                y=y,
+                text=t,
+                showarrow=False,
+                yshift=yshift,
+                yanchor=yanchor,
+                font=dict(size=12, color=INK),
+            )
 
         ann(0, tot18, money(tot18), yshift=10, yanchor="bottom")
         ann(4, tot19, money(tot19), yshift=10, yanchor="bottom")
@@ -348,27 +581,31 @@ def _(ACCENT, ACCENT2, GT, INK, MUTED, brentq, go, np):
         ann(1, both18 + only18 / 2, money(only18))
         ann(2, lo, f"−{money(abs(delta))}", yshift=-8, yanchor="top")
         ann(3, both19 + only19 / 2, money(only19))
-        fig.update_layout(title="Decomposition of annual customer profit",
-                          width=width, height=height, barmode="overlay", bargap=0.35)
-        fig.update_xaxes(tickvals=[0, 4], ticktext=["2018", "2019"], range=[-0.7, 4.7],
-                         showline=True, linecolor=MUTED)
+        fig.update_layout(
+            title="Decomposition of annual customer profit",
+            width=width,
+            height=height,
+            barmode="overlay",
+            bargap=0.35,
+        )
+        fig.update_xaxes(
+            tickvals=[0, 4],
+            ticktext=["2018", "2019"],
+            range=[-0.7, 4.7],
+            showline=True,
+            linecolor=MUTED,
+        )
         fig.update_yaxes(visible=False, range=[0, tot19 * 1.14])
         return fig
 
-    return (
-        DECILE_FIELDS,
-        decile_labels,
-        decile_report,
-        decile_report_gt,
-        profit_bridge_chart,
-        venn_two,
-    )
+    return (profit_bridge_chart,)
 
 
 @app.cell
 def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
     def _sample_colorscale(n, scale="Viridis"):
         import plotly.colors as pc
+
         if n == 1:
             return [pc.sample_colorscale(scale, [0.15])[0]]
         return pc.sample_colorscale(scale, [i / (n - 1) for i in range(n)])
@@ -380,38 +617,82 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
 
     def second_purchase_chart(sp, width=780, height=340):
         fig = go.Figure()
-        fig.add_bar(x=sp["Period"], y=sp["inc_pct"], name="Incremental", marker_color=SEQ[2],
-                    marker_line_width=0, yaxis="y",
-                    hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>")
-        fig.add_scatter(x=sp["Period"], y=sp["cum_pct"], name="Cumulative", mode="lines+markers",
-                        line=dict(width=1.8, color=ACCENT2), marker=dict(size=6, color=ACCENT2),
-                        yaxis="y2", hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>")
+        fig.add_bar(
+            x=sp["Period"],
+            y=sp["inc_pct"],
+            name="Incremental",
+            marker_color=SEQ[2],
+            marker_line_width=0,
+            yaxis="y",
+            hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
+        )
+        fig.add_scatter(
+            x=sp["Period"],
+            y=sp["cum_pct"],
+            name="Cumulative",
+            mode="lines+markers",
+            line=dict(width=1.8, color=ACCENT2),
+            marker=dict(size=6, color=ACCENT2),
+            yaxis="y2",
+            hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
+        )
         fig.update_layout(
             title="Percent of cohort making a second purchase, by quarter",
-            width=width, height=height, bargap=0.25,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
-            yaxis=dict(title="Incremental", tickformat=".0%", showgrid=True, gridcolor=GRID),
-            yaxis2=dict(title="Cumulative", tickformat=".0%", overlaying="y", side="right",
-                        showgrid=False, range=[0, 1]))
+            width=width,
+            height=height,
+            bargap=0.25,
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
+            ),
+            yaxis=dict(
+                title="Incremental", tickformat=".0%", showgrid=True, gridcolor=GRID
+            ),
+            yaxis2=dict(
+                title="Cumulative",
+                tickformat=".0%",
+                overlaying="y",
+                side="right",
+                showgrid=False,
+                range=[0, 1],
+            ),
+        )
         fig.update_xaxes(type="category", tickangle=-45)
         return fig
 
-    def cohort_lines(df, metric, cohorts=None, align=False, index=False, tickformat=None,
-                     title=None, width=740, height=360, pattern=r"y(\d{4})_q([1-4])"):
+    def cohort_lines(
+        df,
+        metric,
+        cohorts=None,
+        align=False,
+        index=False,
+        tickformat=None,
+        title=None,
+        width=740,
+        height=360,
+        pattern=r"y(\d{4})_q([1-4])",
+    ):
         d = df.reset_index()
         if cohorts is not None:
             d = d[d["Cohort"].isin(cohorts)]
         d = d.sort_values(["Cohort", "YearQuarter"]).copy()
         base_year = d["YearQuarter"].str.extract(pattern)[0].astype("float").min()
-        d["Age"] = _q_index(d["YearQuarter"], base_year, pattern) - _q_index(d["Cohort"], base_year, pattern)
+        d["Age"] = _q_index(d["YearQuarter"], base_year, pattern) - _q_index(
+            d["Cohort"], base_year, pattern
+        )
         if index:
             d[metric] = d[metric] / d.groupby("Cohort")[metric].transform("first") * 100
-        order = [c for c in ["pre y2016", *sorted(d["YearQuarter"].unique())] if c in set(d["Cohort"])]
+        order = [
+            c
+            for c in ["pre y2016", *sorted(d["YearQuarter"].unique())]
+            if c in set(d["Cohort"])
+        ]
         colors = dict(zip(order, _sample_colorscale(len(order))))
         tickformat = tickformat or (",.0f" if index else ",.2f")
         y_title = f"{metric} (acq. qtr = 100)" if index else metric
         if title is None:
-            _bits = [b for b in ("aligned" if align else "", "indexed" if index else "") if b]
+            _bits = [
+                b for b in ("aligned" if align else "", "indexed" if index else "") if b
+            ]
             title = f"{metric} by cohort" + (f" ({', '.join(_bits)})" if _bits else "")
         fig = go.Figure()
         for c in order:
@@ -421,11 +702,21 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
                 x = dc["Age"].astype(int)
             else:
                 x = dc["YearQuarter"]
-            fig.add_scatter(x=x, y=dc[metric], mode="lines+markers", name=c.replace("_", " "),
-                            line=dict(width=1.6, color=colors[c]), marker=dict(size=5, color=colors[c]),
-                            hovertemplate=f"{c} · %{{x}}<br>%{{y}}<extra></extra>")
-        fig.update_layout(title=title, width=width, height=height,
-                          legend=dict(title="Cohort", font=dict(size=10)))
+            fig.add_scatter(
+                x=x,
+                y=dc[metric],
+                mode="lines+markers",
+                name=c.replace("_", " "),
+                line=dict(width=1.6, color=colors[c]),
+                marker=dict(size=5, color=colors[c]),
+                hovertemplate=f"{c} · %{{x}}<br>%{{y}}<extra></extra>",
+            )
+        fig.update_layout(
+            title=title,
+            width=width,
+            height=height,
+            legend=dict(title="Cohort", font=dict(size=10)),
+        )
         if align:
             fig.update_xaxes(title="Quarters since acquisition", dtick=1)
         else:
@@ -438,85 +729,178 @@ def _(ACCENT, ACCENT2, GRID, SEQ, go, pd):
     def acquisitions_by_year(df, width=520, height=340):
         d = df.reset_index()
         d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
-        fig = go.Figure(go.Bar(x=d["Year"].astype(str), y=d["NumActive"], marker_color=ACCENT,
-                               hovertemplate="%{x}<br>New: %{y:,}<extra></extra>"))
-        fig.update_layout(title="Acquisitions by year", width=width, height=height, bargap=0.4)
+        fig = go.Figure(
+            go.Bar(
+                x=d["Year"].astype(str),
+                y=d["NumActive"],
+                marker_color=ACCENT,
+                hovertemplate="%{x}<br>New: %{y:,}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            title="Acquisitions by year", width=width, height=height, bargap=0.4
+        )
         fig.update_yaxes(title="New customers", tickformat=",.0f")
         fig.update_xaxes(type="category")
         return fig
 
     def active_by_year(df, width=520, height=340):
         d = df.groupby("Year", observed=True)["NumActive"].sum().reset_index()
-        fig = go.Figure(go.Bar(x=d["Year"].astype(str), y=d["NumActive"], marker_color=ACCENT,
-                               hovertemplate="%{x}<br>Active: %{y:,}<extra></extra>"))
-        fig.update_layout(title="Active customers by year", width=width, height=height, bargap=0.4)
+        fig = go.Figure(
+            go.Bar(
+                x=d["Year"].astype(str),
+                y=d["NumActive"],
+                marker_color=ACCENT,
+                hovertemplate="%{x}<br>Active: %{y:,}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            title="Active customers by year", width=width, height=height, bargap=0.4
+        )
         fig.update_yaxes(title="Active customers", tickformat=",.0f")
         fig.update_xaxes(type="category")
         return fig
 
     def spend_profit_by_year(df, width=560, height=360):
-        d = (df.reset_index().melt(id_vars=["CohortYear", "Year"],
-                                   value_vars=["TotalSpend", "TotalProfit"],
-                                   var_name="Metric", value_name="Value")
-             .groupby(["Year", "Metric"], observed=True, as_index=False)["Value"].sum())
+        d = (
+            df.reset_index()
+            .melt(
+                id_vars=["CohortYear", "Year"],
+                value_vars=["TotalSpend", "TotalProfit"],
+                var_name="Metric",
+                value_name="Value",
+            )
+            .groupby(["Year", "Metric"], observed=True, as_index=False)["Value"]
+            .sum()
+        )
         d["Year"] = d["Year"].astype(str)
         fig = go.Figure()
-        for metric, col, name in [("TotalSpend", ACCENT, "Spend"), ("TotalProfit", ACCENT2, "Profit")]:
+        for metric, col, name in [
+            ("TotalSpend", ACCENT, "Spend"),
+            ("TotalProfit", ACCENT2, "Profit"),
+        ]:
             dm = d[d["Metric"] == metric]
-            fig.add_bar(x=dm["Year"], y=dm["Value"], name=name, marker_color=col,
-                        hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>")
-        fig.update_layout(title="Spend and profit by year", barmode="group", width=width,
-                          height=height, bargap=0.35, bargroupgap=0.08)
+            fig.add_bar(
+                x=dm["Year"],
+                y=dm["Value"],
+                name=name,
+                marker_color=col,
+                hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>",
+            )
+        fig.update_layout(
+            title="Spend and profit by year",
+            barmode="group",
+            width=width,
+            height=height,
+            bargap=0.35,
+            bargroupgap=0.08,
+        )
         fig.update_yaxes(title=None, tickformat="$,.0f")
         fig.update_xaxes(type="category")
         return fig
 
-    def stacked_by_cohort(df, metric, y_title, tickformat="$,.0f", width=560, height=380,
-                          order=tuple(ANNUAL_ORDER)):
+    def stacked_by_cohort(
+        df,
+        metric,
+        y_title,
+        tickformat="$,.0f",
+        width=560,
+        height=380,
+        order=tuple(ANNUAL_ORDER),
+    ):
         d = df.reset_index()
         d["Year"] = d["Year"].astype(str)
-        colors = dict(zip(order, SEQ[:len(order)]))
+        colors = dict(zip(order, SEQ[: len(order)]))
         fig = go.Figure()
         for c in order:
-            dc = d[d["CohortYear"].astype(str) == c].set_index("Year").reindex(sorted(d["Year"].unique()))
-            fig.add_bar(x=dc.index, y=dc[metric], name=c.replace("_", " "), marker_color=colors[c],
-                        marker_line=dict(color="white", width=0.5),
-                        hovertemplate=f"{c} · %{{x}}<br>%{{y:,.0f}}<extra></extra>")
-        fig.update_layout(title=f"{y_title} by acquisition cohort", barmode="stack", width=width,
-                          height=height, bargap=0.35,
-                          legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)))
+            dc = (
+                d[d["CohortYear"].astype(str) == c]
+                .set_index("Year")
+                .reindex(sorted(d["Year"].unique()))
+            )
+            fig.add_bar(
+                x=dc.index,
+                y=dc[metric],
+                name=c.replace("_", " "),
+                marker_color=colors[c],
+                marker_line=dict(color="white", width=0.5),
+                hovertemplate=f"{c} · %{{x}}<br>%{{y:,.0f}}<extra></extra>",
+            )
+        fig.update_layout(
+            title=f"{y_title} by acquisition cohort",
+            barmode="stack",
+            width=width,
+            height=height,
+            bargap=0.35,
+            legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)),
+        )
         fig.update_yaxes(title=y_title, tickformat=tickformat)
         fig.update_xaxes(type="category")
         return fig
 
-    def cohort_profit_annotated(df, metric="TotalProfit", scale=1e6, width=780, height=520,
-                                order=tuple(ANNUAL_ORDER)):
+    def cohort_profit_annotated(
+        df,
+        metric="TotalProfit",
+        scale=1e6,
+        width=780,
+        height=520,
+        order=tuple(ANNUAL_ORDER),
+    ):
         P = df[metric].unstack("Year").reindex(list(order)).div(scale)
         P.columns = P.columns.astype(str)
         years = list(P.columns)
         year_tot = P.sum(axis=0)
         share = P.div(year_tot, axis=1)
         bottoms = P.cumsum(axis=0) - P
-        colors = dict(zip(order, SEQ[:len(order)]))
+        # Solid, clearly-visible colours (the pale end of SEQ washes out on a
+        # white background). Darkest cohort at the bottom of the stack.
+        solid = ["#0d3b66", "#1f5c99", "#3b82c4", "#6aa5d9", "#a3c7e8"]
+        colors = dict(zip(order, solid[: len(order)]))
+        # Numeric x positions with tick labels — the same axis strategy the
+        # working waterfall uses. Annotations reference these numeric positions,
+        # NOT category strings; a category-string annotation ref on a
+        # type="category" axis fails to resolve and blanks the whole plot.
+        xpos = list(range(len(years)))
         fig = go.Figure()
         for c in order:
-            fig.add_bar(name=c.replace("_", " "), x=years, y=P.loc[c].values, width=0.55,
-                        marker=dict(color=colors[c], line=dict(color="white", width=0.5)))
-        fig.update_layout(barmode="stack", bargap=0.45, title="Profit by acquisition cohort",
-                          width=width, height=height,
-                          legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)))
+            y_vals = [None if pd.isna(v) else float(v) for v in P.loc[c]]
+            fig.add_bar(
+                name=c.replace("_", " "),
+                x=xpos,
+                y=y_vals,
+                marker=dict(color=colors[c], line=dict(color="white", width=1)),
+            )
+        fig.update_layout(
+            barmode="stack",
+            bargap=0.45,
+            title="Profit by acquisition cohort",
+            width=width,
+            height=height,
+            legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)),
+        )
         for c in order:
-            for yr in years:
+            for i, yr in enumerate(years):
                 v = P.loc[c, yr]
                 if pd.isna(v) or v == 0:
                     continue
-                fig.add_annotation(x=yr, y=bottoms.loc[c, yr] + v / 2, text=f"{share.loc[c, yr]:.0%}",
-                                   showarrow=False, font=dict(size=10))
-        for yr in years:
-            fig.add_annotation(x=yr, y=year_tot[yr], yshift=12, text=f"{year_tot[yr]:.2f}",
-                               showarrow=False, font=dict(size=12))
+                fig.add_annotation(
+                    x=i,
+                    y=float(bottoms.loc[c, yr] + v / 2),
+                    text=f"{share.loc[c, yr]:.0%}",
+                    showarrow=False,
+                    font=dict(size=10, color="white"),
+                )
+        for i, yr in enumerate(years):
+            fig.add_annotation(
+                x=i,
+                y=float(year_tot[yr]),
+                yshift=12,
+                text=f"{year_tot[yr]:.2f}",
+                showarrow=False,
+                font=dict(size=12),
+            )
         fig.update_yaxes(title="Profit ($ MM)", rangemode="tozero")
-        fig.update_xaxes(type="category")
+        fig.update_xaxes(tickvals=xpos, ticktext=years)
         return fig
 
     return (
@@ -605,7 +989,8 @@ def _(pd):
         Spend=lambda x: (x["Spend"] * 100).round().astype("int64"),
         Profit=lambda x: (x["Profit"] * 100).round().astype("int64"),
     ).assign(
-        **cust_data["YearQuarter"].str.extract(r"y(\d{4})_q(\d)")
+        **cust_data["YearQuarter"]
+        .str.extract(r"y(\d{4})_q(\d)")
         .rename(columns={0: "Year", 1: "Quarter"})
         .astype({"Year": "int32", "Quarter": "int8"})
     )
@@ -615,17 +1000,27 @@ def _(pd):
 @app.cell
 def _(np):
     def yearly_cust_data(df, year):
-        return (df.query(f"Year == {year}")
-                .groupby("CustomerID", as_index=False)
-                .agg(NumTrans=("NumTrans", "sum"), Spend=("Spend", "sum"), Profit=("Profit", "sum"))
-                .assign(Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
-                        Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2)))
+        return (
+            df.query(f"Year == {year}")
+            .groupby("CustomerID", as_index=False)
+            .agg(
+                NumTrans=("NumTrans", "sum"),
+                Spend=("Spend", "sum"),
+                Profit=("Profit", "sum"),
+            )
+            .assign(
+                Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
+                Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2),
+            )
+        )
 
     def with_derived(df):
         # Add per-customer average spend per transaction and margin once, at creation.
         return df.assign(
             AvgSpendPerTrans=lambda x: x["Spend"] / x["NumTrans"],
-            Margin=lambda x: np.where(x["Spend"] > 0, x["Profit"] / x["Spend"] * 100, np.nan),
+            Margin=lambda x: np.where(
+                x["Spend"] > 0, x["Profit"] / x["Spend"] * 100, np.nan
+            ),
         )
 
     return with_derived, yearly_cust_data
@@ -655,16 +1050,31 @@ def _(GT, cust_data, pd, with_derived, yearly_cust_data):
     cust_data_2019 = with_derived(yearly_cust_data(cust_data, 2019))
     cust_data_2018 = with_derived(yearly_cust_data(cust_data, 2018))
 
-    _summary = pd.DataFrame({
-        "Metric": ["Active customers", "Total transactions", "Total spend", "Total profit",
-                   "Transactions / customer", "Spend / customer", "Profit / customer"],
-        "Value": [len(cust_data_2019), cust_data_2019["NumTrans"].sum(),
-                  cust_data_2019["Spend"].sum(), cust_data_2019["Profit"].sum(),
-                  cust_data_2019["NumTrans"].mean(), cust_data_2019["Spend"].mean(),
-                  cust_data_2019["Profit"].mean()],
-    })
+    _summary = pd.DataFrame(
+        {
+            "Metric": [
+                "Active customers",
+                "Total transactions",
+                "Total spend",
+                "Total profit",
+                "Transactions / customer",
+                "Spend / customer",
+                "Profit / customer",
+            ],
+            "Value": [
+                len(cust_data_2019),
+                cust_data_2019["NumTrans"].sum(),
+                cust_data_2019["Spend"].sum(),
+                cust_data_2019["Profit"].sum(),
+                cust_data_2019["NumTrans"].mean(),
+                cust_data_2019["Spend"].mean(),
+                cust_data_2019["Profit"].mean(),
+            ],
+        }
+    )
     (
-        GT(_summary).tab_header(title="2019 annual customer summary")
+        GT(_summary)
+        .tab_header(title="2019 annual customer summary")
         .fmt_number(columns="Value", rows=[0, 1], decimals=0)
         .fmt_currency(columns="Value", rows=[2, 3], decimals=0)
         .fmt_number(columns="Value", rows=[4], decimals=2)
@@ -680,7 +1090,9 @@ def _(cust_data_2019, customer_descriptives):
     profit_stats = customer_descriptives(cust_data_2019, "Profit")
     trans_stats = customer_descriptives(cust_data_2019, "NumTrans")
     avg_spend_stats = customer_descriptives(cust_data_2019, "AvgSpendPerTrans")
-    avg_margin_stats = customer_descriptives(cust_data_2019.query("Spend > 0"), "Margin")
+    avg_margin_stats = customer_descriptives(
+        cust_data_2019.query("Spend > 0"), "Margin"
+    )
     return (
         avg_margin_stats,
         avg_spend_stats,
@@ -718,8 +1130,13 @@ def _(spend_stats, stat_badges):
 
 @app.cell
 def _(create_percentile_table, spend_stats):
-    create_percentile_table(spend_stats, "Spend", "Customer spend percentiles",
-                            "2019 annual spend", fmt="currency")
+    create_percentile_table(
+        spend_stats,
+        "Spend",
+        "Customer spend percentiles",
+        "2019 annual spend",
+        fmt="currency",
+    )
     return
 
 
@@ -732,7 +1149,9 @@ def _(
 ):
     bar_distribution(
         create_distribution(cust_data_2019, "Spend", **create_bins_labels(25, 1000)),
-        title="Customer spend distribution (2019)", x_title="Annual spend ($)")
+        title="Customer spend distribution (2019)",
+        x_title="Annual spend ($)",
+    )
     return
 
 
@@ -766,7 +1185,10 @@ def _(
 ):
     bar_distribution(
         create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)),
-        title="Customer profit distribution (2019)", x_title="Annual profit ($)", color=ACCENT2)
+        title="Customer profit distribution (2019)",
+        x_title="Annual profit ($)",
+        color=ACCENT2,
+    )
     return
 
 
@@ -798,7 +1220,9 @@ def _(bar_distribution, create_distribution, cust_data_2019, np):
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     bar_distribution(
         create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
-        title="Customer transactions distribution (2019)", x_title="Annual transactions")
+        title="Customer transactions distribution (2019)",
+        x_title="Annual transactions",
+    )
     return
 
 
@@ -868,9 +1292,12 @@ def _(
     cust_data_2019,
 ):
     bar_distribution(
-        create_distribution(cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)),
+        create_distribution(
+            cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+        ),
         title="Average spend per transaction (2019)",
-        x_title="Average spend per transaction ($)")
+        x_title="Average spend per transaction ($)",
+    )
     return
 
 
@@ -893,14 +1320,19 @@ def _(GT, cust_data_2019, np, pd):
     _bins = list(range(1, 11)) + [np.inf]
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     _binned = cust_data_2019.assign(
-        TransBin=lambda d: pd.cut(d["NumTrans"], bins=_bins, labels=_labels, right=False))
+        TransBin=lambda d: pd.cut(
+            d["NumTrans"], bins=_bins, labels=_labels, right=False
+        )
+    )
     aspt_by_level = _binned.groupby("TransBin", as_index=False, observed=True).agg(
-        Mean=("AvgSpendPerTrans", "mean"), Std=("AvgSpendPerTrans", "std"),
+        Mean=("AvgSpendPerTrans", "mean"),
+        Std=("AvgSpendPerTrans", "std"),
         Min=("AvgSpendPerTrans", "min"),
         P05=("AvgSpendPerTrans", lambda s: s.quantile(0.05)),
         Median=("AvgSpendPerTrans", "median"),
         P95=("AvgSpendPerTrans", lambda s: s.quantile(0.95)),
-        Max=("AvgSpendPerTrans", "max"))
+        Max=("AvgSpendPerTrans", "max"),
+    )
     (
         GT(aspt_by_level.rename(columns={"TransBin": "Transactions"}))
         .tab_header(title="Average spend per transaction, by transaction level")
@@ -942,9 +1374,13 @@ def _(
     cust_data_2019,
 ):
     bar_distribution(
-        create_distribution(cust_data_2019.query("Spend > 0"), "Margin",
-                            **create_bins_labels(5, 100, 0)),
-        title="Average margin distribution (2019)", x_title="Margin (%)", color=ACCENT2)
+        create_distribution(
+            cust_data_2019.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0)
+        ),
+        title="Average margin distribution (2019)",
+        x_title="Margin (%)",
+        color=ACCENT2,
+    )
     return
 
 
@@ -977,8 +1413,13 @@ def _(mo):
 @app.cell
 def _(DECILE_FIELDS, cust_data_2019, decile_report, decile_report_gt, pd):
     _ranked = cust_data_2019.assign(
-        CustDecile=lambda d: pd.qcut(d["Profit"].rank(method="first", ascending=False),
-                                     q=10, labels=False) + 1)
+        CustDecile=lambda d: (
+            pd.qcut(
+                d["Profit"].rank(method="first", ascending=False), q=10, labels=False
+            )
+            + 1
+        )
+    )
     cust_decile_rep, _f = decile_report(_ranked, "CustDecile")
     decile_report_gt(cust_decile_rep, DECILE_FIELDS, "Customer decile report")
     return
@@ -994,7 +1435,9 @@ def _(
 ):
     _labelled = decile_labels(cust_data_2019, "Profit")[0]
     profit_decile_rep, _f = decile_report(_labelled, "ProfitDecile")
-    decile_report_gt(profit_decile_rep, DECILE_FIELDS, "Profit decile report", pct_decimals=2)
+    decile_report_gt(
+        profit_decile_rep, DECILE_FIELDS, "Profit decile report", pct_decimals=2
+    )
     return
 
 
@@ -1032,13 +1475,24 @@ def _(mo):
 @app.cell
 def _(cust_data_2018, cust_data_2019):
     cust_2018_2019 = (
-        cust_data_2018.merge(cust_data_2019, on="CustomerID", how="outer",
-                             suffixes=("_2018", "_2019"), indicator=True)
-        .assign(Status=lambda df: df["_merge"].map({
-            "both": "Active Both Years",
-            "left_only": "2018 Only (Lapsed)",
-            "right_only": "2019 Only (New/Reactivated)"}))
-        .drop(columns="_merge"))
+        cust_data_2018.merge(
+            cust_data_2019,
+            on="CustomerID",
+            how="outer",
+            suffixes=("_2018", "_2019"),
+            indicator=True,
+        )
+        .assign(
+            Status=lambda df: df["_merge"].map(
+                {
+                    "both": "Active Both Years",
+                    "left_only": "2018 Only (Lapsed)",
+                    "right_only": "2019 Only (New/Reactivated)",
+                }
+            )
+        )
+        .drop(columns="_merge")
+    )
     return (cust_2018_2019,)
 
 
@@ -1056,19 +1510,33 @@ def _(mo):
 
 @app.cell
 def _(GT, cust_2018_2019, cust_data_2018, cust_data_2019, pd):
-    _yoy = pd.concat([
-        (cust_2018_2019.filter(like="_2018").sum(numeric_only=True)
-         .rename(lambda c: c.removesuffix("_2018")).rename("2018")),
-        (cust_2018_2019.filter(like="_2019").sum(numeric_only=True)
-         .rename(lambda c: c.removesuffix("_2019")).rename("2019")),
-    ], axis=1)
+    _yoy = pd.concat(
+        [
+            (
+                cust_2018_2019.filter(like="_2018")
+                .sum(numeric_only=True)
+                .rename(lambda c: c.removesuffix("_2018"))
+                .rename("2018")
+            ),
+            (
+                cust_2018_2019.filter(like="_2019")
+                .sum(numeric_only=True)
+                .rename(lambda c: c.removesuffix("_2019"))
+                .rename("2019")
+            ),
+        ],
+        axis=1,
+    )
     _yoy["Δ"] = (_yoy["2019"] - _yoy["2018"]) / _yoy["2018"]
     _a18 = cust_data_2018["CustomerID"].nunique()
     _a19 = cust_data_2019["CustomerID"].nunique()
     _yoy.loc["Active customers"] = [_a18, _a19, (_a19 - _a18) / _a18]
     _yoy = _yoy.drop(index="NumTrans").reset_index(names="")
     (
-        GT(_yoy).tab_header(title="Spend, profit and active-customer summary", subtitle="2018 to 2019")
+        GT(_yoy)
+        .tab_header(
+            title="Spend, profit and active-customer summary", subtitle="2018 to 2019"
+        )
         .fmt_percent(columns=["Δ"], decimals=1)
         .fmt_currency(columns=["2018", "2019"], decimals=0)
         .fmt_number(columns=["2018", "2019"], rows=[2], decimals=0)
@@ -1101,9 +1569,18 @@ def _(
     overlay_bar_distribution,
 ):
     overlay_bar_distribution(
-        [create_distribution(cust_data_2018, "Spend", **create_bins_labels(25, 1000)),
-         create_distribution(cust_data_2019, "Spend", **create_bins_labels(25, 1000))],
-        labels=("2018", "2019"), title="Customer spend, 2018 vs 2019", x_title="Annual spend ($)")
+        [
+            create_distribution(
+                cust_data_2018, "Spend", **create_bins_labels(25, 1000)
+            ),
+            create_distribution(
+                cust_data_2019, "Spend", **create_bins_labels(25, 1000)
+            ),
+        ],
+        labels=("2018", "2019"),
+        title="Customer spend, 2018 vs 2019",
+        x_title="Annual spend ($)",
+    )
     return
 
 
@@ -1116,9 +1593,18 @@ def _(
     overlay_bar_distribution,
 ):
     overlay_bar_distribution(
-        [create_distribution(cust_data_2018, "Profit", **create_bins_labels(25, 500, 0)),
-         create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0))],
-        labels=("2018", "2019"), title="Customer profit, 2018 vs 2019", x_title="Annual profit ($)")
+        [
+            create_distribution(
+                cust_data_2018, "Profit", **create_bins_labels(25, 500, 0)
+            ),
+            create_distribution(
+                cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)
+            ),
+        ],
+        labels=("2018", "2019"),
+        title="Customer profit, 2018 vs 2019",
+        x_title="Annual profit ($)",
+    )
     return
 
 
@@ -1133,9 +1619,14 @@ def _(
     _bins = list(range(1, 11)) + [np.inf]
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     overlay_bar_distribution(
-        [create_distribution(cust_data_2018, "NumTrans", bins=_bins, labels=_labels),
-         create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels)],
-        labels=("2018", "2019"), title="Transactions, 2018 vs 2019", x_title="Annual transactions")
+        [
+            create_distribution(cust_data_2018, "NumTrans", bins=_bins, labels=_labels),
+            create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
+        ],
+        labels=("2018", "2019"),
+        title="Transactions, 2018 vs 2019",
+        x_title="Annual transactions",
+    )
     return
 
 
@@ -1148,10 +1639,18 @@ def _(
     overlay_bar_distribution,
 ):
     overlay_bar_distribution(
-        [create_distribution(cust_data_2018, "AvgSpendPerTrans", **create_bins_labels(25, 500)),
-         create_distribution(cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500))],
-        labels=("2018", "2019"), title="Average spend per transaction, 2018 vs 2019",
-        x_title="Average spend per transaction ($)")
+        [
+            create_distribution(
+                cust_data_2018, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+            ),
+            create_distribution(
+                cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+            ),
+        ],
+        labels=("2018", "2019"),
+        title="Average spend per transaction, 2018 vs 2019",
+        x_title="Average spend per transaction ($)",
+    )
     return
 
 
@@ -1164,9 +1663,22 @@ def _(
     overlay_bar_distribution,
 ):
     overlay_bar_distribution(
-        [create_distribution(cust_data_2018.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0)),
-         create_distribution(cust_data_2019.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0))],
-        labels=("2018", "2019"), title="Average margin, 2018 vs 2019", x_title="Margin (%)")
+        [
+            create_distribution(
+                cust_data_2018.query("Spend > 0"),
+                "Margin",
+                **create_bins_labels(5, 100, 0),
+            ),
+            create_distribution(
+                cust_data_2019.query("Spend > 0"),
+                "Margin",
+                **create_bins_labels(5, 100, 0),
+            ),
+        ],
+        labels=("2018", "2019"),
+        title="Average margin, 2018 vs 2019",
+        x_title="Margin (%)",
+    )
     return
 
 
@@ -1187,10 +1699,15 @@ def _(mo):
 @app.cell
 def _(GT, cust_2018_2019):
     overlap = cust_2018_2019.groupby("Status").agg(Customers=("CustomerID", "count"))
-    overlap.loc["Active 2018"] = overlap.loc["2018 Only (Lapsed)"] + overlap.loc["Active Both Years"]
-    overlap.loc["Active 2019"] = overlap.loc["2019 Only (New/Reactivated)"] + overlap.loc["Active Both Years"]
+    overlap.loc["Active 2018"] = (
+        overlap.loc["2018 Only (Lapsed)"] + overlap.loc["Active Both Years"]
+    )
+    overlap.loc["Active 2019"] = (
+        overlap.loc["2019 Only (New/Reactivated)"] + overlap.loc["Active Both Years"]
+    )
     (
-        GT(overlap.reset_index(names="Group")).tab_header(title="Customer overlap")
+        GT(overlap.reset_index(names="Group"))
+        .tab_header(title="Customer overlap")
         .fmt_number(columns="Customers", decimals=0)
         .tab_options(table_font_size="12px", data_row_padding="4px")
     )
@@ -1203,7 +1720,10 @@ def _(overlap, venn_two):
         int(overlap.loc["Active 2018", "Customers"]),
         int(overlap.loc["Active 2019", "Customers"]),
         int(overlap.loc["Active Both Years", "Customers"]),
-        "2018 only", "2019 only", "Active customers: 2018 vs 2019 (area-proportional)")
+        "2018 only",
+        "2019 only",
+        "Active customers: 2018 vs 2019 (area-proportional)",
+    )
     return
 
 
@@ -1231,10 +1751,12 @@ def _(mo):
 def _(GT, cust_2018_2019):
     profit_by_group = cust_2018_2019.groupby("Status").agg(
         Y2018=("Profit_2018", lambda s: s.sum(min_count=1)),
-        Y2019=("Profit_2019", lambda s: s.sum(min_count=1)))
+        Y2019=("Profit_2019", lambda s: s.sum(min_count=1)),
+    )
     profit_by_group.loc["Total"] = profit_by_group.sum(min_count=1)
     (
-        GT(profit_by_group.reset_index(names="Group")).tab_header(title="Profit by activity group")
+        GT(profit_by_group.reset_index(names="Group"))
+        .tab_header(title="Profit by activity group")
         .fmt_currency(columns=["Y2018", "Y2019"], decimals=0)
         .cols_label(Y2018="2018 profit", Y2019="2019 profit")
         .tab_options(table_font_size="12px", data_row_padding="4px")
@@ -1266,27 +1788,63 @@ def _(mo):
 def _(GT, cust_2018_2019):
     _flows = cust_2018_2019.melt(
         id_vars=["CustomerID", "Status"],
-        value_vars=["NumTrans_2018", "NumTrans_2019", "Spend_2018", "Spend_2019",
-                    "Profit_2018", "Profit_2019"],
-        var_name="MetricYear", value_name="Value").assign(
+        value_vars=[
+            "NumTrans_2018",
+            "NumTrans_2019",
+            "Spend_2018",
+            "Spend_2019",
+            "Profit_2018",
+            "Profit_2019",
+        ],
+        var_name="MetricYear",
+        value_name="Value",
+    ).assign(
         Metric=lambda d: d["MetricYear"].str.rsplit("_", n=1).str[0],
-        Year=lambda d: d["MetricYear"].str.rsplit("_", n=1).str[-1])
-    _g = _flows.groupby(["Status", "Metric", "Year"])["Value"].sum(min_count=1).unstack("Metric")
-    _g["NumCust"] = (_flows.assign(active=lambda d: d["Value"].notna())
-                     .query("Metric == 'NumTrans'").groupby(["Status", "Year"])["active"].sum()
-                     .where(lambda s: s > 0))
+        Year=lambda d: d["MetricYear"].str.rsplit("_", n=1).str[-1],
+    )
+    _g = (
+        _flows.groupby(["Status", "Metric", "Year"])["Value"]
+        .sum(min_count=1)
+        .unstack("Metric")
+    )
+    _g["NumCust"] = (
+        _flows.assign(active=lambda d: d["Value"].notna())
+        .query("Metric == 'NumTrans'")
+        .groupby(["Status", "Year"])["active"]
+        .sum()
+        .where(lambda s: s > 0)
+    )
     _g["AOF"] = _g["NumTrans"] / _g["NumCust"]
     _g["AOV"] = _g["Spend"] / _g["NumTrans"]
     _g["Margin"] = _g["Profit"] / _g["Spend"]
-    _crosstab = (_g.stack().rename("Value").unstack("Year").reset_index()
-                 .rename(columns={"level_1": "Metric"}))
+    _crosstab = (
+        _g.stack()
+        .rename("Value")
+        .unstack("Year")
+        .reset_index()
+        .rename(columns={"level_1": "Metric"})
+    )
     (
         GT(_crosstab, groupname_col="Status", rowname_col="Metric")
-        .tab_header(title="Performance summary and decomposition", subtitle="by group and year")
+        .tab_header(
+            title="Performance summary and decomposition", subtitle="by group and year"
+        )
         .fmt_number(columns=["2018", "2019"], decimals=2)
-        .fmt_number(columns=["2018", "2019"], rows=lambda d: d["Metric"].isin(["NumCust", "NumTrans"]), decimals=0)
-        .fmt_currency(columns=["2018", "2019"], rows=lambda d: d["Metric"].isin(["Spend", "Profit"]), decimals=0)
-        .fmt_percent(columns=["2018", "2019"], rows=lambda d: d["Metric"].eq("Margin"), decimals=1)
+        .fmt_number(
+            columns=["2018", "2019"],
+            rows=lambda d: d["Metric"].isin(["NumCust", "NumTrans"]),
+            decimals=0,
+        )
+        .fmt_currency(
+            columns=["2018", "2019"],
+            rows=lambda d: d["Metric"].isin(["Spend", "Profit"]),
+            decimals=0,
+        )
+        .fmt_percent(
+            columns=["2018", "2019"],
+            rows=lambda d: d["Metric"].eq("Margin"),
+            decimals=1,
+        )
         .sub_missing(missing_text="")
         .tab_options(table_font_size="12px", data_row_padding="4px")
     )
@@ -1336,13 +1894,14 @@ def _(
         out = 10 - np.searchsorted(_avg_bnd[::-1], v, side="left")
         return np.where(np.isnan(v), np.nan, out)
 
-    _dc = cust_2018_2019.assign(Row=lambda d: _decile(d["Profit_2018"]),
-                                Col=lambda d: _decile(d["Profit_2019"])).fillna(
-        {"Row": "2019 Only", "Col": "2018 Only"})
+    _dc = cust_2018_2019.assign(
+        Row=lambda d: _decile(d["Profit_2018"]), Col=lambda d: _decile(d["Profit_2019"])
+    ).fillna({"Row": "2019 Only", "Col": "2018 Only"})
     _or = [*range(1, 11), "2019 Only"]
     _oc = [*range(1, 11), "2018 Only"]
-    _tbl = pd.crosstab(_dc["Row"], _dc["Col"], margins=True, margins_name="Total").reindex(
-        index=[*_or, "Total"], columns=[*_oc, "Total"], fill_value=0)
+    _tbl = pd.crosstab(
+        _dc["Row"], _dc["Col"], margins=True, margins_name="Total"
+    ).reindex(index=[*_or, "Total"], columns=[*_oc, "Total"], fill_value=0)
     _tbl.columns = [str(c) for c in _tbl.columns]
     _tbl.index = [str(i) for i in _tbl.index]
     _tbl["% 2018"] = _tbl["Total"] / cust_data_2018["CustomerID"].count()
@@ -1363,11 +1922,16 @@ def _(
         .fmt_percent(columns=_ccols, rows=_is_pct, decimals=1)
         .fmt_percent(columns="% 2018", decimals=1)
         .sub_missing(missing_text="")
-        .data_color(columns=_dcols,
-                    rows=lambda d: ~d["2018 decile"].isin(["2019 Only", "Total", "% 2019"]),
-                    palette=["#ffffff", "#c6dbef", "#4292c6", "#08306b"], na_color="white")
+        .data_color(
+            columns=_dcols,
+            rows=lambda d: ~d["2018 decile"].isin(["2019 Only", "Total", "% 2019"]),
+            palette=["#ffffff", "#c6dbef", "#4292c6", "#08306b"],
+            na_color="white",
+        )
         .tab_style(style=style.text(weight="bold"), locations=loc.body(rows=_is_total))
-        .tab_style(style=style.text(weight="bold"), locations=loc.body(columns=["Total"]))
+        .tab_style(
+            style=style.text(weight="bold"), locations=loc.body(columns=["Total"])
+        )
         .tab_options(table_font_size="11px", data_row_padding="3px")
     )
     return
@@ -1406,45 +1970,106 @@ def _(mo):
 
 @app.cell
 def _(GT, cust_2018_2019, np, pd):
-    _both = (cust_2018_2019.query("Status == 'Active Both Years'")
-             .query("Spend_2018 > 0 and Spend_2019 > 0").assign(
-        profit_up=lambda d: d["Profit_2019"] >= d["Profit_2018"],
-        trans_state=lambda d: np.sign(d["NumTrans_2019"] - d["NumTrans_2018"]).astype("int8"),
-        aspt_up=lambda d: d["Spend_2019"] / d["NumTrans_2019"] >= d["Spend_2018"] / d["NumTrans_2018"],
-        margin_up=lambda d: d["Profit_2019"] / d["Spend_2019"] >= d["Profit_2018"] / d["Spend_2018"]))
+    _both = (
+        cust_2018_2019.query("Status == 'Active Both Years'")
+        .query("Spend_2018 > 0 and Spend_2019 > 0")
+        .assign(
+            profit_up=lambda d: d["Profit_2019"] >= d["Profit_2018"],
+            trans_state=lambda d: np.sign(
+                d["NumTrans_2019"] - d["NumTrans_2018"]
+            ).astype("int8"),
+            aspt_up=lambda d: (
+                d["Spend_2019"] / d["NumTrans_2019"]
+                >= d["Spend_2018"] / d["NumTrans_2018"]
+            ),
+            margin_up=lambda d: (
+                d["Profit_2019"] / d["Spend_2019"] >= d["Profit_2018"] / d["Spend_2018"]
+            ),
+        )
+    )
     _flags = ["profit_up", "trans_state", "aspt_up", "margin_up"]
-    _grp = (_both.groupby(_flags, as_index=False)
-            .agg(NumCust=("CustomerID", "count"), P2018=("Profit_2018", "sum"), P2019=("Profit_2019", "sum"))
-            .sort_values(_flags, ascending=False)
-            .assign(Change=lambda d: d["P2019"] - d["P2018"]))
+    _grp = (
+        _both.groupby(_flags, as_index=False)
+        .agg(
+            NumCust=("CustomerID", "count"),
+            P2018=("Profit_2018", "sum"),
+            P2019=("Profit_2019", "sum"),
+        )
+        .sort_values(_flags, ascending=False)
+        .assign(Change=lambda d: d["P2019"] - d["P2018"])
+    )
     _bmap = {True: "Up", False: "Down"}
     _tmap = {1: "Up", 0: "Same", -1: "Down"}
     _lbl = _grp[_flags].assign(
         profit_up=lambda d: d["profit_up"].map(_bmap),
         trans_state=lambda d: d["trans_state"].map(_tmap),
         aspt_up=lambda d: d["aspt_up"].map(_bmap),
-        margin_up=lambda d: d["margin_up"].map(_bmap))
+        margin_up=lambda d: d["margin_up"].map(_bmap),
+    )
     _body = pd.concat([_lbl, _grp[["NumCust", "P2018", "P2019", "Change"]]], axis=1)
-    _body.columns = ["Profit", "# Trans", "ASPT", "Avg Marg", "# Customers", "2018", "2019", "Change"]
+    _body.columns = [
+        "Profit",
+        "# Trans",
+        "ASPT",
+        "Avg Marg",
+        "# Customers",
+        "2018",
+        "2019",
+        "Change",
+    ]
 
     _o18n = (cust_2018_2019["Status"] == "2018 Only (Lapsed)").sum()
     _o19n = (cust_2018_2019["Status"] == "2019 Only (New/Reactivated)").sum()
-    _o18p = cust_2018_2019.loc[cust_2018_2019["Status"] == "2018 Only (Lapsed)", "Profit_2018"].sum()
-    _o19p = cust_2018_2019.loc[cust_2018_2019["Status"] == "2019 Only (New/Reactivated)", "Profit_2019"].sum()
+    _o18p = cust_2018_2019.loc[
+        cust_2018_2019["Status"] == "2018 Only (Lapsed)", "Profit_2018"
+    ].sum()
+    _o19p = cust_2018_2019.loc[
+        cust_2018_2019["Status"] == "2019 Only (New/Reactivated)", "Profit_2019"
+    ].sum()
     _blank = {"Profit": "", "# Trans": "", "ASPT": ""}
-    _tail = pd.DataFrame([
-        {**_blank, "Avg Marg": "", "# Customers": _body["# Customers"].sum(),
-         "2018": _body["2018"].sum(), "2019": _body["2019"].sum(), "Change": _body["Change"].sum()},
-        {**_blank, "Avg Marg": "2018 only", "# Customers": _o18n,
-         "2018": _o18p, "2019": np.nan, "Change": -_o18p},
-        {**_blank, "Avg Marg": "2019 only", "# Customers": _o19n,
-         "2018": np.nan, "2019": _o19p, "Change": _o19p}])
-    _tail.loc[3] = {**_blank, "Avg Marg": "Total", "# Customers": _tail["# Customers"].sum(),
-                    "2018": _tail["2018"].sum(), "2019": _tail["2019"].sum(), "Change": _tail["Change"].sum()}
+    _tail = pd.DataFrame(
+        [
+            {
+                **_blank,
+                "Avg Marg": "",
+                "# Customers": _body["# Customers"].sum(),
+                "2018": _body["2018"].sum(),
+                "2019": _body["2019"].sum(),
+                "Change": _body["Change"].sum(),
+            },
+            {
+                **_blank,
+                "Avg Marg": "2018 only",
+                "# Customers": _o18n,
+                "2018": _o18p,
+                "2019": np.nan,
+                "Change": -_o18p,
+            },
+            {
+                **_blank,
+                "Avg Marg": "2019 only",
+                "# Customers": _o19n,
+                "2018": np.nan,
+                "2019": _o19p,
+                "Change": _o19p,
+            },
+        ]
+    )
+    _tail.loc[3] = {
+        **_blank,
+        "Avg Marg": "Total",
+        "# Customers": _tail["# Customers"].sum(),
+        "2018": _tail["2018"].sum(),
+        "2019": _tail["2019"].sum(),
+        "Change": _tail["Change"].sum(),
+    }
     _tbl = pd.concat([_body, _tail], ignore_index=True)
     _nb = len(_body)
     (
-        GT(_tbl).tab_header(title="Up-down analysis", subtitle="Customers active in both 2018 and 2019")
+        GT(_tbl)
+        .tab_header(
+            title="Up-down analysis", subtitle="Customers active in both 2018 and 2019"
+        )
         .tab_spanner(label="Profit", columns=["2018", "2019", "Change"])
         .fmt_number(columns="# Customers", decimals=0, use_seps=True)
         .fmt_currency(columns=["2018", "2019", "Change"], currency="USD", decimals=0)
@@ -1486,46 +2111,82 @@ def _(mo):
 
 @app.cell
 def _(cust_data):
-    _s = (cust_data.query("Cohort == 'y2016_q1'").groupby(["Year", "Quarter"]).agg(
-        ActiveCust=("CustomerID", "count"), TotalTrans=("NumTrans", "sum"),
-        TotalSpend=("Spend", "sum"), TotalProfit=("Profit", "sum")))
+    _s = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .groupby(["Year", "Quarter"])
+        .agg(
+            ActiveCust=("CustomerID", "count"),
+            TotalTrans=("NumTrans", "sum"),
+            TotalSpend=("Spend", "sum"),
+            TotalProfit=("Profit", "sum"),
+        )
+    )
     _size = _s.xs((2016, 1))["ActiveCust"]
-    cohort_q1_decomp = _s.assign(
-        Pct_Active=_s["ActiveCust"] / _size,
-        ASPAC=_s["TotalSpend"] / _s["ActiveCust"] / 100,
-        AOF=_s["TotalTrans"] / _s["ActiveCust"],
-        AOV=_s["TotalSpend"] / _s["TotalTrans"] / 100,
-    ).reset_index().assign(
-        Period=lambda d: (d["Year"] - 2016) * 4 + (d["Quarter"] - 1),
-        TotalSpend=lambda d: d["TotalSpend"] / 100)
+    cohort_q1_decomp = (
+        _s.assign(
+            Pct_Active=_s["ActiveCust"] / _size,
+            ASPAC=_s["TotalSpend"] / _s["ActiveCust"] / 100,
+            AOF=_s["TotalTrans"] / _s["ActiveCust"],
+            AOV=_s["TotalSpend"] / _s["TotalTrans"] / 100,
+        )
+        .reset_index()
+        .assign(
+            Period=lambda d: (d["Year"] - 2016) * 4 + (d["Quarter"] - 1),
+            TotalSpend=lambda d: d["TotalSpend"] / 100,
+        )
+    )
     return (cohort_q1_decomp,)
 
 
 @app.cell
 def _(cohort_q1_decomp, line_chart):
-    line_chart(cohort_q1_decomp, "Period", "TotalSpend", "Cohort revenue by quarter",
-               "Total spend ($)", tickformat="$,.0f")
+    line_chart(
+        cohort_q1_decomp,
+        "Period",
+        "TotalSpend",
+        "Cohort revenue by quarter",
+        "Total spend ($)",
+        tickformat="$,.0f",
+    )
     return
 
 
 @app.cell
 def _(cohort_q1_decomp, line_chart):
-    line_chart(cohort_q1_decomp, "Period", "Pct_Active", "Percent active by quarter",
-               "% active", tickformat=".0%")
+    line_chart(
+        cohort_q1_decomp,
+        "Period",
+        "Pct_Active",
+        "Percent active by quarter",
+        "% active",
+        tickformat=".0%",
+    )
     return
 
 
 @app.cell
 def _(cohort_q1_decomp, line_chart):
-    line_chart(cohort_q1_decomp, "Period", "ASPAC", "Average spend per active member",
-               "ASPAC ($)", tickformat="$,.0f")
+    line_chart(
+        cohort_q1_decomp,
+        "Period",
+        "ASPAC",
+        "Average spend per active member",
+        "ASPAC ($)",
+        tickformat="$,.0f",
+    )
     return
 
 
 @app.cell
 def _(cohort_q1_decomp, line_chart):
-    line_chart(cohort_q1_decomp, "Period", "AOV", "Average order value by quarter",
-               "AOV ($)", tickformat="$,.0f")
+    line_chart(
+        cohort_q1_decomp,
+        "Period",
+        "AOV",
+        "Average order value by quarter",
+        "AOV ($)",
+        tickformat="$,.0f",
+    )
     return
 
 
@@ -1550,24 +2211,47 @@ def _(mo):
 @app.cell
 def _(GT, cust_data, pd):
     _m = cust_data.query("Cohort == 'y2016_q1'").pivot_table(
-        index="CustomerID", columns="Year", values="NumTrans", aggfunc="sum", fill_value=0)
+        index="CustomerID",
+        columns="Year",
+        values="NumTrans",
+        aggfunc="sum",
+        fill_value=0,
+    )
     _first = _m.columns.min()
     _thr = pd.Series(1, index=_m.columns).mask(_m.columns != _first, 0)
     _flags = _m.gt(_thr).rename(columns=str)
     _years = list(_flags.columns)
-    _rp = (_flags.reset_index().groupby(_years, as_index=False)
-           .agg(NumCust=("CustomerID", "count"))
-           .sort_values(_years, ascending=False).reset_index(drop=True)
-           .assign(Pct=lambda d: d["NumCust"] / d["NumCust"].sum()))
-    _body = pd.concat([_rp[_years].replace({True: "Y", False: "N"}), _rp[["NumCust", "Pct"]]], axis=1)
-    _tail = pd.DataFrame([{**{c: "" for c in _years[:-1]}, _years[-1]: "Total",
-                           "NumCust": _body["NumCust"].sum(), "Pct": _body["Pct"].sum()}])
+    _rp = (
+        _flags.reset_index()
+        .groupby(_years, as_index=False)
+        .agg(NumCust=("CustomerID", "count"))
+        .sort_values(_years, ascending=False)
+        .reset_index(drop=True)
+        .assign(Pct=lambda d: d["NumCust"] / d["NumCust"].sum())
+    )
+    _body = pd.concat(
+        [_rp[_years].replace({True: "Y", False: "N"}), _rp[["NumCust", "Pct"]]], axis=1
+    )
+    _tail = pd.DataFrame(
+        [
+            {
+                **{c: "" for c in _years[:-1]},
+                _years[-1]: "Total",
+                "NumCust": _body["NumCust"].sum(),
+                "Pct": _body["Pct"].sum(),
+            }
+        ]
+    )
     _tbl = pd.concat([_body, _tail], ignore_index=True)
     (
-        GT(_tbl).tab_header(title="Cohort annual repeat-buying patterns",
-                            subtitle="Customers acquired in Q1 2016 (n = 2,944)")
+        GT(_tbl)
+        .tab_header(
+            title="Cohort annual repeat-buying patterns",
+            subtitle="Customers acquired in Q1 2016 (n = 2,944)",
+        )
         .tab_spanner(label="Active in year", columns=_years)
-        .fmt_number(columns="NumCust", decimals=0).fmt_percent(columns="Pct", decimals=1)
+        .fmt_number(columns="NumCust", decimals=0)
+        .fmt_percent(columns="Pct", decimals=1)
         .cols_label(NumCust="# Customers", Pct="% of cohort")
         .cols_align(align="center", columns=_years)
         .tab_options(table_font_size="11px", data_row_padding="3px")
@@ -1593,17 +2277,30 @@ def _(mo):
 
 @app.cell
 def _(cust_data, pd):
-    _m = (cust_data.query("Cohort == 'y2016_q1'").sort_values(["Year", "Quarter"]).pivot_table(
-        index="CustomerID", columns=["Year", "Quarter"], values="NumTrans",
-        aggfunc="sum", fill_value=0))
+    _m = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .sort_values(["Year", "Quarter"])
+        .pivot_table(
+            index="CustomerID",
+            columns=["Year", "Quarter"],
+            values="NumTrans",
+            aggfunc="sum",
+            fill_value=0,
+        )
+    )
     _first = _m.columns.min()
     _thr = pd.Series(1, index=_m.columns).mask(_m.columns != _first, 0)
     _latched = _m.gt(_thr).rename(columns=str).cummax(axis=1)
-    second_purchase = pd.DataFrame({
-        "Period": [f"Y{y}Q{q}" for y, q in _m.columns],
-        "cum_fr": _latched.sum().to_numpy(),
-        "cum_pct": _latched.mean().to_numpy()})
-    second_purchase["inc_pct"] = second_purchase["cum_pct"].diff().fillna(second_purchase["cum_pct"].iloc[0])
+    second_purchase = pd.DataFrame(
+        {
+            "Period": [f"Y{y}Q{q}" for y, q in _m.columns],
+            "cum_fr": _latched.sum().to_numpy(),
+            "cum_pct": _latched.mean().to_numpy(),
+        }
+    )
+    second_purchase["inc_pct"] = (
+        second_purchase["cum_pct"].diff().fillna(second_purchase["cum_pct"].iloc[0])
+    )
     return (second_purchase,)
 
 
@@ -1635,15 +2332,40 @@ def _(mo):
 
 @app.cell
 def _(cust_data, line_chart):
-    _a = (cust_data.query("Cohort == 'y2016_q1'").sort_values(["Year", "Quarter"]).pivot_table(
-        index="CustomerID", columns=["Year", "Quarter"], values="NumTrans",
-        aggfunc="count", fill_value=0).gt(0))
+    _a = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .sort_values(["Year", "Quarter"])
+        .pivot_table(
+            index="CustomerID",
+            columns=["Year", "Quarter"],
+            values="NumTrans",
+            aggfunc="count",
+            fill_value=0,
+        )
+        .gt(0)
+    )
     _both = (_a & _a.shift(-1, axis=1)).sum().iloc[:-1]
-    _rbr = ((_both / _a.sum().iloc[:-1]).rename("Rate").rename_axis(["Year", "Quarter"])
-            .reset_index().assign(
-                Period=lambda d: "Y" + d["Year"].astype(str) + "Q" + d["Quarter"].astype(str)))
-    line_chart(_rbr, "Period", "Rate", "Quarter-to-quarter repeat-buying rate (Q1 2016 cohort)",
-               "Repeat rate", x_title="Quarter", tickformat=".0%", x_categorical=True)
+    _rbr = (
+        (_both / _a.sum().iloc[:-1])
+        .rename("Rate")
+        .rename_axis(["Year", "Quarter"])
+        .reset_index()
+        .assign(
+            Period=lambda d: (
+                "Y" + d["Year"].astype(str) + "Q" + d["Quarter"].astype(str)
+            )
+        )
+    )
+    line_chart(
+        _rbr,
+        "Period",
+        "Rate",
+        "Quarter-to-quarter repeat-buying rate (Q1 2016 cohort)",
+        "Repeat rate",
+        x_title="Quarter",
+        tickformat=".0%",
+        x_categorical=True,
+    )
     return
 
 
@@ -1670,38 +2392,63 @@ def _(mo):
 
 @app.cell
 def _(bar_distribution, create_bins_labels, create_distribution, cust_data):
-    vtd_df = (cust_data.query("Cohort == 'y2016_q1'").groupby("CustomerID").agg(
-        NumTrans=("NumTrans", "sum"),
-        TotalSpend=("Spend", lambda s: s.sum() / 100),
-        TotalProfit=("Profit", lambda s: s.sum() / 100)))
+    vtd_df = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .groupby("CustomerID")
+        .agg(
+            NumTrans=("NumTrans", "sum"),
+            TotalSpend=("Spend", lambda s: s.sum() / 100),
+            TotalProfit=("Profit", lambda s: s.sum() / 100),
+        )
+    )
     bar_distribution(
         create_distribution(vtd_df, "TotalProfit", **create_bins_labels(25, 1000, 0)),
-        title="Distribution of Q1 2016 cohort value to date", x_title="Value to date ($)")
+        title="Distribution of Q1 2016 cohort value to date",
+        x_title="Value to date ($)",
+    )
     return (vtd_df,)
 
 
 @app.cell
 def _(GT, decile_labels, vtd_df):
     vtd_decile = decile_labels(vtd_df, "TotalProfit")[0].reset_index()
-    _rep = (vtd_decile.groupby("ProfitDecile", as_index=False)
-            .agg(Customers=("CustomerID", "count"), Transactions=("NumTrans", "sum"),
-                 Spend=("TotalSpend", "sum"), Profit=("TotalProfit", "sum"))
-            .assign(
-                PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
-                PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
-                PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
-                PctVTD=lambda x: x["Profit"] / x["Profit"].sum(),
-                AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
-                AvgVTDCust=lambda x: x["Profit"] / x["Customers"],
-                AOF=lambda x: x["Transactions"] / x["Customers"],
-                AOV=lambda x: x["Spend"] / x["Transactions"],
-                AvgMargin=lambda x: x["Profit"] / x["Spend"])
-            .drop(columns=["Customers", "Transactions", "Spend", "Profit"]))
-    _fields = ["Decile", "% Cust.", "% Trans.", "% Spend", "% VTD", "Avg Spend/Cust.",
-               "Avg. VTD/Cust.", "AOF", "AOV", "Avg. Margin"]
+    _rep = (
+        vtd_decile.groupby("ProfitDecile", as_index=False)
+        .agg(
+            Customers=("CustomerID", "count"),
+            Transactions=("NumTrans", "sum"),
+            Spend=("TotalSpend", "sum"),
+            Profit=("TotalProfit", "sum"),
+        )
+        .assign(
+            PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
+            PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
+            PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
+            PctVTD=lambda x: x["Profit"] / x["Profit"].sum(),
+            AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
+            AvgVTDCust=lambda x: x["Profit"] / x["Customers"],
+            AOF=lambda x: x["Transactions"] / x["Customers"],
+            AOV=lambda x: x["Spend"] / x["Transactions"],
+            AvgMargin=lambda x: x["Profit"] / x["Spend"],
+        )
+        .drop(columns=["Customers", "Transactions", "Spend", "Profit"])
+    )
+    _fields = [
+        "Decile",
+        "% Cust.",
+        "% Trans.",
+        "% Spend",
+        "% VTD",
+        "Avg Spend/Cust.",
+        "Avg. VTD/Cust.",
+        "AOF",
+        "AOV",
+        "Avg. Margin",
+    ]
     _rep.columns = _fields
     (
-        GT(_rep).tab_header(title="Cohort behaviour by VTD decile")
+        GT(_rep)
+        .tab_header(title="Cohort behaviour by VTD decile")
         .fmt_percent(columns=_fields[1:5] + [_fields[-1]], decimals=2)
         .fmt_currency(columns=_fields[5:7] + [_fields[8]])
         .fmt_number(columns=_fields[7])
@@ -1712,17 +2459,36 @@ def _(GT, decile_labels, vtd_df):
 
 @app.cell
 def _(GT, cust_data, vtd_decile):
-    _a = (cust_data.query("Cohort == 'y2016_q1'").pivot_table(
-        index="CustomerID", columns="Year", values="NumTrans", aggfunc="sum", fill_value=0).gt(0))
+    _a = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .pivot_table(
+            index="CustomerID",
+            columns="Year",
+            values="NumTrans",
+            aggfunc="sum",
+            fill_value=0,
+        )
+        .gt(0)
+    )
     _a.columns = _a.columns.astype(str)
     _yr = list(_a.columns)
-    _g = _a.join(vtd_decile.set_index("CustomerID")["ProfitDecile"], how="right").groupby("ProfitDecile")
+    _g = _a.join(
+        vtd_decile.set_index("CustomerID")["ProfitDecile"], how="right"
+    ).groupby("ProfitDecile")
     _counts = _g[_yr].sum().assign(NumCust=_g.size())
     _counts.loc["Total"] = _counts.sum()
-    _tbl = (_counts[_yr].div(_counts["NumCust"], axis=0)
-            .assign(**{"% Cohort": _counts["NumCust"].div(_counts.loc["Total", "NumCust"])
-                       .mask(_counts.index == "Total")})
-            .reset_index(names="Decile"))
+    _tbl = (
+        _counts[_yr]
+        .div(_counts["NumCust"], axis=0)
+        .assign(
+            **{
+                "% Cohort": _counts["NumCust"]
+                .div(_counts.loc["Total", "NumCust"])
+                .mask(_counts.index == "Total")
+            }
+        )
+        .reset_index(names="Decile")
+    )
     (
         GT(_tbl, rowname_col="Decile")
         .tab_header(title="Annual % active by VTD decile", subtitle="Q1 2016 cohort")
@@ -1757,32 +2523,62 @@ def _(mo):
 
 @app.cell
 def _(GT, cust_data, np, pd):
-    _r = (cust_data.query("Cohort == 'y2016_q1'")
-          .assign(Period=lambda d: (d["Year"] - 2016) * 4 + d["Quarter"])
-          .groupby("CustomerID")
-          .agg(Recency=("Period", "max"), Frequency=("NumTrans", "sum"), SumProfit=("Profit", "sum"))
-          .assign(Monetary=lambda d: d["SumProfit"] / 100 / d["Frequency"]).drop(columns="SumProfit"))
+    _r = (
+        cust_data.query("Cohort == 'y2016_q1'")
+        .assign(Period=lambda d: (d["Year"] - 2016) * 4 + d["Quarter"])
+        .groupby("CustomerID")
+        .agg(
+            Recency=("Period", "max"),
+            Frequency=("NumTrans", "sum"),
+            SumProfit=("Profit", "sum"),
+        )
+        .assign(Monetary=lambda d: d["SumProfit"] / 100 / d["Frequency"])
+        .drop(columns="SumProfit")
+    )
     _ro = ["Q1", "Q2-Q8", "Q9-Q15", "Q16"]
     _mo = ["<$25", "$25-50", "$50-75", "$75+"]
     _fo = ["1", "2-4", "5-10", "11+"]
     _r = _r.assign(
-        R=lambda d: pd.Categorical(np.select(
-            [d["Recency"].eq(1), d["Recency"].le(8), d["Recency"].le(15)],
-            ["Q1", "Q2-Q8", "Q9-Q15"], default="Q16"), categories=_ro, ordered=True),
-        F=lambda d: pd.Categorical(np.select(
-            [d["Frequency"].eq(1), d["Frequency"].le(4), d["Frequency"].le(10)],
-            ["1", "2-4", "5-10"], default="11+"), categories=_fo, ordered=True),
-        M=lambda d: pd.Categorical(np.select(
-            [d["Monetary"].le(25), d["Monetary"].le(50), d["Monetary"].le(75)],
-            ["<$25", "$25-50", "$50-75"], default="$75+"), categories=_mo, ordered=True))
-    _tbl = (pd.crosstab([_r["R"], _r["M"]], _r["F"], dropna=False)
-            .replace(0, pd.NA).reset_index()
-            .rename(columns={"R": "Recency", "M": "Avg profit/trans"}))
+        R=lambda d: pd.Categorical(
+            np.select(
+                [d["Recency"].eq(1), d["Recency"].le(8), d["Recency"].le(15)],
+                ["Q1", "Q2-Q8", "Q9-Q15"],
+                default="Q16",
+            ),
+            categories=_ro,
+            ordered=True,
+        ),
+        F=lambda d: pd.Categorical(
+            np.select(
+                [d["Frequency"].eq(1), d["Frequency"].le(4), d["Frequency"].le(10)],
+                ["1", "2-4", "5-10"],
+                default="11+",
+            ),
+            categories=_fo,
+            ordered=True,
+        ),
+        M=lambda d: pd.Categorical(
+            np.select(
+                [d["Monetary"].le(25), d["Monetary"].le(50), d["Monetary"].le(75)],
+                ["<$25", "$25-50", "$50-75"],
+                default="$75+",
+            ),
+            categories=_mo,
+            ordered=True,
+        ),
+    )
+    _tbl = (
+        pd.crosstab([_r["R"], _r["M"]], _r["F"], dropna=False)
+        .replace(0, pd.NA)
+        .reset_index()
+        .rename(columns={"R": "Recency", "M": "Avg profit/trans"})
+    )
     (
         GT(_tbl, groupname_col="Recency", rowname_col="Avg profit/trans")
         .tab_header(title="RFM summary", subtitle="Q1 2016 cohort")
         .tab_spanner(label="Frequency", columns=_fo)
-        .fmt_number(columns=_fo, decimals=0).sub_missing(missing_text="")
+        .fmt_number(columns=_fo, decimals=0)
+        .sub_missing(missing_text="")
         .cols_align(align="right", columns=_fo)
         .tab_options(table_font_size="12px", data_row_padding="3px")
     )
@@ -1824,18 +2620,28 @@ def _(mo):
 @app.cell
 def _(cust_data):
     cohort_df = (
-        cust_data.groupby(["Cohort", "YearQuarter"]).agg(
-            TotalCust=("CustomerID", "nunique"), TotalTrans=("NumTrans", "sum"),
+        cust_data.groupby(["Cohort", "YearQuarter"])
+        .agg(
+            TotalCust=("CustomerID", "nunique"),
+            TotalTrans=("NumTrans", "sum"),
             TotalSpend=("Spend", lambda s: s.sum() / 100),
-            TotalProfit=("Profit", lambda s: s.sum() / 100))
-        .assign(AOF=lambda d: d["TotalTrans"] / d["TotalCust"],
-                AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
-                AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"]))
+            TotalProfit=("Profit", lambda s: s.sum() / 100),
+        )
+        .assign(
+            AOF=lambda d: d["TotalTrans"] / d["TotalCust"],
+            AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
+            AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"],
+        )
+    )
     _idx = cohort_df.index
-    _csize = (cohort_df["TotalCust"]
-              .loc[_idx.get_level_values("Cohort") == _idx.get_level_values("YearQuarter")]
-              .droplevel("YearQuarter"))
-    cohort_df = cohort_df.assign(PctActive=lambda d: d["TotalCust"].div(_csize, level="Cohort"))
+    _csize = (
+        cohort_df["TotalCust"]
+        .loc[_idx.get_level_values("Cohort") == _idx.get_level_values("YearQuarter")]
+        .droplevel("YearQuarter")
+    )
+    cohort_df = cohort_df.assign(
+        PctActive=lambda d: d["TotalCust"].div(_csize, level="Cohort")
+    )
     return (cohort_df,)
 
 
@@ -1849,7 +2655,9 @@ def _(mo):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "TotalProfit", cohorts=["y2016_q3", "y2016_q4"], tickformat="$,.0f")
+    cohort_lines(
+        cohort_df, "TotalProfit", cohorts=["y2016_q3", "y2016_q4"], tickformat="$,.0f"
+    )
     return
 
 
@@ -1861,7 +2669,9 @@ def _(cohort_df, cohort_lines):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "PctActive", cohorts=["y2016_q3", "y2016_q4"], tickformat=".0%")
+    cohort_lines(
+        cohort_df, "PctActive", cohorts=["y2016_q3", "y2016_q4"], tickformat=".0%"
+    )
     return
 
 
@@ -1881,13 +2691,25 @@ def _(mo):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "TotalProfit", cohorts=["y2016_q4", "y2017_q4"], align=True, tickformat="$,.0f")
+    cohort_lines(
+        cohort_df,
+        "TotalProfit",
+        cohorts=["y2016_q4", "y2017_q4"],
+        align=True,
+        tickformat="$,.0f",
+    )
     return
 
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "PctActive", cohorts=["y2016_q4", "y2017_q4"], align=True, tickformat=".0%")
+    cohort_lines(
+        cohort_df,
+        "PctActive",
+        cohorts=["y2016_q4", "y2017_q4"],
+        align=True,
+        tickformat=".0%",
+    )
     return
 
 
@@ -1937,11 +2759,16 @@ def _(cust_data, pd):
     _annual = cust_data.assign(
         CohortYear=lambda d: pd.Categorical(
             d["Cohort"].str.extract(r"y(\d{4})_q\d", expand=False).fillna("pre_2016"),
-            categories=_order, ordered=True))
+            categories=_order,
+            ordered=True,
+        )
+    )
     annual_cohort_combined = _annual.groupby(["CohortYear", "Year"], observed=True).agg(
-        NumActive=("CustomerID", "nunique"), TotalTrans=("NumTrans", "sum"),
+        NumActive=("CustomerID", "nunique"),
+        TotalTrans=("NumTrans", "sum"),
         TotalSpend=("Spend", lambda s: s.sum() / 100),
-        TotalProfit=("Profit", lambda s: s.sum() / 100))
+        TotalProfit=("Profit", lambda s: s.sum() / 100),
+    )
     return (annual_cohort_combined,)
 
 
@@ -1965,7 +2792,21 @@ def _(annual_cohort_combined, spend_profit_by_year):
 
 @app.cell
 def _(annual_cohort_combined, stacked_by_cohort):
-    stacked_by_cohort(annual_cohort_combined, "NumActive", "Active customers", tickformat=",.0f")
+    stacked_by_cohort(
+        annual_cohort_combined, "NumActive", "Active customers", tickformat=",.0f"
+    )
+    return
+
+
+@app.cell
+def _(annual_cohort_combined, stacked_by_cohort):
+    stacked_by_cohort(annual_cohort_combined, "TotalProfit", "Total profit")
+    return
+
+
+@app.cell
+def _(annual_cohort_combined, stacked_by_cohort):
+    stacked_by_cohort(annual_cohort_combined, "TotalSpend", "Total spend")
     return
 
 

@@ -9,22 +9,26 @@ dependencies = [
     "arviz>=1.2.0",
     "bridgestan>=2.9.0",
     "cmdstanpy>=1.2.5",
-    "great-tables>=0.22.0",
-    "ipykernel>=7.3.0",
-    "ipywidgets>=8.1.8",
+    "great-tables>=0.23.0",
     "lifetimes>=0.11.3",
-    "marimo>=0.23.15",
-    "matplotlib>=3.11.0",
+    "matplotlib>=3.11.1",
     "numpy>=2.5.1",
-    "pandas>=3.0.3",
+    "pandas>=3.0.5",
     "plotly>=6.9.0",
-    "polars>=1.42.1",
-    "quarto>=0.1.0",
+    "polars>=1.43.2",
     "scikit-learn>=1.9.0",
     "scipy>=1.18.0",
     "seaborn>=0.13.2",
     "statsmodels>=0.14.6",
     "xarray>=2026.7.0",
+]
+
+[dependency-groups]
+dev = [
+    "marimo[lsp]>=0.23.16",
+    "ty>=0.0.65",
+    "ipykernel>=7.3.0",
+    "ipywidgets>=8.1.8",
 ]
 
 [build-system]

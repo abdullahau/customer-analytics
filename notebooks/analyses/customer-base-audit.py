@@ -15,7 +15,13 @@ def _():
 def _(mo):
     mo.md(r"""
     # Customer-Base Audit
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     This notebook reproduces the five "lenses" of a customer-base audit, as set
     out in *The Customer-Base Audit* (Fader, Hardie and Ross) and its
     Excel-based companion. A customer-base audit is a structured review of how a
@@ -251,6 +257,9 @@ def _(go, pio):
     FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
     W, H = 820, 400
 
+    # One font object shared by tick labels AND axis titles, so they always
+    # match in family / size / colour / weight across every chart.
+    _axis_font = dict(family=FONT, size=12, color=MUTED)
     # Shared axis styling; `fixedrange` bakes in "no zoom / no pan" for every figure.
     _axis = dict(
         showline=True,
@@ -259,10 +268,10 @@ def _(go, pio):
         ticks="outside",
         tickcolor=MUTED,
         ticklen=4,
-        tickfont=dict(size=11, color=MUTED),
+        tickfont=_axis_font,
         # standoff adds breathing room between the tick labels and the axis
         # title; automargin then grows the outer margin to fit both.
-        title=dict(font=dict(size=12, color=MUTED), standoff=16),
+        title=dict(font=_axis_font, standoff=16),
         zeroline=False,
         fixedrange=True,
         automargin=True,
@@ -270,11 +279,20 @@ def _(go, pio):
     _tpl = go.layout.Template()
     _tpl.layout = go.Layout(
         font=dict(family=FONT, size=13, color=INK),
-        title=dict(font=dict(size=15, color=INK), x=0.0, xanchor="left"),
+        title=dict(
+            font=dict(size=15, color=INK),
+            # xref="paper" aligns the title with the left edge of the plotting
+            # area (inset by the left margin) rather than the image edge; pad.b
+            # adds breathing room below it, and the larger top margin above it.
+            x=0.0,
+            xanchor="left",
+            xref="paper",
+            pad=dict(b=8),
+        ),
         paper_bgcolor="white",
         plot_bgcolor="white",
         colorway=CAT,
-        margin=dict(l=66, r=26, t=54, b=58),
+        margin=dict(l=66, r=26, t=66, b=58),
         xaxis={**_axis, "showgrid": False},
         yaxis={
             **_axis,
@@ -497,7 +515,752 @@ def _(ACCENT, ACCENT2, H, W, go):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Venn Diagram
+    ## Data
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The master dataset is `cust_data_long.csv`. It has one row for each customer
+    and each quarter **in which that customer was active**. Each row records the
+    number of transactions, the spend, and the profit for that customer-quarter.
+
+    | Column | Meaning |
+    |---|---|
+    | `CustomerID` | customer key |
+    | `Cohort` | acquisition quarter, for example `y2016_q1`; customers acquired before the window are `pre_y2016` |
+    | `YearQuarter` | `y2016_q1` … `y2019_q4` |
+    | `NumTrans` | transactions in that quarter |
+    | `Spend` | revenue in that quarter |
+    | `Profit` | contribution profit in that quarter |
+
+    The `Year` and `Quarter` fields come from `YearQuarter`. Spend and profit are
+    held as integer cents during aggregation to avoid floating-point drift, then
+    converted back to dollars.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Definitions
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    - A **cohort** is the set of customers acquired in one period.
+    - The **cohort size** is the number of customers acquired in that period. The
+      size of the `pre_y2016` cohort is unknown. Exclude that cohort from every
+      calculation that divides by cohort size.
+    - **AOF** (average order frequency) is transactions divided by active
+      customers.
+    - **AOV** (average order value) is spend divided by transactions.
+    - **Margin** is profit divided by spend.
+
+    Profit factors into four terms. This identity is the backbone of the audit:
+
+    $$
+    \text{Profit} \;=\; N_c \,\times\, \text{AOF} \,\times\, \text{AOV} \,\times\, \text{Margin}
+    \;=\; N_c \times \frac{\text{trans}}{\text{cust}} \times \frac{\text{spend}}{\text{trans}} \times \frac{\text{profit}}{\text{spend}}
+    $$
+
+    where $N_c$ is the number of active customers. For a cohort in a period,
+    decompose number of active customers into cohort size and fraction of the cohort that is active:
+
+    $$
+    \text{Cohort profit} \;=\; (\text{cohort size}) \times (\%\,\text{cohort active}) \times \text{AOF} \times \text{AOV} \times \text{Margin}
+    $$
+
+    This structure lets you trace any change in profit to a specific cause: **fewer
+    customers**, **less frequent orders**, **smaller orders**, or **thinner margins**.
+
+    Similarly, revenue factors three terms.
+
+    $$
+    \text{Revenue} \;=\; N_c \,\times\, \text{AOF} \,\times\, \text{AOV}
+    \;=\; N_c \times \frac{\text{trans}}{\text{cust}} \times \frac{\text{spend}}{\text{trans}}
+    $$
+
+    where $\text{AOF} \times \text{AOV}$ is average spend per active customer,
+
+    $$
+    \text{ASPAC} \;=\; \text{AOF} \times \text{AOV}
+    $$
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Load Long Format Data
+    """)
+    return
+
+
+@app.cell
+def _(pd):
+    cust_data = pd.read_csv("data/madrigal/cust_data_long.csv")
+    cust_data = cust_data.assign(
+        Spend=lambda x: (x["Spend"] * 100).round().astype("int64"),
+        Profit=lambda x: (x["Profit"] * 100).round().astype("int64"),
+    ).assign(
+        **cust_data["YearQuarter"]
+        .str.extract(r"y(\d{4})_q(\d)")
+        .rename(columns={0: "Year", 1: "Quarter"})
+        .astype({"Year": "int32", "Quarter": "int8"})
+    )
+    return (cust_data,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Convert Wide to Long Format Data
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Three files — `cust_by_qtr_trans.csv`, `cust_by_qtr_spend.csv`, `cust_by_qtr_profit.csv` — one row per customer, one column per quarter, plus a `Cohort` column. Mostly zeros/blanks. If you use these, **do not assume the three files share the same CustomerID ordering — verify.**
+
+    In this exercise, we will be using the long format data. However, if you only have wide format data, you can create a long format dataframe with the following steps:
+
+    ```python
+    from functools import reduce
+
+    def wide_to_long(wide_df, value):
+        long_data = wide_df.melt(
+            id_vars=["CustomerID", "Cohort"],
+            value_vars=wide_df.columns[2:],
+            var_name="YearQuarter",
+            value_name=value
+        ).sort_values(
+            ["CustomerID", "YearQuarter"]
+        )
+
+        if value == "NumTrans":
+            long_data = long_data.query(
+                "NumTrans > 0"
+            ).astype({"NumTrans": "int32"})
+
+        return long_data.reset_index(drop=True)
+
+    trans_wide = pd.read_csv("data/madrigal/cust_by_qtr_trans.csv")
+    spend_wide = pd.read_csv("data/madrigal/cust_by_qtr_spend.csv")
+    profit_wide = pd.read_csv("data/madrigal/cust_by_qtr_profit.csv")
+
+    cust_data_long = reduce(
+        lambda left, right: left.merge(
+            right,
+            on=["CustomerID", "Cohort", "YearQuarter"],
+            how="left",
+        ),
+        (
+            wide_to_long(df, value)
+            for df, value in [
+                (trans_wide, "NumTrans"),
+                (spend_wide, "Spend"),
+                (profit_wide, "Profit"),
+            ]
+        ),
+    )
+    ```
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Binning rules for the distributions
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Most behavioural quantities are heavily right-skewed. The maximum is often 10
+    to 100 times the mean. Follow four rules for every histogram:
+
+    1. Make each bin **half-open on the left**. The \$25–50 bin holds spend in the
+       interval $(25, 50]$. The first bin includes its lower edge, so a customer
+       with \$0 falls in the first bin.
+    2. Add a **right-censoring bin** ("greater than $x$") to hold the long tail.
+    3. Set the bin width from the percentile table, not from a rule of thumb.
+       Use one of 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500. A narrow width
+       gives a noisy plot. A wide width hides the skew.
+    4. Plot **relative frequencies**, not counts, when you compare two groups of
+       different size.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Lens 1 — How do customers differ from one another?
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Lens 1 looks at one calendar year (2019) and measures how much customers
+    differ inside that year. The central result is that the **"average customer"
+    does not describe anyone**. Every behavioural quantity is skewed, so the mean
+    sits far above the median and most customers fall below the mean.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Keep the rows for 2019, group by `CustomerID`, and sum transactions, spend,
+    and profit. Only customers with at least one 2019 transaction appear. The
+    totals below are fixed reference points for the rest of Lens 1.
+    """)
+    return
+
+
+@app.cell
+def _(np):
+    def annual_customer_totals(df, year):
+        return (
+            df.query(f"Year == {year}")
+            .groupby("CustomerID", as_index=False)
+            .agg(
+                NumTrans=("NumTrans", "sum"),
+                Spend=("Spend", "sum"),
+                Profit=("Profit", "sum"),
+            )
+            .assign(
+                Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
+                Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2),
+            )
+        )
+
+    def add_customer_ratios(df):
+        # Add per-customer average spend per transaction and margin once, at creation.
+        return df.assign(
+            AvgSpendPerTrans=lambda x: x["Spend"] / x["NumTrans"],
+            Margin=lambda x: np.where(
+                x["Spend"] > 0, x["Profit"] / x["Spend"] * 100, np.nan
+            ),
+        )
+
+    return add_customer_ratios, annual_customer_totals
+
+
+@app.cell
+def _(
+    GT,
+    add_customer_ratios,
+    annual_customer_totals,
+    cust_data,
+    pd,
+    style_table,
+):
+    cust_data_2019 = add_customer_ratios(annual_customer_totals(cust_data, 2019))
+    cust_data_2018 = add_customer_ratios(annual_customer_totals(cust_data, 2018))
+
+    _summary = pd.DataFrame(
+        {
+            "Metric": [
+                "Active customers",
+                "Total transactions",
+                "Total spend",
+                "Total profit",
+                "Transactions / customer",
+                "Spend / customer",
+                "Profit / customer",
+            ],
+            "Value": [
+                len(cust_data_2019),
+                cust_data_2019["NumTrans"].sum(),
+                cust_data_2019["Spend"].sum(),
+                cust_data_2019["Profit"].sum(),
+                cust_data_2019["NumTrans"].mean(),
+                cust_data_2019["Spend"].mean(),
+                cust_data_2019["Profit"].mean(),
+            ],
+        }
+    )
+    (
+        GT(_summary)
+        .tab_header(title="2019 annual customer summary")
+        .fmt_number(columns="Value", rows=[0, 1], decimals=0)
+        .fmt_currency(columns="Value", rows=[2, 3], decimals=0)
+        .fmt_number(columns="Value", rows=[4], decimals=2)
+        .fmt_currency(columns="Value", rows=[5, 6], decimals=2)
+        .pipe(style_table)
+    )
+    return cust_data_2018, cust_data_2019
+
+
+@app.cell
+def _(cust_data_2019, customer_descriptives):
+    spend_stats = customer_descriptives(cust_data_2019, "Spend")
+    profit_stats = customer_descriptives(cust_data_2019, "Profit")
+    trans_stats = customer_descriptives(cust_data_2019, "NumTrans")
+    avg_spend_stats = customer_descriptives(cust_data_2019, "AvgSpendPerTrans")
+    avg_margin_stats = customer_descriptives(
+        cust_data_2019.query("Spend > 0"), "Margin"
+    )
+    return (
+        avg_margin_stats,
+        avg_spend_stats,
+        profit_stats,
+        spend_stats,
+        trans_stats,
+    )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Distribution of spend
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The spend distribution is strongly right-skewed. The maximum (\$6,695) is
+    about 37 times the mean (\$183), and the mean is well above the median
+    (\$113). As a result, **69% of customers spend below the average**. The
+    bottom 5% spend \$22 or less; the top 5% each spend more than \$579.
+
+    The mean is therefore a poor summary of a typical customer. Read the median
+    and the percentiles instead. The percentile table also sets the bin width: a
+    width of \$25 with censoring at \$1,000 gives 41 bins and shows the skew
+    without noise.
+
+    Two customers have exactly \$0 spend in 2019. They fall in the first bin.
+    """)
+    return
+
+
+@app.cell
+def _(spend_stats, stat_badges):
+    stat_badges(spend_stats, "Spend")
+    return
+
+
+@app.cell
+def _(create_percentile_table, spend_stats):
+    create_percentile_table(
+        spend_stats,
+        "Spend",
+        "Customer spend percentiles",
+        "2019 annual spend",
+        fmt="currency",
+    )
+    return
+
+
+@app.cell
+def _(
+    bar_distribution,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+):
+    bar_distribution(
+        create_distribution(cust_data_2019, "Spend", **create_bins_labels(25, 1000)),
+        title="Customer spend distribution (2019)",
+        x_title="Annual spend ($)",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Distribution of profit
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Profit has the same right-skewed shape as spend. The values run from −\$652
+    to \$3,347. The mean (\$88) is above the median (\$54), and again **69% of
+    customers fall below the mean**. Profit runs at roughly 45–50% of the
+    corresponding spend figures, so the plot uses a lower censoring point
+    (\$500). A separate `< 0` bin holds the loss-making customers.
+    """)
+    return
+
+
+@app.cell
+def _(profit_stats, stat_badges):
+    stat_badges(profit_stats, "Profit")
+    return
+
+
+@app.cell
+def _(
+    bar_distribution,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+):
+    bar_distribution(
+        create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)),
+        title="Customer profit distribution (2019)",
+        x_title="Annual profit ($)",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Distribution of the number of transactions
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The transaction count is a reverse-J distribution. The maximum is 58, but
+    **63% of customers made exactly one purchase** (20,149 of 31,855). The mean of
+    1.9 therefore describes almost no one.
+
+    Keep every non-terminal bin at width 1 and censor at `10+`. Do not merge bins
+    into unequal groups (for example 1 / 2–4 / 5–9) in a histogram. If you need
+    unequal groups, use a table.
+    """)
+    return
+
+
+@app.cell
+def _(stat_badges, trans_stats):
+    stat_badges(trans_stats, "Transactions", money=False)
+    return
+
+
+@app.cell
+def _(bar_distribution, create_distribution, cust_data_2019, np):
+    _bins = list(range(1, 11)) + [np.inf]
+    _labels = [str(i) for i in range(1, 10)] + ["10+"]
+    bar_distribution(
+        create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
+        title="Customer transactions distribution (2019)",
+        x_title="Annual transactions",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Distribution of average spend per transaction
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For each customer, average spend per transaction is $\text{spend}/\text{trans}$.
+    Bin at width \$25 and censor at \$500.
+
+    #### Two different "average transaction" numbers
+
+    Two quantities are both called "average spend per transaction". They are not
+    equal, and both appear in practice.
+
+    - **Ratio of totals (AOV).** Divide total spend by total transactions. For
+      2019 this is about \$96.
+    - **Mean of per-customer averages.** Average each customer's own spend per
+      transaction, then take the mean across customers. For 2019 this is about
+      \$99.
+
+    Start from the ratio of the two per-customer means. The count $I$ cancels,
+    which leaves total spend over total transactions:
+
+    $$
+    \frac{\frac{1}{I}\sum_{i=1}^{I}\text{spend}_i}{\frac{1}{I}\sum_{i=1}^{I}\text{trans}_i}
+    = \frac{\sum_{i=1}^{I}\text{spend}_i}{\sum_{i=1}^{I}\text{trans}_i}
+    = \sum_{i=1}^{I}\left(\frac{\text{trans}_i}{\sum_{j}\text{trans}_j}\right)\frac{\text{spend}_i}{\text{trans}_i}
+    $$
+
+    The last form shows that **AOV is a transaction-weighted average** of the
+    per-customer values. Each customer's weight is that customer's share of total
+    transactions, so frequent buyers dominate it.
+
+    The mean of per-customer averages gives every customer equal weight:
+
+    $$
+    \frac{1}{I}\sum_{i=1}^{I}\frac{\text{spend}_i}{\text{trans}_i}
+    $$
+
+    The one-and-done buyers (63% of the base) count as much as the customer with
+    58 transactions.
+
+    The two numbers are equal **only** when every customer makes the same number
+    of transactions. That never happens in a real customer base, so the two always
+    differ. The direction of the gap carries information. Here \$96 is below \$99,
+    which means heavier buyers have **smaller** average baskets than light buyers.
+
+    Use one name for each quantity and keep it fixed. "AOV" always means the
+    transaction-weighted ratio of totals.
+    """)
+    return
+
+
+@app.cell
+def _(avg_spend_stats, stat_badges):
+    stat_badges(avg_spend_stats, "Avg spend / transaction")
+    return
+
+
+@app.cell
+def _(
+    bar_distribution,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+):
+    bar_distribution(
+        create_distribution(
+            cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+        ),
+        title="Average spend per transaction (2019)",
+        x_title="Average spend per transaction ($)",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Average spend per transaction, by transaction level
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Both the number of transactions and the average spend per transaction vary
+    across customers. The natural next question is whether the two are related.
+    Group customers by transaction count (1, 2, …, 9, `10+`) and report the spread
+    of average spend inside each group. The result confirms the finding above:
+    average basket size does not rise with purchase frequency.
+    """)
+    return
+
+
+@app.cell
+def _(GT, cust_data_2019, np, pd, style_table):
+    _bins = list(range(1, 11)) + [np.inf]
+    _labels = [str(i) for i in range(1, 10)] + ["10+"]
+    _binned = cust_data_2019.assign(
+        TransBin=lambda d: pd.cut(
+            d["NumTrans"], bins=_bins, labels=_labels, right=False
+        )
+    )
+    aspt_by_level = _binned.groupby("TransBin", as_index=False, observed=True).agg(
+        Mean=("AvgSpendPerTrans", "mean"),
+        Std=("AvgSpendPerTrans", "std"),
+        Min=("AvgSpendPerTrans", "min"),
+        P05=("AvgSpendPerTrans", lambda s: s.quantile(0.05)),
+        Median=("AvgSpendPerTrans", "median"),
+        P95=("AvgSpendPerTrans", lambda s: s.quantile(0.95)),
+        Max=("AvgSpendPerTrans", "max"),
+    )
+    (
+        GT(aspt_by_level.rename(columns={"TransBin": "Transactions"}))
+        .tab_header(title="Average spend per transaction, by transaction level")
+        .fmt_currency(columns=list(aspt_by_level.columns[1:]), decimals=2)
+        .pipe(style_table)
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Distribution of average margin
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For each customer, margin is $\text{profit}/\text{spend}$. It is defined only
+    where spend is greater than 0, so exclude the two zero-spend customers rather
+    than fill them with 0. This is the **overall** margin across all of a
+    customer's 2019 purchases, not the average of transaction-level margins;
+    transaction-level margins cannot be recovered from quarter-level data.
+
+    Unlike the other four quantities, margin is **left-skewed**. Bin at width 5%
+    and add a `< 0%` bin for loss-makers.
+    """)
+    return
+
+
+@app.cell
+def _(avg_margin_stats, stat_badges):
+    stat_badges(avg_margin_stats, "Margin", money=False, pct=True)
+    return
+
+
+@app.cell
+def _(
+    bar_distribution,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+):
+    bar_distribution(
+        create_distribution(
+            cust_data_2019.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0)
+        ),
+        title="Average margin distribution (2019)",
+        x_title="Margin (%)",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Decile analyses
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    A decile report splits the customer base into ten groups and applies the
+    profit identity to each group. It shows how concentrated value is, and which
+    of the four factors drives that concentration. Two versions exist, and they
+    answer different questions.
+
+    **Customer decile** — each decile holds 10% of *customers*, ranked by profit.
+    This shows how much of total profit the top-ranked tenth of customers
+    produces.
+
+    **Profit decile** — each decile holds 10% of *profit*. The top decile
+    contains the few customers who together make the first 10% of profit, so it
+    holds far fewer than 10% of customers. This version shows the size of the most
+    valuable group.
+
+    Read the report by column: `% Cust.` against `% Profit` measures
+    concentration; `AOF`, `AOV` and `Avg. Margin` show which factor separates the
+    top deciles from the bottom.
+    """)
+    return
+
+
+@app.cell
+def _(DECILE_FIELDS, cust_data_2019, decile_report, decile_report_gt, pd):
+    _ranked = cust_data_2019.assign(
+        CustDecile=lambda d: (
+            pd.qcut(
+                d["Profit"].rank(method="first", ascending=False), q=10, labels=False
+            )
+            + 1
+        )
+    )
+    cust_decile_rep, _f = decile_report(_ranked, "CustDecile")
+    decile_report_gt(cust_decile_rep, DECILE_FIELDS, "Customer decile report")
+    return
+
+
+@app.cell
+def _(
+    DECILE_FIELDS,
+    cust_data_2019,
+    decile_labels,
+    decile_report,
+    decile_report_gt,
+):
+    _labelled = decile_labels(cust_data_2019, "Profit")[0]
+    profit_decile_rep, _f = decile_report(_labelled, "ProfitDecile")
+    decile_report_gt(
+        profit_decile_rep, DECILE_FIELDS, "Profit decile report", pct_decimals=2
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Two points need care in the profit decile report:
+
+    1. **Cumulative profit is not monotonic.** It rises to about \$2,802,772, then
+       falls back to the total of \$2,798,904, because 263 customers are
+       loss-making. Every loss-maker lands in decile 10. The decile-1 cut-off is
+       about \$546 of individual profit; the decile-2 cut-off is about \$345.
+    2. **A revenue version is a useful fallback.** If you do not have cost data,
+       run the same decile report on spend. A variant that pulls the loss-makers
+       into a separate 11th group is also worth building.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Lens 2 — What changed between two periods?
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Lens 2 compares 2018 with 2019 and traces the change in firm performance to
+    changes in customer behaviour. The working dataset has one row for each
+    customer active in **either** year (an outer join of the two annual
+    aggregates, with zeros filled in). It covers 48,238 customers. A `Status`
+    field marks each customer as active in both years, in 2018 only (lapsed), or
+    in 2019 only (new or reactivated).
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Venn diagram
     """)
     return
 
@@ -509,7 +1272,7 @@ def _(ACCENT, ACCENT2, brentq, go, np):
         r = np.sqrt(n_b / n_a)
         a_target = np.pi * (n_both / n_a)
 
-        def lens(d):
+        def lens_area(d):
             if d >= R + r:
                 return 0.0
             if d <= abs(R - r):
@@ -521,7 +1284,7 @@ def _(ACCENT, ACCENT2, brentq, go, np):
             )
             return p1 + p2 - p3
 
-        d = brentq(lambda x: lens(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
+        d = brentq(lambda x: lens_area(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
         cy = max(R, r)
         cx1, cx2 = R, R + d
         xlens = R + (d**2 + R**2 - r**2) / (2 * d)
@@ -604,7 +1367,7 @@ def _(ACCENT, ACCENT2, brentq, go, np):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Waterfall Chart
+    #### Profit bridge (waterfall)
     """)
     return
 
@@ -695,964 +1458,6 @@ def _(ACCENT, ACCENT2, INK, MUTED, go):
     return (profit_bridge_chart,)
 
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Second-purchase chart
-    """)
-    return
-
-
-@app.cell
-def _(ACCENT, ACCENT2, GRID, go):
-    def second_purchase_chart(sp, width=None, height=360):
-        fig = go.Figure()
-        fig.add_bar(
-            x=sp["Period"],
-            y=sp["inc_pct"],
-            name="Incremental",
-            marker_color=ACCENT,
-            marker_line_width=0,
-            yaxis="y",
-            hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
-        )
-        fig.add_scatter(
-            x=sp["Period"],
-            y=sp["cum_pct"],
-            name="Cumulative",
-            mode="lines+markers",
-            line=dict(width=1.8, color=ACCENT2),
-            marker=dict(size=6, color=ACCENT2),
-            yaxis="y2",
-            hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
-        )
-        # width=None + autosize lets the figure fill the cell; automargin keeps
-        # each axis title clear of its tick labels as the width changes. Axis
-        # titles are tinted to match their series (navy bars, ochre line).
-        fig.update_layout(
-            template="cba",
-            title="Percent of cohort making a second purchase, by quarter",
-            autosize=True,
-            width=width,
-            height=height,
-            bargap=0.25,
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
-            ),
-            yaxis=dict(
-                title=dict(text="Incremental", font=dict(color=ACCENT)),
-                tickformat=".0%",
-                tickfont=dict(color=ACCENT),
-                showgrid=True,
-                gridcolor=GRID,
-                fixedrange=True,
-                automargin=True,
-            ),
-            yaxis2=dict(
-                title=dict(text="Cumulative", font=dict(color=ACCENT2)),
-                tickformat=".0%",
-                tickfont=dict(color=ACCENT2),
-                overlaying="y",
-                side="right",
-                showgrid=False,
-                range=[0, 1],
-                fixedrange=True,
-                automargin=True,
-            ),
-        )
-        fig.update_xaxes(type="category", tickangle=-45, automargin=True)
-        return fig
-
-    return (second_purchase_chart,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Cohort trajectory lines
-    """)
-    return
-
-
-@app.cell
-def _(go):
-    def _sample_colorscale(n, scale=("#0d3b66", "#6aa5d9")):
-        # Consultant blue ramp (navy → medium blue) for ordinal cohort series.
-        import plotly.colors as pc
-
-        if n == 1:
-            return [pc.sample_colorscale(scale, [0.0])[0]]
-        return pc.sample_colorscale(scale, [i / (n - 1) for i in range(n)])
-
-    def _q_index(s, base_year, pattern=r"y(\d{4})_q([1-4])"):
-        parts = s.str.extract(pattern)
-        year, qtr = parts[0].astype("float"), parts[1].astype("float")
-        return (year - base_year) * 4 + qtr - 1
-
-    def cohort_lines(
-        df,
-        metric,
-        cohorts=None,
-        align=False,
-        index=False,
-        tickformat=None,
-        title=None,
-        width=740,
-        height=360,
-        pattern=r"y(\d{4})_q([1-4])",
-    ):
-        d = df.reset_index()
-        if cohorts is not None:
-            d = d[d["Cohort"].isin(cohorts)]
-        d = d.sort_values(["Cohort", "YearQuarter"]).copy()
-        base_year = d["YearQuarter"].str.extract(pattern)[0].astype("float").min()
-        d["Age"] = _q_index(d["YearQuarter"], base_year, pattern) - _q_index(
-            d["Cohort"], base_year, pattern
-        )
-        if index:
-            d[metric] = d[metric] / d.groupby("Cohort")[metric].transform("first") * 100
-        order = [
-            c
-            for c in ["pre y2016", *sorted(d["YearQuarter"].unique())]
-            if c in set(d["Cohort"])
-        ]
-        colors = dict(zip(order, _sample_colorscale(len(order))))
-        tickformat = tickformat or (",.0f" if index else ",.2f")
-        y_title = f"{metric} (acq. qtr = 100)" if index else metric
-        if title is None:
-            _bits = [
-                b for b in ("aligned" if align else "", "indexed" if index else "") if b
-            ]
-            title = f"{metric} by cohort" + (f" ({', '.join(_bits)})" if _bits else "")
-        fig = go.Figure()
-        for c in order:
-            dc = d[d["Cohort"] == c]
-            if align:
-                dc = dc.dropna(subset=["Age"])
-                x = dc["Age"].astype(int)
-            else:
-                x = dc["YearQuarter"]
-            fig.add_scatter(
-                x=x,
-                y=dc[metric],
-                mode="lines+markers",
-                name=c.replace("_", " "),
-                line=dict(width=1.6, color=colors[c]),
-                marker=dict(size=5, color=colors[c]),
-                hovertemplate=f"{c} · %{{x}}<br>%{{y}}<extra></extra>",
-            )
-        fig.update_layout(
-            template="cba",
-            title=title,
-            width=width,
-            height=height,
-            legend=dict(title="Cohort", font=dict(size=10)),
-        )
-        if align:
-            fig.update_xaxes(title="Quarters since acquisition", dtick=1)
-        else:
-            fig.update_xaxes(title=None, tickangle=-45, type="category")
-        fig.update_yaxes(title=y_title, tickformat=tickformat)
-        return fig
-
-    return (cohort_lines,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Annual summary bars
-    """)
-    return
-
-
-@app.cell
-def _(ACCENT, ACCENT2, go):
-    def acquisitions_by_year(df, width=520, height=340):
-        d = df.reset_index()
-        d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
-        fig = go.Figure(
-            go.Bar(
-                x=d["Year"].astype(str),
-                y=d["NumActive"],
-                marker_color=ACCENT,
-                hovertemplate="%{x}<br>New: %{y:,}<extra></extra>",
-            )
-        )
-        fig.update_layout(
-            template="cba",
-            title="Acquisitions by year",
-            width=width,
-            height=height,
-            bargap=0.4,
-        )
-        fig.update_yaxes(title="New customers", tickformat=",.0f")
-        fig.update_xaxes(type="category")
-        return fig
-
-    def active_by_year(df, width=520, height=340):
-        d = df.groupby("Year", observed=True)["NumActive"].sum().reset_index()
-        fig = go.Figure(
-            go.Bar(
-                x=d["Year"].astype(str),
-                y=d["NumActive"],
-                marker_color=ACCENT,
-                hovertemplate="%{x}<br>Active: %{y:,}<extra></extra>",
-            )
-        )
-        fig.update_layout(
-            template="cba",
-            title="Active customers by year",
-            width=width,
-            height=height,
-            bargap=0.4,
-        )
-        fig.update_yaxes(title="Active customers", tickformat=",.0f")
-        fig.update_xaxes(type="category")
-        return fig
-
-    def spend_profit_by_year(df, width=560, height=360):
-        d = (
-            df.reset_index()
-            .melt(
-                id_vars=["CohortYear", "Year"],
-                value_vars=["TotalSpend", "TotalProfit"],
-                var_name="Metric",
-                value_name="Value",
-            )
-            .groupby(["Year", "Metric"], observed=True, as_index=False)["Value"]
-            .sum()
-        )
-        d["Year"] = d["Year"].astype(str)
-        fig = go.Figure()
-        for metric, col, name in [
-            ("TotalSpend", ACCENT, "Spend"),
-            ("TotalProfit", ACCENT2, "Profit"),
-        ]:
-            dm = d[d["Metric"] == metric]
-            fig.add_bar(
-                x=dm["Year"],
-                y=dm["Value"],
-                name=name,
-                marker_color=col,
-                hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>",
-            )
-        fig.update_layout(
-            template="cba",
-            title="Spend and profit by year",
-            barmode="group",
-            width=width,
-            height=height,
-            bargap=0.35,
-            bargroupgap=0.08,
-        )
-        fig.update_yaxes(title=None, tickformat="$,.0f")
-        fig.update_xaxes(type="category")
-        return fig
-
-    return acquisitions_by_year, active_by_year, spend_profit_by_year
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Cohort stack and flow
-    """)
-    return
-
-
-@app.cell
-def _(SEQ, go, pd):
-    ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
-
-    def _hex_rgba(hexc, a):
-        h = hexc.lstrip("#")
-        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
-        return f"rgba({r},{g},{b},{a})"
-
-    def cohort_flow_stack(
-        df,
-        metric="TotalProfit",
-        y_title="Profit ($ MM)",
-        scale=1e6,
-        total_fmt="{:.2f}",
-        flows=True,
-        width=820,
-        height=520,
-        order=tuple(ANNUAL_ORDER),
-    ):
-        # Stacked bars of `metric` by acquisition cohort per year, with:
-        #   • Sankey-style ribbons linking each cohort's segment across adjacent
-        #     years (the retention flow — how a cohort's contribution decays);
-        #   • in-segment share-of-year labels and per-year totals on top.
-        # Generalised: pass metric/y_title/scale/total_fmt for profit, active
-        # customers, spend, etc.
-        P = df[metric].unstack("Year").reindex(list(order)).div(scale)
-        P.columns = P.columns.astype(str)
-        years = list(P.columns)
-        year_tot = P.sum(axis=0)
-        share = P.div(year_tot, axis=1)
-        bottoms = P.cumsum(axis=0) - P
-        # Darkest cohort at the bottom of the stack; light text on the dark
-        # lower segments, dark text on the two lightest upper ones.
-        colors = dict(zip(order, SEQ[: len(order)]))
-        text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
-        # Numeric x positions (annotations must reference these, not category
-        # strings — a string ref on a category axis blanks the plot).
-        xpos = list(range(len(years)))
-        hw = (1 - 0.45) / 2  # half bar width in x-units (bargap=0.45)
-        fig = go.Figure()
-        # Ribbons first, so the bars render on top of them.
-        if flows:
-            for c in order:
-                for i in range(len(years) - 1):
-                    v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
-                    if pd.isna(v1) or pd.isna(v2) or v1 == 0 or v2 == 0:
-                        continue
-                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
-                    fig.add_scatter(
-                        x=[i + hw, i + 1 - hw, i + 1 - hw, i + hw],
-                        y=[b1 + v1, b2 + v2, b2, b1],
-                        fill="toself",
-                        mode="lines",
-                        line=dict(width=0),
-                        fillcolor=_hex_rgba(colors[c], 0.22),
-                        hoverinfo="skip",
-                        showlegend=False,
-                    )
-        for c in order:
-            y_vals = [None if pd.isna(v) else float(v) for v in P.loc[c]]
-            fig.add_bar(
-                name=c.replace("_", " "),
-                x=xpos,
-                y=y_vals,
-                marker=dict(color=colors[c], line=dict(color="white", width=1)),
-                hovertemplate=f"{c.replace('_', ' ')} · %{{x}}<br>{y_title}: %{{y:,.2f}}<extra></extra>",
-            )
-        fig.update_layout(
-            template="cba",
-            barmode="stack",
-            bargap=0.45,
-            title=f"{y_title.split(' (')[0]} by acquisition cohort",
-            autosize=True,
-            width=width,
-            height=height,
-            legend=dict(title="Cohort", traceorder="reversed", font=dict(size=10)),
-        )
-        for c in order:
-            for i, yr in enumerate(years):
-                v = P.loc[c, yr]
-                if pd.isna(v) or v == 0 or share.loc[c, yr] < 0.03:
-                    continue
-                fig.add_annotation(
-                    x=i,
-                    y=float(bottoms.loc[c, yr] + v / 2),
-                    text=f"{share.loc[c, yr]:.0%}",
-                    showarrow=False,
-                    font=dict(size=10, color=text_color[c]),
-                )
-        for i, yr in enumerate(years):
-            fig.add_annotation(
-                x=i,
-                y=float(year_tot[yr]),
-                yshift=12,
-                text=total_fmt.format(year_tot[yr]),
-                showarrow=False,
-                font=dict(size=12),
-            )
-        # Retention of the existing base between adjacent years (TCBA §6.2):
-        # the share of a year's value that the cohorts present that year
-        # still deliver the next year. `new_next` is the value from the
-        # newest cohort in the next year, so it is left out of the base.
-        if flows:
-            for i in range(len(years) - 1):
-                base = year_tot[years[i]]
-                new_next = (
-                    P.loc[years[i + 1], years[i + 1]]
-                    if years[i + 1] in P.index
-                    else 0.0
-                )
-                new_next = 0.0 if pd.isna(new_next) else new_next
-                retained = year_tot[years[i + 1]] - new_next
-                if base <= 0:
-                    continue
-                fig.add_annotation(
-                    x=i + 0.5,
-                    y=float(0.5 * (base + retained)),
-                    text=f"{retained / base:.0%}",
-                    showarrow=False,
-                    font=dict(size=11, color="#374151"),
-                    bgcolor="rgba(255,255,255,0.72)",
-                    bordercolor="#c9d3df",
-                    borderpad=2,
-                )
-        fig.update_yaxes(title=y_title, rangemode="tozero", automargin=True)
-        fig.update_xaxes(tickvals=xpos, ticktext=years, automargin=True)
-        return fig
-
-    return (cohort_flow_stack,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Data
-
-    The master dataset is `cust_data_long.csv`. It has one row for each customer
-    and each quarter **in which that customer was active**. Each row records the
-    number of transactions, the spend, and the profit for that customer-quarter.
-
-    | Column | Meaning |
-    |---|---|
-    | `CustomerID` | customer key |
-    | `Cohort` | acquisition quarter, for example `y2016_q1`; customers acquired before the window are `pre_y2016` |
-    | `YearQuarter` | `y2016_q1` … `y2019_q4` |
-    | `NumTrans` | transactions in that quarter |
-    | `Spend` | revenue in that quarter |
-    | `Profit` | contribution profit in that quarter |
-
-    The `Year` and `Quarter` fields come from `YearQuarter`. Spend and profit are
-    held as integer cents during aggregation to avoid floating-point drift, then
-    converted back to dollars.
-
-    ### Definitions
-
-    - A **cohort** is the set of customers acquired in one period.
-    - The **cohort size** is the number of customers acquired in that period. The
-      size of the `pre_y2016` cohort is unknown. Exclude that cohort from every
-      calculation that divides by cohort size.
-    - **AOF** (average order frequency) is transactions divided by active
-      customers.
-    - **AOV** (average order value) is spend divided by transactions.
-    - **Margin** is profit divided by spend.
-
-    Profit factors into four terms. This identity is the backbone of the audit:
-
-    $$
-    \text{Profit} \;=\; N_c \,\times\, \text{AOF} \,\times\, \text{AOV} \,\times\, \text{Margin}
-    \;=\; N_c \times \frac{\text{trans}}{\text{cust}} \times \frac{\text{spend}}{\text{trans}} \times \frac{\text{profit}}{\text{spend}}
-    $$
-
-    where $N_c$ is the number of active customers. For a cohort in a period,
-    decompose number of active customers into cohort size and fraction of the cohort that is active:
-
-    $$
-    \text{Cohort profit} \;=\; (\text{cohort size}) \times (\%\,\text{active}) \times \text{AOF} \times \text{AOV} \times \text{Margin}
-    $$
-
-    This structure lets you trace any change in profit to a specific cause: **fewer
-    customers**, **less frequent orders**, **smaller orders**, or **thinner margins**.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Binning rules for the distributions
-
-    Most behavioural quantities are heavily right-skewed. The maximum is often 10
-    to 100 times the mean. Follow four rules for every histogram:
-
-    1. Make each bin **half-open on the left**. The \$25–50 bin holds spend in the
-       interval $(25, 50]$. The first bin includes its lower edge, so a customer
-       with \$0 falls in the first bin.
-    2. Add a **right-censoring bin** ("greater than $x$") to hold the long tail.
-    3. Set the bin width from the percentile table, not from a rule of thumb.
-       Use one of 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500. A narrow width
-       gives a noisy plot. A wide width hides the skew.
-    4. Plot **relative frequencies**, not counts, when you compare two groups of
-       different size.
-    """)
-    return
-
-
-@app.cell
-def _(pd):
-    cust_data = pd.read_csv("data/madrigal/cust_data_long.csv")
-    cust_data = cust_data.assign(
-        Spend=lambda x: (x["Spend"] * 100).round().astype("int64"),
-        Profit=lambda x: (x["Profit"] * 100).round().astype("int64"),
-    ).assign(
-        **cust_data["YearQuarter"]
-        .str.extract(r"y(\d{4})_q(\d)")
-        .rename(columns={0: "Year", 1: "Quarter"})
-        .astype({"Year": "int32", "Quarter": "int8"})
-    )
-    return (cust_data,)
-
-
-@app.cell
-def _(np):
-    def yearly_cust_data(df, year):
-        return (
-            df.query(f"Year == {year}")
-            .groupby("CustomerID", as_index=False)
-            .agg(
-                NumTrans=("NumTrans", "sum"),
-                Spend=("Spend", "sum"),
-                Profit=("Profit", "sum"),
-            )
-            .assign(
-                Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
-                Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2),
-            )
-        )
-
-    def with_derived(df):
-        # Add per-customer average spend per transaction and margin once, at creation.
-        return df.assign(
-            AvgSpendPerTrans=lambda x: x["Spend"] / x["NumTrans"],
-            Margin=lambda x: np.where(
-                x["Spend"] > 0, x["Profit"] / x["Spend"] * 100, np.nan
-            ),
-        )
-
-    return with_derived, yearly_cust_data
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Lens 1 — How do customers differ from one another?
-
-    Lens 1 looks at one calendar year (2019) and measures how much customers
-    differ inside that year. The central result is that the **"average customer"
-    does not describe anyone**. Every behavioural quantity is skewed, so the mean
-    sits far above the median and most customers fall below the mean.
-
-    ### Working dataset
-
-    Keep the rows for 2019, group by `CustomerID`, and sum transactions, spend,
-    and profit. Only customers with at least one 2019 transaction appear. The
-    totals below are fixed reference points for the rest of Lens 1.
-    """)
-    return
-
-
-@app.cell
-def _(GT, cust_data, pd, style_table, with_derived, yearly_cust_data):
-    cust_data_2019 = with_derived(yearly_cust_data(cust_data, 2019))
-    cust_data_2018 = with_derived(yearly_cust_data(cust_data, 2018))
-
-    _summary = pd.DataFrame(
-        {
-            "Metric": [
-                "Active customers",
-                "Total transactions",
-                "Total spend",
-                "Total profit",
-                "Transactions / customer",
-                "Spend / customer",
-                "Profit / customer",
-            ],
-            "Value": [
-                len(cust_data_2019),
-                cust_data_2019["NumTrans"].sum(),
-                cust_data_2019["Spend"].sum(),
-                cust_data_2019["Profit"].sum(),
-                cust_data_2019["NumTrans"].mean(),
-                cust_data_2019["Spend"].mean(),
-                cust_data_2019["Profit"].mean(),
-            ],
-        }
-    )
-    (
-        GT(_summary)
-        .tab_header(title="2019 annual customer summary")
-        .fmt_number(columns="Value", rows=[0, 1], decimals=0)
-        .fmt_currency(columns="Value", rows=[2, 3], decimals=0)
-        .fmt_number(columns="Value", rows=[4], decimals=2)
-        .fmt_currency(columns="Value", rows=[5, 6], decimals=2)
-        .pipe(style_table)
-    )
-    return cust_data_2018, cust_data_2019
-
-
-@app.cell
-def _(cust_data_2019, customer_descriptives):
-    spend_stats = customer_descriptives(cust_data_2019, "Spend")
-    profit_stats = customer_descriptives(cust_data_2019, "Profit")
-    trans_stats = customer_descriptives(cust_data_2019, "NumTrans")
-    avg_spend_stats = customer_descriptives(cust_data_2019, "AvgSpendPerTrans")
-    avg_margin_stats = customer_descriptives(
-        cust_data_2019.query("Spend > 0"), "Margin"
-    )
-    return (
-        avg_margin_stats,
-        avg_spend_stats,
-        profit_stats,
-        spend_stats,
-        trans_stats,
-    )
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Distribution of spend
-
-    The spend distribution is strongly right-skewed. The maximum (\$6,695) is
-    about 37 times the mean (\$183), and the mean is well above the median
-    (\$113). As a result, **69% of customers spend below the average**. The
-    bottom 5% spend \$22 or less; the top 5% each spend more than \$579.
-
-    The mean is therefore a poor summary of a typical customer. Read the median
-    and the percentiles instead. The percentile table also sets the bin width: a
-    width of \$25 with censoring at \$1,000 gives 41 bins and shows the skew
-    without noise.
-
-    Two customers have exactly \$0 spend in 2019. They fall in the first bin.
-    """)
-    return
-
-
-@app.cell
-def _(spend_stats, stat_badges):
-    stat_badges(spend_stats, "Spend")
-    return
-
-
-@app.cell
-def _(create_percentile_table, spend_stats):
-    create_percentile_table(
-        spend_stats,
-        "Spend",
-        "Customer spend percentiles",
-        "2019 annual spend",
-        fmt="currency",
-    )
-    return
-
-
-@app.cell
-def _(
-    bar_distribution,
-    create_bins_labels,
-    create_distribution,
-    cust_data_2019,
-):
-    bar_distribution(
-        create_distribution(cust_data_2019, "Spend", **create_bins_labels(25, 1000)),
-        title="Customer spend distribution (2019)",
-        x_title="Annual spend ($)",
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Distribution of profit
-
-    Profit has the same right-skewed shape as spend. The values run from −\$652
-    to \$3,347. The mean (\$88) is above the median (\$54), and again **69% of
-    customers fall below the mean**. Profit runs at roughly 45–50% of the
-    corresponding spend figures, so the plot uses a lower censoring point
-    (\$500). A separate `< 0` bin holds the loss-making customers.
-    """)
-    return
-
-
-@app.cell
-def _(profit_stats, stat_badges):
-    stat_badges(profit_stats, "Profit")
-    return
-
-
-@app.cell
-def _(
-    bar_distribution,
-    create_bins_labels,
-    create_distribution,
-    cust_data_2019,
-):
-    bar_distribution(
-        create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)),
-        title="Customer profit distribution (2019)",
-        x_title="Annual profit ($)",
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Distribution of the number of transactions
-
-    The transaction count is a reverse-J distribution. The maximum is 58, but
-    **63% of customers made exactly one purchase** (20,149 of 31,855). The mean of
-    1.9 therefore describes almost no one.
-
-    Keep every non-terminal bin at width 1 and censor at `10+`. Do not merge bins
-    into unequal groups (for example 1 / 2–4 / 5–9) in a histogram. If you need
-    unequal groups, use a table.
-    """)
-    return
-
-
-@app.cell
-def _(stat_badges, trans_stats):
-    stat_badges(trans_stats, "Transactions", money=False)
-    return
-
-
-@app.cell
-def _(bar_distribution, create_distribution, cust_data_2019, np):
-    _bins = list(range(1, 11)) + [np.inf]
-    _labels = [str(i) for i in range(1, 10)] + ["10+"]
-    bar_distribution(
-        create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
-        title="Customer transactions distribution (2019)",
-        x_title="Annual transactions",
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Distribution of average spend per transaction
-
-    For each customer, average spend per transaction is $\text{spend}/\text{trans}$.
-    Bin at width \$25 and censor at \$500.
-
-    #### Two different "average transaction" numbers
-
-    Two quantities are both called "average spend per transaction". They are not
-    equal, and both appear in practice.
-
-    - **Ratio of totals (AOV).** Divide total spend by total transactions. For
-      2019 this is about \$96.
-    - **Mean of per-customer averages.** Average each customer's own spend per
-      transaction, then take the mean across customers. For 2019 this is about
-      \$99.
-
-    Start from the ratio of the two per-customer means. The count $I$ cancels,
-    which leaves total spend over total transactions:
-
-    $$
-    \frac{\frac{1}{I}\sum_{i=1}^{I}\text{spend}_i}{\frac{1}{I}\sum_{i=1}^{I}\text{trans}_i}
-    = \frac{\sum_{i=1}^{I}\text{spend}_i}{\sum_{i=1}^{I}\text{trans}_i}
-    = \sum_{i=1}^{I}\left(\frac{\text{trans}_i}{\sum_{j}\text{trans}_j}\right)\frac{\text{spend}_i}{\text{trans}_i}
-    $$
-
-    The last form shows that **AOV is a transaction-weighted average** of the
-    per-customer values. Each customer's weight is that customer's share of total
-    transactions, so frequent buyers dominate it.
-
-    The mean of per-customer averages gives every customer equal weight:
-
-    $$
-    \frac{1}{I}\sum_{i=1}^{I}\frac{\text{spend}_i}{\text{trans}_i}
-    $$
-
-    The one-and-done buyers (63% of the base) count as much as the customer with
-    58 transactions.
-
-    The two numbers are equal **only** when every customer makes the same number
-    of transactions. That never happens in a real customer base, so the two always
-    differ. The direction of the gap carries information. Here \$96 is below \$99,
-    which means heavier buyers have **smaller** average baskets than light buyers.
-
-    Use one name for each quantity and keep it fixed. "AOV" always means the
-    transaction-weighted ratio of totals.
-    """)
-    return
-
-
-@app.cell
-def _(avg_spend_stats, stat_badges):
-    stat_badges(avg_spend_stats, "Avg spend / transaction")
-    return
-
-
-@app.cell
-def _(
-    bar_distribution,
-    create_bins_labels,
-    create_distribution,
-    cust_data_2019,
-):
-    bar_distribution(
-        create_distribution(
-            cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)
-        ),
-        title="Average spend per transaction (2019)",
-        x_title="Average spend per transaction ($)",
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    #### Average spend per transaction, by transaction level
-
-    Both the number of transactions and the average spend per transaction vary
-    across customers. The natural next question is whether the two are related.
-    Group customers by transaction count (1, 2, …, 9, `10+`) and report the spread
-    of average spend inside each group. The result confirms the finding above:
-    average basket size does not rise with purchase frequency.
-    """)
-    return
-
-
-@app.cell
-def _(GT, cust_data_2019, np, pd, style_table):
-    _bins = list(range(1, 11)) + [np.inf]
-    _labels = [str(i) for i in range(1, 10)] + ["10+"]
-    _binned = cust_data_2019.assign(
-        TransBin=lambda d: pd.cut(
-            d["NumTrans"], bins=_bins, labels=_labels, right=False
-        )
-    )
-    aspt_by_level = _binned.groupby("TransBin", as_index=False, observed=True).agg(
-        Mean=("AvgSpendPerTrans", "mean"),
-        Std=("AvgSpendPerTrans", "std"),
-        Min=("AvgSpendPerTrans", "min"),
-        P05=("AvgSpendPerTrans", lambda s: s.quantile(0.05)),
-        Median=("AvgSpendPerTrans", "median"),
-        P95=("AvgSpendPerTrans", lambda s: s.quantile(0.95)),
-        Max=("AvgSpendPerTrans", "max"),
-    )
-    (
-        GT(aspt_by_level.rename(columns={"TransBin": "Transactions"}))
-        .tab_header(title="Average spend per transaction, by transaction level")
-        .fmt_currency(columns=list(aspt_by_level.columns[1:]), decimals=2)
-        .pipe(style_table)
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Distribution of average margin
-
-    For each customer, margin is $\text{profit}/\text{spend}$. It is defined only
-    where spend is greater than 0, so exclude the two zero-spend customers rather
-    than fill them with 0. This is the **overall** margin across all of a
-    customer's 2019 purchases, not the average of transaction-level margins;
-    transaction-level margins cannot be recovered from quarter-level data.
-
-    Unlike the other four quantities, margin is **left-skewed**. Bin at width 5%
-    and add a `< 0%` bin for loss-makers.
-    """)
-    return
-
-
-@app.cell
-def _(avg_margin_stats, stat_badges):
-    stat_badges(avg_margin_stats, "Margin", money=False, pct=True)
-    return
-
-
-@app.cell
-def _(
-    bar_distribution,
-    create_bins_labels,
-    create_distribution,
-    cust_data_2019,
-):
-    bar_distribution(
-        create_distribution(
-            cust_data_2019.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0)
-        ),
-        title="Average margin distribution (2019)",
-        x_title="Margin (%)",
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Decile analyses
-
-    A decile report splits the customer base into ten groups and applies the
-    profit identity to each group. It shows how concentrated value is, and which
-    of the four factors drives that concentration. Two versions exist, and they
-    answer different questions.
-
-    **Customer decile** — each decile holds 10% of *customers*, ranked by profit.
-    This shows how much of total profit the top-ranked tenth of customers
-    produces.
-
-    **Profit decile** — each decile holds 10% of *profit*. The top decile
-    contains the few customers who together make the first 10% of profit, so it
-    holds far fewer than 10% of customers. This version shows the size of the most
-    valuable group.
-
-    Read the report by column: `% Cust.` against `% Profit` measures
-    concentration; `AOF`, `AOV` and `Avg. Margin` show which factor separates the
-    top deciles from the bottom.
-    """)
-    return
-
-
-@app.cell
-def _(DECILE_FIELDS, cust_data_2019, decile_report, decile_report_gt, pd):
-    _ranked = cust_data_2019.assign(
-        CustDecile=lambda d: (
-            pd.qcut(
-                d["Profit"].rank(method="first", ascending=False), q=10, labels=False
-            )
-            + 1
-        )
-    )
-    cust_decile_rep, _f = decile_report(_ranked, "CustDecile")
-    decile_report_gt(cust_decile_rep, DECILE_FIELDS, "Customer decile report")
-    return
-
-
-@app.cell
-def _(
-    DECILE_FIELDS,
-    cust_data_2019,
-    decile_labels,
-    decile_report,
-    decile_report_gt,
-):
-    _labelled = decile_labels(cust_data_2019, "Profit")[0]
-    profit_decile_rep, _f = decile_report(_labelled, "ProfitDecile")
-    decile_report_gt(
-        profit_decile_rep, DECILE_FIELDS, "Profit decile report", pct_decimals=2
-    )
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    Two points need care in the profit decile report:
-
-    1. **Cumulative profit is not monotonic.** It rises to about \$2,802,772, then
-       falls back to the total of \$2,798,904, because 263 customers are
-       loss-making. Every loss-maker lands in decile 10. The decile-1 cut-off is
-       about \$546 of individual profit; the decile-2 cut-off is about \$345.
-    2. **A revenue version is a useful fallback.** If you do not have cost data,
-       run the same decile report on spend. A variant that pulls the loss-makers
-       into a separate 11th group is also worth building.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ## Lens 2 — What changed between two periods?
-
-    Lens 2 compares 2018 with 2019 and traces the change in firm performance to
-    changes in customer behaviour. The working dataset has one row for each
-    customer active in **either** year (an outer join of the two annual
-    aggregates, with zeros filled in). It covers 48,238 customers. A `Status`
-    field marks each customer as active in both years, in 2018 only (lapsed), or
-    in 2019 only (new or reactivated).
-    """)
-    return
-
-
 @app.cell
 def _(cust_data_2018, cust_data_2019):
     cust_2018_2019 = (
@@ -1681,7 +1486,13 @@ def _(cust_data_2018, cust_data_2019):
 def _(mo):
     mo.md(r"""
     ### Headline
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Spend and profit both grew, and the active count grew with them. The question
     for the rest of Lens 2 is whether that growth came from existing customers
     buying more, or from acquisition outrunning churn.
@@ -1730,7 +1541,13 @@ def _(GT, cust_2018_2019, cust_data_2018, cust_data_2019, pd, style_table):
 def _(mo):
     mo.md(r"""
     ### Overlaid distributions
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Re-draw each Lens 1 distribution for 2018 and 2019 on the same axes, with the
     same bin edges and relative frequencies. The two years overlap almost exactly.
     The **shape** of customer heterogeneity is stable across years; what moved is
@@ -1867,7 +1684,13 @@ def _(
 def _(mo):
     mo.md(r"""
     ### Customer overlap
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Split the two years into three groups: active in both years, 2018 only, and
     2019 only. Of the 26,254 customers active in 2018, only 9,871 returned in
     2019. Repeat buyers are 38% of the 2018 base and 31% of the 2019 base. The
@@ -1912,7 +1735,13 @@ def _(overlap, venn_two):
 def _(mo):
     mo.md(r"""
     ### Profit by activity group and the profit bridge
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Split profit by the three activity groups. The both-years group made 53% of
     2018 profit but only 42% of 2019 profit, and its profit **fell** by about
     \$33,000. All of the growth came from acquisition: the 2019-only group added
@@ -1955,7 +1784,13 @@ def _(profit_bridge_chart, profit_by_group):
 def _(mo):
     mo.md(r"""
     ### Performance decomposition by group
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Apply the profit identity to each group in each year. This shows **why** the
     retained group is over-represented in profit relative to its headcount: it
     buys more often (higher AOF) and spends more per order (higher AOV) than the
@@ -2036,7 +1871,13 @@ def _(GT, cust_2018_2019, style_table):
 def _(mo):
     mo.md(r"""
     ### Decile change analysis
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Do high-value customers stay high-value? Compute profit-decile cut-offs
     separately for 2018 and 2019. In this base they are close, so use one common
     set of cut-offs for both years (the average of the two, rounded to the nearest
@@ -2123,7 +1964,13 @@ def _(
 def _(mo):
     mo.md(r"""
     ### Up-down analysis
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     For the 9,871 customers active in both years, mark each of four quantities as
     up or down from 2018 to 2019: profit, transactions, average spend per
     transaction, and margin. The four flags give up to 16 groups. Add rows for the
@@ -2266,11 +2113,100 @@ def _(GT, cust_2018_2019, np, pd, style_table):
 def _(mo):
     mo.md(r"""
     ## Lens 3 — How does a cohort evolve?
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Lens 3 follows one acquisition cohort across its life. The cohort is the 2,944
     customers whose first purchase was in Q1 2016. Because the data are quarterly,
     the finest time step is a quarter.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Time-to-second-purchase chart
+    """)
+    return
+
+
+@app.cell
+def _(ACCENT, ACCENT2, GRID, go):
+    def second_purchase_chart(sp, width=None, height=360):
+        fig = go.Figure()
+        fig.add_bar(
+            x=sp["Period"],
+            y=sp["inc_pct"],
+            name="Incremental",
+            marker_color=ACCENT,
+            marker_line_width=0,
+            yaxis="y",
+            hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
+        )
+        fig.add_scatter(
+            x=sp["Period"],
+            y=sp["cum_pct"],
+            name="Cumulative",
+            mode="lines+markers",
+            line=dict(width=1.8, color=ACCENT2),
+            marker=dict(size=6, color=ACCENT2),
+            yaxis="y2",
+            hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
+        )
+        # width=None + autosize lets the figure fill the cell; automargin keeps
+        # each axis title clear of its tick labels as the width changes. Axis
+        # titles are tinted to match their series (navy bars, ochre line).
+        fig.update_layout(
+            template="cba",
+            title="Percent of cohort making a second purchase, by quarter",
+            autosize=True,
+            width=width,
+            height=height,
+            bargap=0.25,
+            legend=dict(
+                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
+            ),
+            yaxis=dict(
+                title="Incremental",
+                tickformat=".0%",
+                showgrid=True,
+                gridcolor=GRID,
+                fixedrange=True,
+                automargin=True,
+            ),
+            yaxis2=dict(
+                title="Cumulative",
+                tickformat=".0%",
+                overlaying="y",
+                side="right",
+                showgrid=False,
+                range=[0, 1],
+                fixedrange=True,
+                automargin=True,
+            ),
+        )
+        fig.update_xaxes(type="category", tickangle=-45, automargin=True)
+        return fig
+
+    return (second_purchase_chart,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Revenue decomposition over time
 
     Cohort revenue in each quarter factors as:
@@ -2376,7 +2312,13 @@ def _(cohort_q1_decomp, line_chart):
 def _(mo):
     mo.md(r"""
     ### Annual repeat-buying patterns
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Reduce each customer to four annual flags. The 2016 flag is set only if the
     customer made **more than one** transaction in 2016, so it records a repeat
     purchase beyond acquisition. The 2017–2019 flags record any activity in the
@@ -2445,7 +2387,13 @@ def _(GT, cust_data, pd, style_table):
 def _(mo):
     mo.md(r"""
     ### Time to second purchase
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     From the customer-by-quarter matrix, build a latching "has made a second
     purchase" indicator. It turns on in the quarter of a customer's second
     ever purchase and stays on. The column means give the **cumulative** share of
@@ -2496,7 +2444,13 @@ def _(second_purchase, second_purchase_chart):
 def _(mo):
     mo.md(r"""
     ### Quarter-to-quarter repeat-buying rate
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     The repeat-buying rate for quarter $t$ is the share of customers active in $t$
     who are also active in $t+1$:
 
@@ -2555,7 +2509,13 @@ def _(cust_data, line_chart):
 def _(mo):
     mo.md(r"""
     ### Value to date (VTD) and its concentration
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Value to date is a customer's total undiscounted profit over the four years.
     It runs from −\$23 to \$3,756, with a mean of \$170 and a median of \$78, so
     **72% of the cohort is below average VTD**. Just over 2% exceed \$1,000. Total
@@ -2686,7 +2646,13 @@ def _(GT, cust_data, style_table, vtd_decile):
 def _(mo):
     mo.md(r"""
     ### RFM analysis
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Compute recency, frequency, and monetary value at the end of the window.
     Recency is the index of the last active quarter (1 = Q1 2016 … 16 = Q4 2019).
     Frequency is total transactions. Monetary value is average profit per
@@ -2771,13 +2737,125 @@ def _(GT, cust_data, np, pd, style_table):
 def _(mo):
     mo.md(r"""
     ## Lens 4 — Comparing cohorts
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Lens 4 compares acquisition cohorts, controlling for their size. The working
     dataset is a cohort-by-quarter grid of active customers, transactions, spend,
     and profit, plus the derived % active, AOF, AOV, and margin. Cohort size is the
     diagonal (the acquisition-quarter count). Exclude the `pre y2016` cohort from
     anything that needs cohort size.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Cohort trajectory lines
+    """)
+    return
+
+
+@app.cell
+def _(go):
+    def _sample_colorscale(n, scale=("#0d3b66", "#6aa5d9")):
+        # Consultant blue ramp (navy → medium blue) for ordinal cohort series.
+        import plotly.colors as pc
+
+        if n == 1:
+            return [pc.sample_colorscale(scale, [0.0])[0]]
+        return pc.sample_colorscale(scale, [i / (n - 1) for i in range(n)])
+
+    def _q_index(s, base_year, pattern=r"y(\d{4})_q([1-4])"):
+        parts = s.str.extract(pattern)
+        year, qtr = parts[0].astype("float"), parts[1].astype("float")
+        return (year - base_year) * 4 + qtr - 1
+
+    def cohort_lines(
+        df,
+        metric,
+        cohorts=None,
+        align=False,
+        index=False,
+        tickformat=None,
+        title=None,
+        width=740,
+        height=360,
+        pattern=r"y(\d{4})_q([1-4])",
+    ):
+        d = df.reset_index()
+        if cohorts is not None:
+            d = d[d["Cohort"].isin(cohorts)]
+        d = d.sort_values(["Cohort", "YearQuarter"]).copy()
+        base_year = d["YearQuarter"].str.extract(pattern)[0].astype("float").min()
+        d["Age"] = _q_index(d["YearQuarter"], base_year, pattern) - _q_index(
+            d["Cohort"], base_year, pattern
+        )
+        if index:
+            d[metric] = d[metric] / d.groupby("Cohort")[metric].transform("first") * 100
+        order = [
+            c
+            for c in ["pre y2016", *sorted(d["YearQuarter"].unique())]
+            if c in set(d["Cohort"])
+        ]
+        colors = dict(zip(order, _sample_colorscale(len(order))))
+        tickformat = tickformat or (",.0f" if index else ",.2f")
+        y_title = f"{metric} (acq. qtr = 100)" if index else metric
+        if title is None:
+            _bits = [
+                b for b in ("aligned" if align else "", "indexed" if index else "") if b
+            ]
+            title = f"{metric} by cohort" + (f" ({', '.join(_bits)})" if _bits else "")
+        fig = go.Figure()
+        for c in order:
+            dc = d[d["Cohort"] == c]
+            if align:
+                dc = dc.dropna(subset=["Age"])
+                x = dc["Age"].astype(int)
+            else:
+                x = dc["YearQuarter"]
+            fig.add_scatter(
+                x=x,
+                y=dc[metric],
+                mode="lines+markers",
+                name=c.replace("_", " "),
+                line=dict(width=1.6, color=colors[c]),
+                marker=dict(size=5, color=colors[c]),
+                hovertemplate=f"{c} · %{{x}}<br>%{{y}}<extra></extra>",
+            )
+        fig.update_layout(
+            template="cba",
+            title=title,
+            width=width,
+            height=height,
+            legend=dict(title="Cohort"),
+        )
+        if align:
+            fig.update_xaxes(title="Quarters since acquisition", dtick=1)
+        else:
+            fig.update_xaxes(title=None, tickangle=-45, type="category")
+        fig.update_yaxes(title=y_title, tickformat=tickformat)
+        return fig
+
+    return (cohort_lines,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Workflow
 
     Cohorts differ in size, so raw comparison is misleading. The Q3 2016 cohort
@@ -2919,15 +2997,302 @@ def _(cohort_df, cohort_lines):
 def _(mo):
     mo.md(r"""
     ## Lens 5 — Health of the customer base
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Lens 5 takes the firm-level view. It asks whether growth comes from a healthy
     base or from acquisition outrunning churn. The working dataset groups customers
     into annual cohorts (pre-2016, 2016, 2017, 2018, 2019) and builds an annual
     cohort-by-year grid of active customers, transactions, spend, and profit.
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Annual summary bars
+    """)
+    return
+
+
+@app.cell
+def _(ACCENT, ACCENT2, go):
+    def acquisitions_bar_chart(df, width=520, height=340):
+        d = df.reset_index()
+        d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
+        fig = go.Figure(
+            go.Bar(
+                x=d["Year"].astype(str),
+                y=d["NumActive"],
+                marker_color=ACCENT,
+                hovertemplate="%{x}<br>New: %{y:,}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            template="cba",
+            title="Acquisitions by year",
+            width=width,
+            height=height,
+            bargap=0.4,
+        )
+        fig.update_yaxes(title="New customers", tickformat=",.0f")
+        fig.update_xaxes(type="category")
+        return fig
+
+    def active_customers_bar_chart(df, width=520, height=340):
+        d = df.groupby("Year", observed=True)["NumActive"].sum().reset_index()
+        fig = go.Figure(
+            go.Bar(
+                x=d["Year"].astype(str),
+                y=d["NumActive"],
+                marker_color=ACCENT,
+                hovertemplate="%{x}<br>Active: %{y:,}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            template="cba",
+            title="Active customers by year",
+            width=width,
+            height=height,
+            bargap=0.4,
+        )
+        fig.update_yaxes(title="Active customers", tickformat=",.0f")
+        fig.update_xaxes(type="category")
+        return fig
+
+    def spend_profit_bar_chart(df, width=560, height=360):
+        d = (
+            df.reset_index()
+            .melt(
+                id_vars=["CohortYear", "Year"],
+                value_vars=["TotalSpend", "TotalProfit"],
+                var_name="Metric",
+                value_name="Value",
+            )
+            .groupby(["Year", "Metric"], observed=True, as_index=False)["Value"]
+            .sum()
+        )
+        d["Year"] = d["Year"].astype(str)
+        fig = go.Figure()
+        for metric, col, name in [
+            ("TotalSpend", ACCENT, "Spend"),
+            ("TotalProfit", ACCENT2, "Profit"),
+        ]:
+            dm = d[d["Metric"] == metric]
+            fig.add_bar(
+                x=dm["Year"],
+                y=dm["Value"],
+                name=name,
+                marker_color=col,
+                hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>",
+            )
+        fig.update_layout(
+            template="cba",
+            title="Spend and profit by year",
+            barmode="group",
+            width=width,
+            height=height,
+            bargap=0.35,
+            bargroupgap=0.08,
+        )
+        fig.update_yaxes(title=None, tickformat="$,.0f")
+        fig.update_xaxes(type="category")
+        return fig
+
+    return (
+        acquisitions_bar_chart,
+        active_customers_bar_chart,
+        spend_profit_bar_chart,
+    )
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Cohort stack and flow
+    """)
+    return
+
+
+@app.cell
+def _(SEQ, go, pd):
+    ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
+
+    def _hex_rgba(hexc, a):
+        h = hexc.lstrip("#")
+        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+        return f"rgba({r},{g},{b},{a})"
+
+    def cohort_flow_data(df, metric, scale=1.0, order=tuple(ANNUAL_ORDER)):
+        # Prepare every number the flow chart draws, so it can be reviewed as
+        # plain tables before plotting. Returns a dict of frames keyed by role.
+        order = list(order)
+        P = df[metric].unstack("Year").reindex(order).div(scale)
+        P.columns = P.columns.astype(str)
+        years = list(P.columns)
+        totals = P.sum(axis=0)
+        share = P.div(totals, axis=1)
+        bottoms = P.cumsum(axis=0) - P
+        gaps = [f"{years[i]}\u2192{years[i + 1]}" for i in range(len(years) - 1)]
+        # Per-cohort retention: a cohort's value next year / its value this year.
+        cohort_retention = pd.DataFrame(
+            {gaps[i]: P[years[i + 1]] / P[years[i]] for i in range(len(gaps))},
+            index=order,
+        )
+        # Base retention (TCBA 6.2): of a year's whole base, the share still
+        # delivered next year (the newest cohort of the next year is excluded).
+        base = {}
+        for i, g in enumerate(gaps):
+            y0, y1 = years[i], years[i + 1]
+            new_next = P.loc[y1, y1] if y1 in P.index else 0.0
+            new_next = 0.0 if pd.isna(new_next) else new_next
+            base[g] = (
+                (totals[y1] - new_next) / totals[y0] if totals[y0] else float("nan")
+            )
+        base_retention = pd.Series(base, name="base_retention")
+        return {
+            "values": P,
+            "totals": totals,
+            "share": share,
+            "bottoms": bottoms,
+            "cohort_retention": cohort_retention,
+            "base_retention": base_retention,
+            "years": years,
+            "gaps": gaps,
+        }
+
+    def cohort_flow_chart(
+        data, y_title="", total_fmt="{:.2f}", flows=True, width=820, height=520
+    ):
+        # Pure renderer: every number comes from `data` (see cohort_flow_data).
+        P, years, gaps = data["values"], data["years"], data["gaps"]
+        totals, share, bottoms = data["totals"], data["share"], data["bottoms"]
+        cohort_ret, base_ret = data["cohort_retention"], data["base_retention"]
+        order = list(P.index)
+        colors = dict(zip(order, SEQ[: len(order)]))
+        text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
+        xpos = list(range(len(years)))
+        hw = (1 - 0.45) / 2  # half bar width in x-units (bargap=0.45)
+        fig = go.Figure()
+        # Ribbons first, so the bars render on top of them.
+        if flows:
+            for c in order:
+                for i in range(len(years) - 1):
+                    v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
+                    if pd.isna(v1) or pd.isna(v2) or v1 == 0 or v2 == 0:
+                        continue
+                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
+                    fig.add_scatter(
+                        x=[i + hw, i + 1 - hw, i + 1 - hw, i + hw],
+                        y=[b1 + v1, b2 + v2, b2, b1],
+                        fill="toself",
+                        mode="lines",
+                        line=dict(width=0),
+                        fillcolor=_hex_rgba(colors[c], 0.22),
+                        hoverinfo="skip",
+                        showlegend=False,
+                    )
+        for c in order:
+            y_vals = [None if pd.isna(v) else float(v) for v in P.loc[c]]
+            fig.add_bar(
+                name=c.replace("_", " "),
+                x=xpos,
+                y=y_vals,
+                marker=dict(color=colors[c], line=dict(color="white", width=1)),
+                hovertemplate=f"{c.replace('_', ' ')} \u00b7 %{{x}}<br>{y_title}: %{{y:,.2f}}<extra></extra>",
+            )
+        fig.update_layout(
+            template="cba",
+            barmode="stack",
+            bargap=0.45,
+            title=f"{y_title.split(' (')[0]} by acquisition cohort",
+            autosize=True,
+            width=width,
+            height=height,
+            legend=dict(title="Cohort", traceorder="reversed"),
+        )
+        # In-segment share-of-year labels.
+        for c in order:
+            for i, yr in enumerate(years):
+                v = P.loc[c, yr]
+                if pd.isna(v) or v == 0 or share.loc[c, yr] < 0.03:
+                    continue
+                fig.add_annotation(
+                    x=i,
+                    y=float(bottoms.loc[c, yr] + v / 2),
+                    text=f"{share.loc[c, yr]:.0%}",
+                    showarrow=False,
+                    font=dict(size=10, color=text_color[c]),
+                )
+        # Per-year totals on top.
+        for i, yr in enumerate(years):
+            fig.add_annotation(
+                x=i,
+                y=float(totals[yr]),
+                yshift=12,
+                text=total_fmt.format(totals[yr]),
+                showarrow=False,
+                font=dict(size=12),
+            )
+        if flows:
+            # Middle labels: each cohort's own retention on its ribbon.
+            for c in order:
+                for i in range(len(years) - 1):
+                    v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
+                    if pd.isna(v1) or pd.isna(v2) or v1 == 0 or v2 == 0:
+                        continue
+                    if share.loc[c, years[i]] < 0.05:
+                        continue
+                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
+                    fig.add_annotation(
+                        x=i + 0.5,
+                        y=float(0.5 * ((b1 + v1 / 2) + (b2 + v2 / 2))),
+                        text=f"{cohort_ret.loc[c, gaps[i]]:.0%}",
+                        showarrow=False,
+                        font=dict(size=9, color="#374151"),
+                    )
+            # Top label: base retention between bars (TCBA 6.2), boxed.
+            for i, g in enumerate(gaps):
+                if pd.isna(base_ret[g]):
+                    continue
+                base_top = totals[years[i]]
+                retained = base_top * base_ret[g]
+                fig.add_annotation(
+                    x=i + 0.5,
+                    y=float(0.5 * (base_top + retained)),
+                    text=f"{base_ret[g]:.0%}",
+                    showarrow=False,
+                    font=dict(size=11, color="#374151"),
+                    bgcolor="rgba(255,255,255,0.82)",
+                    bordercolor="#c9d3df",
+                    borderpad=2,
+                )
+        fig.update_yaxes(title=y_title, rangemode="tozero", automargin=True)
+        fig.update_xaxes(tickvals=xpos, ticktext=years, automargin=True)
+        return fig
+
+    return cohort_flow_chart, cohort_flow_data
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Annual performance
 
-    The three charts below use the same function, `cohort_flow_stack`. One chart
+    The three charts below use the same function, `cohort_flow_chart`. One chart
     shows active customers. One chart shows profit. One chart shows spend.
 
     Each chart has one bar for each year. Each bar is a stack of colored bands.
@@ -2975,56 +3340,74 @@ def _(cust_data, pd):
 
 
 @app.cell
-def _(acquisitions_by_year, annual_cohort_combined):
-    acquisitions_by_year(annual_cohort_combined)
+def _(acquisitions_bar_chart, annual_cohort_combined):
+    acquisitions_bar_chart(annual_cohort_combined)
     return
 
 
 @app.cell
-def _(active_by_year, annual_cohort_combined):
-    active_by_year(annual_cohort_combined)
+def _(active_customers_bar_chart, annual_cohort_combined):
+    active_customers_bar_chart(annual_cohort_combined)
     return
 
 
 @app.cell
-def _(annual_cohort_combined, spend_profit_by_year):
-    spend_profit_by_year(annual_cohort_combined)
+def _(annual_cohort_combined, spend_profit_bar_chart):
+    spend_profit_bar_chart(annual_cohort_combined)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Prepared flow data
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The numbers for the three flow charts are computed first, as tables, so you
+    can review them before plotting. `cohort_flow_data` returns the values, the
+    per-year totals, the share of each year, the per-cohort year-to-year
+    retention, and the base retention. The plot function only draws them.
+    """)
     return
 
 
 @app.cell
-def _(annual_cohort_combined, cohort_flow_stack):
-    cohort_flow_stack(
-        annual_cohort_combined,
-        metric="NumActive",
-        y_title="Active customers (000s)",
-        scale=1e3,
-        total_fmt="{:.1f}",
+def _(annual_cohort_combined, cohort_flow_data):
+    flow_active = cohort_flow_data(annual_cohort_combined, "NumActive", scale=1e3)
+    flow_profit = cohort_flow_data(annual_cohort_combined, "TotalProfit", scale=1e6)
+    flow_spend = cohort_flow_data(annual_cohort_combined, "TotalSpend", scale=1e6)
+    return flow_active, flow_profit, flow_spend
+
+
+@app.cell
+def _(flow_profit):
+    # Review: each cohort's year-to-year retention for profit (%).
+    (flow_profit["cohort_retention"] * 100).round(0)
+    return
+
+
+@app.cell
+def _(cohort_flow_chart, flow_active):
+    cohort_flow_chart(
+        flow_active, y_title="Active customers (000s)", total_fmt="{:.1f}"
     )
     return
 
 
 @app.cell
-def _(annual_cohort_combined, cohort_flow_stack):
-    cohort_flow_stack(
-        annual_cohort_combined,
-        metric="TotalProfit",
-        y_title="Profit ($ MM)",
-        scale=1e6,
-        total_fmt="{:.2f}",
-    )
+def _(cohort_flow_chart, flow_profit):
+    cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.2f}")
     return
 
 
 @app.cell
-def _(annual_cohort_combined, cohort_flow_stack):
-    cohort_flow_stack(
-        annual_cohort_combined,
-        metric="TotalSpend",
-        y_title="Spend ($ MM)",
-        scale=1e6,
-        total_fmt="{:.2f}",
-    )
+def _(cohort_flow_chart, flow_spend):
+    cohort_flow_chart(flow_spend, y_title="Spend ($ MM)", total_fmt="{:.2f}")
     return
 
 
@@ -3032,7 +3415,13 @@ def _(annual_cohort_combined, cohort_flow_stack):
 def _(mo):
     mo.md(r"""
     ### Two ratios that matter
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Annotate the profit-by-cohort stack with two different ratios. They answer
     different questions.
 
@@ -3058,7 +3447,13 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     ### Further Lens 5 analyses (specifications)
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     The following analyses complete Lens 5. They are specified here and left for a
     later pass. Each reuses grids already built above.
 
@@ -3096,7 +3491,13 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     ## Appendix A — Area-proportional Venn diagram
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     The Venn diagram in Lens 2 is area-proportional: each region's area is
     proportional to its customer count. Set the 2018 circle radius to $R = 1$. The
     2019 radius follows from the area ratio:
@@ -3152,7 +3553,13 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     ## Appendix B — Implementation checklist
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     - Load the long CSV once. Derive `Year`. Keep it as the single source of truth.
     - Reuse one distribution helper for the histograms. Six of them differ only in
       their arguments.

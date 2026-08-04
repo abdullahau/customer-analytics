@@ -46,6 +46,660 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ## Consulting deck
+
+    A slide view of the audit, styled after a top-tier strategy-consulting deck:
+    **action titles** (the "so-what" on top), one idea per slide, clean exhibits,
+    and a source/page footer. The visual style is emulated; it is not affiliated
+    with or branded as any consulting firm. Scroll to review, or run the deck cell
+    to flip through slides.
+    """)
+    return
+
+
+@app.cell
+def _(mo):
+    # ---- Consulting-deck framework: CSS + slide builders (style emulation only) ----
+    # Scroll-stack of fixed 16:9 slides. Each slide is one cell -> easy to edit,
+    # reorder, and reuse as a template. Compose 1+ exhibits per slide with cols()/
+    # exhibit(), narrative with bullets()/note(), and make charts fill with fit().
+    def _slot(obj):
+        # Render any marimo / plotly / great-tables object to embeddable HTML.
+        return obj.text if hasattr(obj, "text") else mo.vstack([obj]).text
+
+    def fit(fig, height=None):
+        # Make a plotly figure fill its column (drop fixed width, autosize).
+        fig.update_layout(autosize=True, width=None)
+        if height is not None:
+            fig.update_layout(height=height)
+        return fig
+
+    def cols(*items, gap=26, widths=None):
+        # Place exhibits side by side. `widths` = list of flex-grow ints.
+        ws = widths or [1] * len(items)
+        inner = "".join(
+            f"<div class='mck-col' style='flex:{w}'>{_slot(it)}</div>"
+            for it, w in zip(items, ws)
+        )
+        return mo.Html(f"<div class='mck-cols' style='gap:{gap}px'>{inner}</div>")
+
+    def stack(*items, gap=16):
+        inner = "".join(f"<div>{_slot(it)}</div>" for it in items)
+        return mo.Html(f"<div class='mck-stack' style='gap:{gap}px'>{inner}</div>")
+
+    def exhibit(obj, caption=""):
+        cap = f"<div class='mck-cap'>{caption}</div>" if caption else ""
+        return mo.Html(f"<div class='mck-exh'>{_slot(obj)}{cap}</div>")
+
+    def bullets(items):
+        lis = "".join(f"<li>{it}</li>" for it in items)
+        return mo.Html(f"<ul class='mck-points'>{lis}</ul>")
+
+    def note(html):
+        return mo.Html(f"<div class='mck-note'>{html}</div>")
+
+    def slide(title, body, eyebrow="", subtitle="", takeaway="", source="", page=None):
+        head = f"<div class='mck-eyebrow'>{eyebrow}</div>" if eyebrow else ""
+        sub = f"<div class='mck-sub'>{subtitle}</div>" if subtitle else ""
+        tak = f"<div class='mck-takeaway'>{takeaway}</div>" if takeaway else ""
+        src = f"Source: {source}" if source else ""
+        pg = "" if page is None else page
+        return mo.Html(
+            "<div class='mck-deck'><section class='mck-slide'>"
+            f"{head}<h2 class='mck-title'>{title}</h2>{sub}"
+            "<div class='mck-rule'></div>"
+            f"<div class='mck-body'>{_slot(body)}</div>{tak}"
+            f"<div class='mck-foot'><div class='mck-src'>{src}</div>"
+            f"<div class='mck-page'>{pg}</div></div>"
+            "</section></div>"
+        )
+
+    def cover(title, subtitle, tagline="", meta=""):
+        return mo.Html(
+            "<div class='mck-deck'><section class='mck-slide mck-cover'>"
+            f"<div class='mck-cover-kicker'>{tagline}</div>"
+            f"<h1 class='mck-cover-title'>{title}</h1>"
+            f"<div class='mck-cover-sub'>{subtitle}</div>"
+            f"<div class='mck-cover-meta'>{meta}</div>"
+            "</section></div>"
+        )
+
+    def divider(number, title, page=None):
+        pg = "" if page is None else f"<div class='mck-corner-page'>{page}</div>"
+        return mo.Html(
+            "<div class='mck-deck'><section class='mck-slide mck-divider'>"
+            f"<div class='mck-divider-num'>{number}</div>"
+            f"<h2 class='mck-divider-title'>{title}</h2>{pg}"
+            "</section></div>"
+        )
+
+    mo.Html("""<style>
+    .mck-deck{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;
+      --navy:#1f3a5f;--ink:#1f2328;--muted:#6b7280;--accent:#c4703a;}
+    /* fixed 16:9 slide, PowerPoint / reveal.js proportions */
+    .mck-slide{position:relative;background:#fff;border:1px solid #e6e8eb;border-radius:3px;
+      box-shadow:0 3px 16px rgba(31,58,95,.10);width:100%;max-width:1180px;aspect-ratio:16/9;
+      margin:20px auto;padding:32px 46px 14px;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;}
+    .mck-eyebrow{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+      font-weight:700;margin-bottom:6px;}
+    .mck-title{font-size:23px;line-height:1.2;font-weight:700;color:var(--navy);margin:0;letter-spacing:-.01em;}
+    .mck-sub{font-size:13px;color:var(--muted);margin-top:4px;}
+    .mck-rule{height:3px;background:var(--navy);width:56px;margin:11px 0 14px;}
+    .mck-body{flex:1;min-height:0;color:var(--ink);font-size:14px;line-height:1.5;overflow:auto;}
+    .mck-takeaway{margin-top:12px;padding:10px 15px;background:#f3f6fa;border-left:3px solid var(--accent);
+      font-size:13px;color:var(--ink);line-height:1.45;}
+    .mck-foot{display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e6e8eb;
+      padding-top:7px;margin-top:10px;font-size:10.5px;color:var(--muted);}
+    .mck-src{font-style:italic;max-width:80%;} .mck-page{font-variant-numeric:tabular-nums;font-weight:700;}
+    /* layout primitives */
+    .mck-cols{display:flex;height:100%;align-items:stretch;}
+    .mck-col{min-width:0;display:flex;flex-direction:column;justify-content:center;}
+    .mck-stack{display:flex;flex-direction:column;height:100%;}
+    .mck-exh{display:flex;flex-direction:column;height:100%;justify-content:center;}
+    .mck-cap{font-size:11px;color:var(--muted);text-align:center;margin-top:2px;font-style:italic;}
+    .mck-note{font-size:14.5px;line-height:1.6;color:var(--ink);}
+    .mck-note b{color:var(--navy);} .mck-note h4{color:var(--navy);margin:.2em 0 .4em;font-size:15px;}
+    /* cover + divider */
+    .mck-cover{background:linear-gradient(135deg,#1f3a5f 0%,#122336 100%);color:#fff;justify-content:center;border:none;}
+    .mck-cover-kicker{font-size:12px;letter-spacing:.24em;text-transform:uppercase;color:#d68a5a;font-weight:700;margin-bottom:18px;}
+    .mck-cover-title{font-size:44px;line-height:1.06;font-weight:700;margin:0 0 14px;max-width:84%;}
+    .mck-cover-sub{font-size:18px;color:#cdd7e3;max-width:66%;line-height:1.45;}
+    .mck-cover-meta{position:absolute;bottom:22px;left:46px;font-size:11px;letter-spacing:.05em;color:#93a6bc;}
+    .mck-divider{background:#1f3a5f;color:#fff;justify-content:center;border:none;}
+    .mck-divider-num{font-size:14px;letter-spacing:.22em;color:#d68a5a;font-weight:700;}
+    .mck-divider-title{font-size:33px;font-weight:700;margin:8px 0 0;max-width:82%;line-height:1.15;}
+    .mck-corner-page{position:absolute;right:46px;bottom:20px;font-size:11px;font-weight:700;
+      color:#93a6bc;font-variant-numeric:tabular-nums;}
+    /* lists */
+    .mck-agenda{list-style:none;padding:0;margin:4px 0 0;}
+    .mck-agenda li{display:flex;gap:18px;padding:12px 2px;border-bottom:1px solid #eef1f4;font-size:16px;color:var(--ink);}
+    .mck-agenda .n{color:var(--accent);font-weight:700;min-width:30px;}
+    .mck-agenda .q{color:var(--muted);font-size:13.5px;margin-left:auto;text-align:right;max-width:46%;}
+    .mck-points{list-style:none;padding:0;margin:0;}
+    .mck-points li{position:relative;padding:8px 0 8px 26px;border-bottom:1px solid #f1f3f5;font-size:15px;line-height:1.45;}
+    .mck-points li:before{content:'';position:absolute;left:2px;top:15px;width:9px;height:9px;background:var(--accent);border-radius:1px;}
+    .mck-points b{color:var(--navy);}
+    </style>""")
+    return cols, cover, divider, exhibit, fit, note, slide, stack
+
+
+@app.cell
+def _(cover):
+    cover(
+        title="Customer-Base Audit",
+        subtitle="How Madrigal's customers differ — and how their behaviour changes over time",
+        tagline="Descriptive customer analytics",
+        meta="Madrigal transaction sample · 2016–2019 · Illustrative analysis",
+    )
+    return
+
+
+@app.cell
+def _(mo, slide):
+    _agenda = mo.Html(
+        "<ol class='mck-agenda'>"
+        "<li><span class='n'>1</span><span>How do customers differ from one another?</span>"
+        "<span class='q'>Heterogeneity within a single year</span></li>"
+        "<li><span class='n'>2</span><span>What changed between two periods?</span>"
+        "<span class='q'>2018 vs 2019 performance bridge</span></li>"
+        "<li><span class='n'>3</span><span>How does a single cohort evolve?</span>"
+        "<span class='q'>The Q1-2016 cohort over its life</span></li>"
+        "<li><span class='n'>4</span><span>How do cohorts compare to one another?</span>"
+        "<span class='q'>Like-for-like by age</span></li>"
+        "<li><span class='n'>5</span><span>How healthy is the customer base overall?</span>"
+        "<span class='q'>Acquisition, repeat buying, concentration</span></li>"
+        "</ol>"
+    )
+    slide(
+        title="Five lenses on the same customer base",
+        eyebrow="Contents",
+        subtitle="Each lens asks a different question of one transaction dataset",
+        body=_agenda,
+        page=2,
+    )
+    return
+
+
+@app.cell
+def _(mo, slide):
+    _pts = mo.Html(
+        "<ul class='mck-points'>"
+        "<li><b>Value is concentrated.</b> A small share of customers accounts for "
+        "most transactions, spend, and profit — the base is not uniform.</li>"
+        "<li><b>The “average customer” describes no one.</b> Every behavioural "
+        "measure is right-skewed, so the mean sits well above the median and most "
+        "customers fall below the mean.</li>"
+        "<li><b>Cohorts decay through fewer active buyers, not weaker spending.</b> "
+        "Spend per active customer stays broadly flat; the base shrinks because fewer "
+        "customers remain — so <b>repeat buying is the lever</b>.</li>"
+        "<li><b>Behaviour is stable and predictable</b> once heterogeneity is taken "
+        "into account — the same patterns recur across periods and cohorts.</li>"
+        "</ul>"
+    )
+    slide(
+        title="The average customer describes no one — value is concentrated, and its decay is driven by repeat buying",
+        eyebrow="Executive summary",
+        body=_pts,
+        takeaway="Manage the customer base as a portfolio: protect the high-value minority and lift repeat buying, rather than chase an “average” customer that does not exist.",
+        source="Madrigal transaction sample, 2016–2019",
+        page=3,
+    )
+    return
+
+
+@app.cell
+def _(cols, note, slide):
+    _left = note(
+        "<h4>The data</h4>"
+        "A 1% sample of <b>Madrigal</b>'s transaction records — 70,041 customers, "
+        "aggregated to the quarter, for 16 quarters (Q1 2016 – Q4 2019). "
+        "Each customer carries transactions, spend, profit, and an acquisition cohort.<br><br>"
+        "The audit is <b>descriptive</b>: it summarises how customers behave, "
+        "it does not forecast."
+    )
+    _right = note(
+        "<h4>One identity ties it together</h4>"
+        "<b>Profit = N<sub>c</sub> × AOF × AOV × Margin</b><br>"
+        "<span style='color:#6b7280'>(active customers × orders per customer × "
+        "spend per order × profit margin)</span><br><br>"
+        "Every result below traces a change in profit to one of these factors — "
+        "<b>fewer customers</b>, <b>less frequent orders</b>, <b>smaller orders</b>, "
+        "or <b>thinner margins</b>."
+    )
+    slide(
+        title="One dataset, one profit identity — read every exhibit through its four factors",
+        eyebrow="Approach & data",
+        body=cols(_left, _right, gap=40),
+        source="Madrigal transaction sample, 2016–2019",
+        page=4,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Lens 1", "How do customers differ from one another?", page=5)
+    return
+
+
+@app.cell
+def _(
+    YEAR_CURR,
+    bar_distribution,
+    cols,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+    exhibit,
+    fit,
+    profit_stats,
+    slide,
+    spend_stats,
+):
+    _spend = fit(
+        bar_distribution(
+            create_distribution(
+                cust_data_2019, "Spend", **create_bins_labels(25, 1000)
+            ),
+            title="",
+            x_title="Annual Spend ($)",
+        ),
+        height=360,
+    )
+    _profit = fit(
+        bar_distribution(
+            create_distribution(
+                cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)
+            ),
+            title="",
+            x_title="Annual Profit ($)",
+            color="#c4703a",
+        ),
+        height=360,
+    )
+    slide(
+        title="The average customer describes no one — spend and profit are both right-skewed",
+        eyebrow=f"Lens 1 · Distributions · {YEAR_CURR}",
+        subtitle="Share of active customers by annual spend (left) and annual profit (right)",
+        body=cols(
+            exhibit(_spend, "Annual spend per customer"),
+            exhibit(_profit, "Annual profit per customer"),
+        ),
+        takeaway=f"About {spend_stats['pct_below_mean']:.0%} of customers spend below the mean "
+        f"and {profit_stats['pct_below_mean']:.0%} earn below the mean profit — a long right tail carries the base.",
+        source=f"Madrigal transaction sample, active customers, {YEAR_CURR}",
+        page=6,
+    )
+    return
+
+
+@app.cell
+def _(DECILE_FIELDS, cust_decile_rep, decile_report_gt, slide):
+    _tbl = decile_report_gt(cust_decile_rep, DECILE_FIELDS, "")
+    slide(
+        title="The top deciles capture a disproportionate share of profit",
+        eyebrow="Lens 1 · Value concentration",
+        subtitle="Customers ranked into ten equal groups by profit contribution",
+        body=_tbl,
+        takeaway="The most valuable decile contributes far more than one-tenth of profit, while the lowest deciles contribute little or are loss-making.",
+        source="Madrigal transaction sample; deciles by annual profit",
+        page=7,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Lens 2", "What changed between two periods?", page=8)
+    return
+
+
+@app.cell
+def _(
+    YEAR_CURR,
+    YEAR_PRIOR,
+    cols,
+    fit,
+    note,
+    profit_bridge_chart,
+    profit_by_group,
+    slide,
+):
+    _bridge = fit(profit_bridge_chart(profit_by_group), height=420)
+    _txt = note(
+        "<h4>Read the bridge</h4>"
+        f"Profit moves from {YEAR_PRIOR} to {YEAR_CURR} through three customer groups:"
+        "<ul class='mck-points' style='margin-top:8px'>"
+        "<li><b>Returning</b> customers, active in both years</li>"
+        "<li><b>Lapsed</b> customers, who leave (a drag)</li>"
+        "<li><b>New / reactivated</b> customers, who join (a lift)</li></ul>"
+    )
+    slide(
+        title="Profit growth is a balance of returning, lapsed, and newly-won customers",
+        eyebrow=f"Lens 2 · Profit bridge · {YEAR_PRIOR}→{YEAR_CURR}",
+        body=cols(_bridge, _txt, gap=34, widths=[3, 2]),
+        takeaway="The net change is small relative to the gross flows beneath it — sustaining profit depends on keeping lapse in check, not only on winning new customers.",
+        source=f"Madrigal transaction sample, {YEAR_PRIOR} and {YEAR_CURR}",
+        page=9,
+    )
+    return
+
+
+@app.cell
+def _(cols, exhibit, fit, note, overlap, slide, venn_two):
+    _venn = fit(
+        venn_two(
+            int(overlap.loc["Active 2018", "Customers"]),
+            int(overlap.loc["Active 2019", "Customers"]),
+            int(overlap.loc["Active Both Years", "Customers"]),
+            "2018 active",
+            "2019 active",
+            "",
+            width=520,
+            height=420,
+        ),
+        height=400,
+    )
+    _txt = note(
+        "Only part of each year's base carries over. The overlap is the "
+        "<b>returning</b> core; the crescents are <b>lapsed</b> (left) and "
+        "<b>new/reactivated</b> (right) customers.<br><br>"
+        "A large non-overlap means the headline active-customer count hides a great "
+        "deal of <b>lapse and replacement</b> underneath."
+    )
+    slide(
+        title="Each year's customer base is substantially replaced, not merely carried forward",
+        eyebrow="Lens 2 · Customer overlap",
+        body=cols(
+            exhibit(_venn, "Area-proportional overlap of the two yearly bases"),
+            _txt,
+            gap=34,
+            widths=[3, 2],
+        ),
+        source="Madrigal transaction sample; customers active in either year",
+        page=10,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Lens 3", "How does a single cohort evolve?", page=11)
+    return
+
+
+@app.cell
+def _(FOCUS_COHORT_QTR, cohort_q1_decomp, cols, fit, line_chart, slide, stack):
+    _h = 205
+    _pa = fit(
+        line_chart(
+            cohort_q1_decomp,
+            "Period",
+            "Pct_Active",
+            "% active by quarter",
+            "% active",
+            tickformat=".0%",
+        ),
+        height=_h,
+    )
+    _as = fit(
+        line_chart(
+            cohort_q1_decomp,
+            "Period",
+            "ASPAC",
+            "Spend per active member",
+            "ASPAC ($)",
+            tickformat="$,.0f",
+        ),
+        height=_h,
+    )
+    _ao = fit(
+        line_chart(
+            cohort_q1_decomp,
+            "Period",
+            "AOF",
+            "Orders per active member",
+            "AOF",
+            tickformat=".2f",
+        ),
+        height=_h,
+    )
+    _av = fit(
+        line_chart(
+            cohort_q1_decomp,
+            "Period",
+            "AOV",
+            "Average order value",
+            "AOV ($)",
+            tickformat="$,.0f",
+        ),
+        height=_h,
+    )
+    slide(
+        title="Cohort revenue decays through fewer active buyers — not weaker spending",
+        eyebrow=f"Lens 3 · Revenue decomposition · {FOCUS_COHORT_QTR} cohort",
+        subtitle="% active falls steeply; spend-per-active, order frequency and order value stay broadly flat",
+        body=stack(cols(_pa, _as), cols(_ao, _av), gap=10),
+        takeaway="The customers who remain keep behaving normally; the base shrinks because fewer of them remain — the lever is repeat buying, not spend stimulation.",
+        source="Madrigal transaction sample; Q1-2016 acquisition cohort by quarter",
+        page=12,
+    )
+    return
+
+
+@app.cell
+def _(
+    FOCUS_COHORT_N,
+    FOCUS_COHORT_QTR,
+    fit,
+    second_purchase,
+    second_purchase_chart,
+    slide,
+):
+    _fig = fit(second_purchase_chart(second_purchase), height=420)
+    slide(
+        title="Most repeat buying is decided early — the second-purchase curve flattens quickly",
+        eyebrow=f"Lens 3 · Second purchase · {FOCUS_COHORT_QTR} cohort",
+        subtitle="Cumulative share of the cohort that has made a second purchase, by quarter",
+        body=_fig,
+        takeaway=f"Across the {FOCUS_COHORT_N:,} customers in the cohort, the cumulative repeat rate rises fastest in the first few quarters, then plateaus — early experience is decisive.",
+        source="Madrigal transaction sample; Q1-2016 acquisition cohort",
+        page=13,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Lens 4", "How do cohorts compare to one another?", page=14)
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines, cols, exhibit, fit, slide):
+    _pa = fit(
+        cohort_lines(cohort_df, "PctActive", align=True, tickformat=".0%"), height=360
+    )
+    _av = fit(
+        cohort_lines(cohort_df, "AOV", align=True, tickformat="$,.0f"), height=360
+    )
+    slide(
+        title="Aligned by age, cohorts trace nearly the same path — behaviour is a property of the base",
+        eyebrow="Lens 4 · Like-for-like by cohort age",
+        subtitle="Every acquisition cohort, indexed to quarters since acquisition",
+        body=cols(
+            exhibit(_pa, "% active by quarters since acquisition"),
+            exhibit(_av, "Average order value by quarters since acquisition"),
+        ),
+        takeaway="Newer cohorts are not obviously better or worse than older ones once you align by age — the decay curve is structural, so forecasts can lean on it.",
+        source="Madrigal transaction sample; all acquisition cohorts aligned by age",
+        page=15,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Lens 5", "How healthy is the customer base overall?", page=16)
+    return
+
+
+@app.cell
+def _(
+    acquisitions_bar_chart,
+    active_customers_bar_chart,
+    annual_cohort_combined,
+    cols,
+    exhibit,
+    fit,
+    slide,
+    spend_profit_bar_chart,
+):
+    _acq = fit(acquisitions_bar_chart(annual_cohort_combined), height=300)
+    _act = fit(active_customers_bar_chart(annual_cohort_combined), height=300)
+    _sp = fit(spend_profit_bar_chart(annual_cohort_combined), height=300)
+    slide(
+        title="The base is growing on every headline measure — customers, spend, and profit",
+        eyebrow="Lens 5 · Annual performance",
+        body=cols(
+            exhibit(_acq, "New customers"),
+            exhibit(_act, "Active customers"),
+            exhibit(_sp, "Spend & profit"),
+        ),
+        takeaway="Growth shows up first in acquisition and the active count; because per-customer behaviour is stable, more customers translates fairly directly into more spend and profit.",
+        source="Madrigal transaction sample, 2016–2019",
+        page=17,
+    )
+    return
+
+
+@app.cell
+def _(cohort_flow_chart, fit, flow_profit, slide):
+    _fig = fit(
+        cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.2f}"),
+        height=430,
+    )
+    slide(
+        title="Each year's profit rests increasingly on older cohorts — repeat buying compounds",
+        eyebrow="Lens 5 · Cohort contribution to profit",
+        subtitle="Annual profit split by acquisition-year cohort",
+        body=_fig,
+        takeaway="A healthy base carries a thick tail of still-active older cohorts; new acquisition tops it up rather than replacing a leaking core.",
+        source="Madrigal transaction sample; profit by acquisition-year cohort",
+        page=18,
+    )
+    return
+
+
+@app.cell
+def _(mo, slide):
+    _imp = mo.Html(
+        "<ul class='mck-points'>"
+        "<li><b>Treat the base as a portfolio.</b> Segment by value and manage the "
+        "high-value minority explicitly — the average hides them.</li>"
+        "<li><b>Make repeat buying the first lever.</b> Cohort decay is driven by fewer "
+        "active customers, so small repeat-buying gains compound across every cohort.</li>"
+        "<li><b>Win the second purchase early.</b> Repeat behaviour is largely set in "
+        "the first few quarters — invest in early-life experience.</li>"
+        "<li><b>Acquire more of the right customers.</b> Per-customer behaviour is "
+        "stable, so growth comes mainly from adding customers like the ones you keep.</li>"
+        "</ul>"
+    )
+    slide(
+        title="Four moves follow directly from the audit",
+        eyebrow="Implications",
+        body=_imp,
+        takeaway="None of these require an “average customer”. They require managing a heterogeneous base by value and by age.",
+        page=19,
+    )
+    return
+
+
+@app.cell
+def _(divider):
+    divider("Appendix", "Supplementary exhibits", page=20)
+    return
+
+
+@app.cell
+def _(
+    YEAR_CURR,
+    bar_distribution,
+    cols,
+    create_bins_labels,
+    create_distribution,
+    cust_data_2019,
+    exhibit,
+    fit,
+    slide,
+):
+    _tx = fit(
+        bar_distribution(
+            create_distribution(
+                cust_data_2019,
+                "NumTrans",
+                bins=list(range(1, 11)) + [float("inf")],
+                labels=[str(i) for i in range(1, 10)] + ["10+"],
+            ),
+            title="",
+            x_title="Annual Transactions",
+        ),
+        height=360,
+    )
+    _mg = fit(
+        bar_distribution(
+            create_distribution(
+                cust_data_2019, "Margin", **create_bins_labels(5, 100, 0)
+            ),
+            title="",
+            x_title="Margin (%)",
+            color="#4c8b6f",
+        ),
+        height=360,
+    )
+    slide(
+        title="Transaction counts and margins are skewed too",
+        eyebrow=f"Appendix · Further distributions · {YEAR_CURR}",
+        body=cols(
+            exhibit(_tx, "Annual transactions per customer"),
+            exhibit(_mg, "Average margin per customer"),
+        ),
+        source=f"Madrigal transaction sample, active customers, {YEAR_CURR}",
+        page=21,
+    )
+    return
+
+
+@app.cell
+def _(note, slide):
+    _txt = note(
+        "<h4>“Average spend per transaction” is two different numbers</h4>"
+        "<ul class='mck-points' style='margin-top:8px'>"
+        "<li><b>AOV — ratio of totals.</b> Total spend ÷ total transactions. A "
+        "<b>transaction-weighted</b> average, so frequent buyers dominate it.</li>"
+        "<li><b>Mean of per-customer averages.</b> Average each customer's own "
+        "spend-per-transaction, then average across customers — every customer counts "
+        "equally, so one-and-done buyers pull it up.</li></ul>"
+        "The two are equal only if every customer transacts the same number of times, "
+        "which never happens. The gap's direction is informative: here the weighted "
+        "figure sits below the unweighted one, so heavier buyers have <b>smaller</b> "
+        "baskets than light buyers.<br><br>"
+        "<span style='color:#6b7280'>Convention used throughout: “AOV” always means the "
+        "transaction-weighted ratio of totals.</span>"
+    )
+    slide(
+        title="A definitions note: keep the two “average transaction” numbers apart",
+        eyebrow="Appendix · Method",
+        body=_txt,
+        source="See Lens 1 — Distribution of average spend per transaction",
+        page=22,
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Imports & Helper Functions
     """)
     return
@@ -1381,7 +2035,7 @@ def _(DECILE_FIELDS, cust_data_2019, decile_report, decile_report_gt, pd):
     )
     cust_decile_rep, _f = decile_report(_ranked, "CustDecile")
     decile_report_gt(cust_decile_rep, DECILE_FIELDS, "Customer decile report")
-    return
+    return (cust_decile_rep,)
 
 
 @app.cell
@@ -1696,7 +2350,7 @@ def _(mo):
     mo.md(r"""
     Spend and profit both grew, and the active count grew with them. The question
     for the rest of Lens 2 is whether that growth came from existing customers
-    buying more, or from acquisition outrunning churn.
+    buying more, or from acquisition outrunning lapse.
     """)
     return
 
@@ -2012,7 +2666,7 @@ def _(mo):
     removes the profit of the lapsed group, applies the small change in the
     both-years group, adds the profit of the new group, and arrives at 2019 total
     profit. The picture makes the source of growth explicit: **the firm grows by
-    replacing lost customers with new ones, not by growing the retained base.**
+    replacing lost customers with new ones, not by growing the returning base.**
     """)
     return
 
@@ -2066,7 +2720,7 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     Apply the profit identity to each group in each year. This shows **why** the
-    retained group is over-represented in profit relative to its headcount: it
+    returning group is over-represented in profit relative to its headcount: it
     buys more often (higher AOF) and spends more per order (higher AOV) than the
     one-year-only groups. The table reports active customers, transactions, spend,
     profit, and the derived AOF, AOV, and margin.
@@ -2174,7 +2828,7 @@ def _(mo):
     customers present in one year only.
 
     The mass sits on and just below the diagonal, so most customers hold their
-    rank. The large `2018 Only` column is concentrated in the low deciles: churn
+    rank. The large `2018 Only` column is concentrated in the low deciles: lapse
     is heaviest among low-value customers, but decile 1 is not immune. A common set
     of cut-offs makes the matrix readable but means each decile no longer holds
     exactly 10% of a year's profit; year-specific cut-offs keep that property at
@@ -2271,8 +2925,8 @@ def _(mo):
     Read this as a diagnosis of the both-years block. The largest positive group is
     up-up-up-up; the largest negative group is down-down-down-down. But both are
     small next to the two one-year blocks: the 2018-only block removes about
-    \$1.1M and the 2019-only block adds about \$1.6M. **Acquisition and churn, not
-    the movement of retained customers, dominate the change in profit.**
+    \$1.1M and the 2019-only block adds about \$1.6M. **Acquisition and lapse, not
+    the movement of returning customers, dominate the change in profit.**
 
     Three points guide the build:
 
@@ -2297,7 +2951,7 @@ def _(how):
     3. Group the customers by the four flags.
     4. Add the customers and the profit in each group.
 
-    **Purpose:** Sort the retained customers by how their behaviour moved.
+    **Purpose:** Sort the returning customers by how their behaviour moved.
     **Goal:** Feed the up-down table.
     """)
     return
@@ -3454,9 +4108,21 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     Lens 5 takes the firm-level view. It asks whether growth comes from a healthy
-    base or from acquisition outrunning churn. The working dataset groups customers
+    base or from acquisition outrunning lapse. The working dataset groups customers
     into annual cohorts (pre-2016, 2016, 2017, 2018, 2019) and builds an annual
     cohort-by-year grid of active customers, transactions, spend, and profit.
+
+    **A note on wording — "retention" vs "repeat-buying rate" vs "% cohort
+    active".** Madrigal is a *noncontractual* business: a customer who skips a
+    period has not necessarily left, so we avoid the word *retention*, which
+    properly describes contractual renewal or survival (where a cancellation is
+    actually observed). This audit instead uses **% of cohort active** — the share
+    of a cohort that buys in a given period (the unconditional diagonal, including
+    one-time buyers) — and, for value, **carryover** — a cohort's profit in one
+    year relative to the year before. The **repeat-buying rate** is the *conditional*
+    quantity — the share of customers active in one period who buy again the next —
+    and is reported in Lens 3. The three are not interchangeable; only in a
+    contractual setting does "retention rate" have a single, well-defined meaning.
     """)
     return
 
@@ -3596,12 +4262,12 @@ def _(SEQ, go, pd, pretty_cohort):
         share = P.div(totals, axis=1)
         bottoms = P.cumsum(axis=0) - P
         gaps = [f"{years[i]}\u2192{years[i + 1]}" for i in range(len(years) - 1)]
-        # Per-cohort retention: a cohort's value next year / its value this year.
-        cohort_retention = pd.DataFrame(
+        # Per-cohort carryover: a cohort's value next year / its value this year.
+        cohort_carryover = pd.DataFrame(
             {gaps[i]: P[years[i + 1]] / P[years[i]] for i in range(len(gaps))},
             index=order,
         )
-        # Base retention (TCBA 6.2): of a year's whole base, the share still
+        # Base carryover (TCBA Ch. 7): of a year's whole base, the share still
         # delivered next year (the newest cohort of the next year is excluded).
         base = {}
         for i, g in enumerate(gaps):
@@ -3611,14 +4277,14 @@ def _(SEQ, go, pd, pretty_cohort):
             base[g] = (
                 (totals[y1] - new_next) / totals[y0] if totals[y0] else float("nan")
             )
-        base_retention = pd.Series(base, name="base_retention")
+        base_carryover = pd.Series(base, name="base_carryover")
         return {
             "values": P,
             "totals": totals,
             "share": share,
             "bottoms": bottoms,
-            "cohort_retention": cohort_retention,
-            "base_retention": base_retention,
+            "cohort_carryover": cohort_carryover,
+            "base_carryover": base_carryover,
             "years": years,
             "gaps": gaps,
         }
@@ -3629,7 +4295,7 @@ def _(SEQ, go, pd, pretty_cohort):
         # Pure renderer: every number comes from `data` (see cohort_flow_data).
         P, years, gaps = data["values"], data["years"], data["gaps"]
         totals, share, bottoms = data["totals"], data["share"], data["bottoms"]
-        cohort_ret, base_ret = data["cohort_retention"], data["base_retention"]
+        cohort_car, base_car = data["cohort_carryover"], data["base_carryover"]
         order = list(P.index)
         colors = dict(zip(order, SEQ[: len(order)]))
         text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
@@ -3697,7 +4363,7 @@ def _(SEQ, go, pd, pretty_cohort):
                 font=dict(size=12),
             )
         if flows:
-            # Middle labels: each cohort's own retention on its ribbon.
+            # Middle labels: each cohort's own carryover on its ribbon.
             for c in order:
                 for i in range(len(years) - 1):
                     v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
@@ -3709,20 +4375,20 @@ def _(SEQ, go, pd, pretty_cohort):
                     fig.add_annotation(
                         x=i + 0.5,
                         y=float(0.5 * ((b1 + v1 / 2) + (b2 + v2 / 2))),
-                        text=f"{cohort_ret.loc[c, gaps[i]]:.0%}",
+                        text=f"{cohort_car.loc[c, gaps[i]]:.0%}",
                         showarrow=False,
                         font=dict(size=9, color="#374151"),
                     )
-            # Top label: base retention between bars (TCBA 6.2), boxed.
+            # Top label: base carryover between bars, boxed.
             for i, g in enumerate(gaps):
-                if pd.isna(base_ret[g]):
+                if pd.isna(base_car[g]):
                     continue
                 base_top = totals[years[i]]
-                retained = base_top * base_ret[g]
+                carried = base_top * base_car[g]
                 fig.add_annotation(
                     x=i + 0.5,
-                    y=float(0.5 * (base_top + retained)),
-                    text=f"{base_ret[g]:.0%}",
+                    y=float(0.5 * (base_top + carried)),
+                    text=f"{base_car[g]:.0%}",
                     showarrow=False,
                     font=dict(size=11, color="#374151"),
                     bgcolor="rgba(255,255,255,0.82)",
@@ -3757,7 +4423,7 @@ def _(mo):
 
     The label in each band is the share of that year from the cohort. The label
     above each bar is the year total. The number between two bars is the
-    retention of the base. It is the part of one year's value that the cohorts
+    carryover of the base. It is the part of one year's value that the cohorts
     from that year still give in the next year. It leaves out the customers who
     join in the next year.
 
@@ -3833,7 +4499,7 @@ def _(mo):
     The numbers for the three flow charts are computed first, as tables, so you
     can review them before plotting. `cohort_flow_data` returns the values, the
     per-year totals, the share of each year, the per-cohort year-to-year
-    retention, and the base retention. The plot function only draws them.
+    carryover, and the base carryover. The plot function only draws them.
     """)
     return
 
@@ -3861,8 +4527,8 @@ def _(annual_cohort_combined, cohort_flow_data):
 
 @app.cell
 def _(flow_profit):
-    # Review: each cohort's year-to-year retention for profit (%).
-    (flow_profit["cohort_retention"] * 100).round(0)
+    # Review: each cohort's year-to-year carryover of profit (%).
+    (flow_profit["cohort_carryover"] * 100).round(0)
     return
 
 
@@ -3904,11 +4570,11 @@ def _(mo):
     \$1,193,524 of \$1,871,911 (64%) came from the 2016 cohort, so 36% came from
     customers acquired earlier.
 
-    **(b) Year-on-year retention of profit from existing cohorts.** Profit in 2017
+    **(b) Year-on-year carryover of profit from existing cohorts.** Profit in 2017
     from cohorts acquired before 2017 was \$988,558, which is 53% of what the same
     cohorts delivered in 2016. Per cohort: the 2016 cohort delivered \$1,193,524 in
-    2016 and \$451,670 in 2017 (38% retention); the pre-2016 cohort delivered
-    \$678,387 then \$536,888 (79% retention).
+    2016 and \$451,670 in 2017 (38% carryover); the pre-2016 cohort delivered
+    \$678,387 then \$536,888 (79% carryover).
 
     The pattern generalizes. **New cohorts decay fast; old, self-selected
     survivors are far stickier.** Each existing cohort's profit falls by roughly

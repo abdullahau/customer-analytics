@@ -1,0 +1,611 @@
+---
+title: "Customer-Base Audit"
+subtitle: "How Madrigal's customers differ — and how their behaviour changes over time"
+format:
+  revealjs:
+    theme: [default, ../../assets/quarto-style/slides.scss]
+    width: 1280
+    height: 720
+    margin: 0.06
+    slide-number: c/t
+    show-slide-number: all
+    controls: true
+    progress: true
+    center: false
+    transition: fade
+    fig-align: center
+    # NOTE: do NOT set `embed-resources: true` for revealjs. It inlines reveal's
+    # speaker-notes plugin, whose source does document.write("<html>…<script…"),
+    # which breaks HTML parsing and renders the plugin source as visible text.
+    # The deck ships its assets in the sibling *_files/ directory instead.
+    embed-resources: false
+    footer: "Customer-Base Audit · Madrigal 1% sample, 2016–2019 · Illustrative"
+title-slide-attributes:
+  data-background-color: "#1f3a5f"
+jupyter: python3
+code-links:
+  - text: View source
+    icon: file-code
+    href: https://github.com/abdullahau/customer-analytics/blob/main/notebooks/analyses/customer-base-audit-slides.qmd
+---
+
+```{python}
+# | echo: false
+# | output: false
+# ---------------------------------------------------------------------------
+# Setup — one chart library (altair), one navy "consulting" theme, one palette,
+# one table style. Tables are Quarto pipe tables so they inherit the deck's
+# typography. Data pipeline reused from the (retired) dashboard.
+# ---------------------------------------------------------------------------
+import numpy as np
+import pandas as pd
+import altair as alt
+
+# --- consulting palette (matches the deck's navy look) ---------------------
+FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
+NAVY, ACCENT, GREEN = "#1f3a5f", "#c4703a", "#4c8b6f"
+INK, MUTED, GRID_C = "#1f2328", "#6b7280", "#e6e8eb"
+RED = "#b0563b"
+COHORT_RAMP = ["#a3c7e8", "#7aa9d0", "#4a86b8", "#2b5f8f", "#0d3b66"]
+CHART_H = 280
+
+
+@alt.theme.register("cba-deck", enable=True)
+def _cba_deck() -> alt.theme.ThemeConfig:
+    return {
+        "config": {
+            "background": "#ffffff",
+            "font": FONT,
+            "padding": {"left": 2, "top": 2, "right": 2, "bottom": 2},
+            "view": {"stroke": None},
+            "title": {
+                "font": FONT, "fontSize": 13, "fontWeight": 700, "color": NAVY,
+                "anchor": "start", "subtitleFont": FONT, "subtitleFontSize": 11,
+                "subtitleColor": MUTED, "offset": 8,
+            },
+            "axis": {
+                "labelFont": FONT, "titleFont": FONT, "labelFontSize": 11,
+                "titleFontSize": 11, "titleFontWeight": 400, "labelColor": MUTED,
+                "titleColor": MUTED, "domainColor": GRID_C, "tickColor": GRID_C,
+                "grid": False,
+            },
+            "axisY": {"grid": True, "gridColor": GRID_C, "gridDash": [2, 2],
+                      "domain": False, "ticks": False, "titlePadding": 6},
+            "legend": {"labelFont": FONT, "titleFont": FONT, "labelFontSize": 11,
+                       "titleFontSize": 11, "labelColor": MUTED, "titleColor": MUTED,
+                       "symbolType": "square", "symbolSize": 90, "orient": "top",
+                       "direction": "horizontal", "offset": 2},
+            "header": {"labelFont": FONT, "labelFontSize": 11, "labelFontWeight": 700,
+                       "labelColor": NAVY, "titleFont": FONT, "labelPadding": 2},
+            "range": {"category": [NAVY, ACCENT, GREEN, "#8a6bb0", "#c9a227"],
+                      "ordinal": COHORT_RAMP},
+            "bar": {"color": NAVY},
+            "line": {"color": NAVY, "strokeWidth": 2},
+            "point": {"color": NAVY, "filled": True, "size": 30},
+            "rule": {"color": MUTED},
+            "text": {"font": FONT, "fontSize": 10, "fill": MUTED},
+        }
+    }
+
+
+# --- Quarto pipe-table helper ---------------------------------------------
+_FMT = {
+    "money0": lambda v: f"${v:,.0f}", "money2": lambda v: f"${v:,.2f}",
+    "num0": lambda v: f"{v:,.0f}", "num1": lambda v: f"{v:,.1f}",
+    "num2": lambda v: f"{v:,.2f}", "pct0": lambda v: f"{v:.0%}",
+    "pct1": lambda v: f"{v:.1%}",
+    "signed_money0": lambda v: f"{'−' if v < 0 else ''}${abs(v):,.0f}",
+}
+
+
+def _cell(v, spec):
+    if v is None or (isinstance(v, float) and np.isnan(v)):
+        return ""
+    if spec is None or isinstance(v, str):
+        return str(v)
+    return _FMT[spec](v)
+
+
+def md_table(df, formats=None, left=(), bold_rows=()):
+    formats = formats or {}
+    cols = list(df.columns)
+    head = "| " + " | ".join(str(c) for c in cols) + " |"
+    rule = "| " + " | ".join(":--" if c in left else "--:" for c in cols) + " |"
+    out = [head, rule]
+    for i, (_, r) in enumerate(df.iterrows()):
+        cells = [_cell(r[c], formats.get(c)) for c in cols]
+        if i in bold_rows:
+            cells = [f"**{c}**" if c else "" for c in cells]
+        out.append("| " + " | ".join(cells) + " |")
+    return "\n".join(out)
+
+
+# --- data ------------------------------------------------------------------
+cust_data = pd.read_csv("data/madrigal/cust_data_long.csv")
+cust_data = (
+    cust_data.assign(
+        Spend=lambda x: (x["Spend"] * 100).round().astype("int64"),
+        Profit=lambda x: (x["Profit"] * 100).round().astype("int64"),
+    )
+    .assign(
+        **cust_data["YearQuarter"].str.extract(r"y(\d{4})_q(\d)")
+        .rename(columns={0: "Year", 1: "Quarter"})
+        .astype({"Year": "int32", "Quarter": "int8"})
+    )
+    .drop(columns="YearQuarter")
+)
+
+YEAR_PRIOR, YEAR_CURR = 2018, 2019
+FOCUS_COHORT, FOCUS_COHORT_QTR = "y2016_q1", "Q1 2016"
+
+
+def yearly_cust_data(df, year):
+    return (
+        df.query(f"Year == {year}").groupby("CustomerID", as_index=False)
+        .agg(NumTrans=("NumTrans", "sum"), Spend=("Spend", "sum"),
+             Profit=("Profit", "sum"))
+        .assign(Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
+                Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2))
+    )
+
+
+def customer_descriptives(df, metric):
+    s = df[metric]
+    mean = s.mean()
+    return {"mean": mean, "median": s.median(), "min": s.min(), "max": s.max(),
+            "pct_below_mean": (s < mean).mean(),
+            "percentiles": s.quantile([i / 100 for i in range(5, 100, 5)])}
+
+
+def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
+    if min_cutoff is None:
+        min_cutoff, lower_bins, lower_labels = 0, [], []
+    else:
+        lower_bins, lower_labels = [-np.inf], [f"<{min_cutoff}"]
+    bins = lower_bins + list(range(min_cutoff, max_cutoff + bin_width, bin_width)) + [np.inf]
+    labels = (lower_labels
+              + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
+              + [f"{max_cutoff}+"])
+    return {"bins": bins, "labels": labels}
+
+
+def create_distribution(df, column, bins, labels):
+    d = (pd.cut(df[column], bins=bins, labels=labels, right=False)
+         .value_counts().sort_index().reset_index()
+         .rename(columns={"count": "Customers", column: "Range"}))
+    d["Percent"] = d["Customers"] / d["Customers"].sum()
+    return d.astype({"Range": str}).assign(Order=range(len(d)))
+
+
+def decile_labels(df, value_col="Profit", n=10):
+    d = df.sort_values(value_col, ascending=False, kind="stable").reset_index(drop=True)
+    cents = np.round(d[value_col].to_numpy() * 100).astype(np.int64)
+    cum = cents.cumsum()
+    thresholds = np.arange(1, n) * cum[-1] / n
+    boundaries = cents[np.searchsorted(cum, thresholds, side="right")]
+    d["ProfitDecile"] = (n - np.searchsorted(boundaries[::-1], cents, side="left")).astype("int8")
+    return d, thresholds / 100, boundaries / 100
+
+
+DECILE_COLS = ["Decile", "% cust.", "% trans.", "% spend", "% profit",
+               "Spend/cust.", "Profit/cust.", "AOF", "AOV", "Margin"]
+DECILE_FMT = {"% cust.": "pct1", "% trans.": "pct1", "% spend": "pct1",
+              "% profit": "pct1", "Spend/cust.": "money0", "Profit/cust.": "money0",
+              "AOF": "num2", "AOV": "money0", "Margin": "pct1"}
+
+
+def decile_report(df, decile_col):
+    out = (df.groupby(decile_col, as_index=False)
+           .agg(Customers=("CustomerID", "count"), Transactions=("NumTrans", "sum"),
+                Spend=("Spend", "sum"), Profit=("Profit", "sum"))
+           .assign(PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
+                   PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
+                   PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
+                   PctProfit=lambda x: x["Profit"] / x["Profit"].sum(),
+                   AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
+                   AvgProfitCust=lambda x: x["Profit"] / x["Customers"],
+                   AOF=lambda x: x["Transactions"] / x["Customers"],
+                   AOV=lambda x: x["Spend"] / x["Transactions"],
+                   AvgMargin=lambda x: x["Profit"] / x["Spend"])
+           .drop(columns=["Customers", "Transactions", "Spend", "Profit"]))
+    return out.rename(columns=dict(zip(out.columns, DECILE_COLS)))
+
+
+# --- working datasets + headline numbers -----------------------------------
+cust_data_2018 = yearly_cust_data(cust_data, YEAR_PRIOR)
+cust_data_2019 = yearly_cust_data(cust_data, YEAR_CURR)
+for _d in (cust_data_2018, cust_data_2019):
+    _d["AvgSpendPerTrans"] = _d["Spend"] / _d["NumTrans"]
+    _d["Margin"] = _d["Profit"] / _d["Spend"] * 100
+
+cust_2018_2019 = (
+    cust_data_2018.merge(cust_data_2019, on="CustomerID", how="outer",
+                         suffixes=("_2018", "_2019"), indicator=True)
+    .assign(Status=lambda df: df["_merge"].map(
+        {"both": "Active both years", "left_only": "2018 only (lapsed)",
+         "right_only": "2019 only (new/reactivated)"}))
+    .drop(columns="_merge")
+)
+
+trans_bins = list(range(1, 11)) + [np.inf]
+trans_labels = [str(i) for i in range(1, 10)] + ["10+"]
+
+n_cust_2018, n_cust_2019 = len(cust_data_2018), len(cust_data_2019)
+n_trans_2019 = int(cust_data_2019["NumTrans"].sum())
+total_spend_2019 = cust_data_2019["Spend"].sum()
+total_profit_2018 = cust_data_2018["Profit"].sum()
+total_profit_2019 = cust_data_2019["Profit"].sum()
+n_both = int((cust_2018_2019["Status"] == "Active both years").sum())
+n_lapsed = int((cust_2018_2019["Status"] == "2018 only (lapsed)").sum())
+n_new = int((cust_2018_2019["Status"] == "2019 only (new/reactivated)").sum())
+one_and_done_pct = (cust_data_2019["NumTrans"] == 1).mean()
+profit_yoy = (total_profit_2019 - total_profit_2018) / total_profit_2018
+repeat_rate_2018 = n_both / n_cust_2018
+aov_2019 = total_spend_2019 / n_trans_2019
+mean_spend_2019 = cust_data_2019["Spend"].mean()
+spend_stats = customer_descriptives(cust_data_2019, "Spend")
+profit_stats = customer_descriptives(cust_data_2019, "Profit")
+```
+
+## What this deck covers {background-color="#ffffff"}
+
+::: {.eyebrow}
+Contents
+:::
+
+<ol class="agenda">
+<li><span class="n">1</span><span>How do customers differ from one another?</span><span class="q">Heterogeneity within a single year</span></li>
+<li><span class="n">2</span><span>What changed between two periods?</span><span class="q">2018 vs 2019 performance bridge</span></li>
+<li><span class="n">3</span><span>How does a single cohort evolve?</span><span class="q">The Q1-2016 cohort over its life</span></li>
+<li><span class="n">4</span><span>How does the base grow and stay healthy?</span><span class="q">Acquisition and cohort contribution</span></li>
+</ol>
+
+::: {.source}
+Each lens asks a different question of one transaction dataset
+:::
+
+## The average customer describes no one — value is concentrated, and its decay is driven by repeat buying
+
+::: {.eyebrow}
+Executive summary
+:::
+
+<ul class="points">
+<li><b>Value is concentrated.</b> A small share of customers accounts for most transactions, spend, and profit — the base is not uniform.</li>
+<li><b>The “average customer” describes no one.</b> Every behavioural measure is right-skewed, so the mean sits above the median and most customers fall below the mean.</li>
+<li><b>Cohorts decay through fewer active buyers, not weaker spending.</b> Spend per active customer stays broadly flat; the base shrinks because fewer customers remain — so <b>repeat buying is the lever</b>.</li>
+<li><b>Behaviour is stable and predictable</b> once heterogeneity is taken into account — the same patterns recur across periods and cohorts.</li>
+</ul>
+
+::: {.takeaway}
+Manage the customer base as a portfolio: protect the high-value minority and lift repeat buying, rather than chase an “average” customer that does not exist.
+:::
+
+## One dataset, one profit identity — read every exhibit through its four factors
+
+::: {.eyebrow}
+Approach & data
+:::
+
+:::: {.columns}
+::: {.column width="50%"}
+**The data.** A 1% sample of **Madrigal**'s transaction records — 70,041 customers, aggregated to the quarter, for 16 quarters (Q1 2016 – Q4 2019). Each customer carries transactions, spend, profit, and an acquisition cohort.
+
+The audit is **descriptive**: it summarises how customers behave; it does not forecast.
+:::
+::: {.column width="50%"}
+**One identity ties it together**
+
+$$\text{Profit} = N_c \times \text{AOF} \times \text{AOV} \times \text{Margin}$$
+
+(active customers × orders per customer × spend per order × margin)
+
+Every result traces a change in profit to one of these factors — **fewer customers**, **less frequent orders**, **smaller orders**, or **thinner margins**.
+:::
+::::
+
+# Lens 1 — How do customers differ from one another? {.divider background-color="#1f3a5f"}
+
+## The average customer describes no one — every per-customer measure is right-skewed
+
+::: {.eyebrow}
+Lens 1 · Distributions · 2019
+:::
+
+```{python}
+# | echo: false
+cust_data_2019["TransBin"] = pd.cut(cust_data_2019["NumTrans"], bins=trans_bins,
+                                    labels=trans_labels, right=False)
+dist_defs = [
+    ("Spend", "Spend", cust_data_2019, create_bins_labels(25, 1000)),
+    ("Profit", "Profit", cust_data_2019, create_bins_labels(25, 500, min_cutoff=0)),
+    ("Transactions", "NumTrans", cust_data_2019, {"bins": trans_bins, "labels": trans_labels}),
+    ("Avg spend / txn", "AvgSpendPerTrans", cust_data_2019, create_bins_labels(25, 500)),
+    ("Margin %", "Margin", cust_data_2019.query("Spend > 0"), create_bins_labels(5, 100, min_cutoff=0)),
+]
+_frames = [create_distribution(df, column=c, **b).assign(Metric=lbl)
+           for lbl, c, df, b in dist_defs]
+dist_long = pd.concat(_frames, ignore_index=True)
+metric_order = [d[0] for d in dist_defs]
+
+alt.Chart(dist_long).mark_bar().encode(
+    x=alt.X("Range:N", sort=alt.EncodingSortField(field="Order"),
+            axis=alt.Axis(labels=False, ticks=False, title=None)),
+    y=alt.Y("Percent:Q", title="Customers", axis=alt.Axis(format="%")),
+    tooltip=[alt.Tooltip("Metric:N"), alt.Tooltip("Range:N", title="Bin"),
+             alt.Tooltip("Percent:Q", format=".1%")],
+).properties(width=180, height=CHART_H).facet(
+    facet=alt.Facet("Metric:N", title=None, sort=metric_order), columns=5
+).resolve_scale(x="independent", y="independent")
+```
+
+::: {.takeaway}
+About **`{python} f"{spend_stats['pct_below_mean']:.0%}"`** of customers spend below the mean and **`{python} f"{profit_stats['pct_below_mean']:.0%}"`** earn below the mean profit — a long right tail carries the base. **`{python} f"{one_and_done_pct:.0%}"`** bought exactly once.
+:::
+
+## The top deciles capture a disproportionate share of profit
+
+::: {.eyebrow}
+Lens 1 · Value concentration
+:::
+
+```{python}
+# | echo: false
+# | output: asis
+_cust_profit = decile_labels(cust_data_2019, "Profit")[0]
+print(md_table(decile_report(_cust_profit, "ProfitDecile"),
+               formats=DECILE_FMT, left=["Decile"]))
+```
+
+::: {.takeaway}
+Each decile is 10% of total profit — so decile 1 is a **handful** of customers and the bottom deciles are many customers contributing little or losing money.
+:::
+
+# Lens 2 — What changed between two periods? {.divider background-color="#1f3a5f"}
+
+## Spend, profit and the active count all grew — but beneath a large lapse-and-replace flow
+
+::: {.eyebrow}
+Lens 2 · 2018 → 2019
+:::
+
+:::: {.columns}
+::: {.column width="60%"}
+```{python}
+# | echo: false
+_status = (cust_2018_2019.groupby("Status", as_index=False)
+           .agg(Customers=("CustomerID", "count")))
+_order = ["Active both years", "2018 only (lapsed)", "2019 only (new/reactivated)"]
+alt.Chart(_status).mark_bar().encode(
+    x=alt.X("Customers:Q", title="Customers", axis=alt.Axis(format="~s")),
+    y=alt.Y("Status:N", sort=_order, title=None),
+    color=alt.Color("Status:N", sort=_order,
+                    scale=alt.Scale(domain=_order, range=[NAVY, RED, GREEN]),
+                    legend=None),
+    tooltip=[alt.Tooltip("Status:N"), alt.Tooltip("Customers:Q", format=",")],
+).properties(width="container", height=CHART_H - 20,
+             title=alt.TitleParams("Customer movement between the two years", anchor="start"))
+```
+:::
+::: {.column width="40%"}
+```{python}
+# | echo: false
+# | output: asis
+_yoy = pd.DataFrame({
+    "": ["Revenue", "Profit", "Active cust."],
+    "2018": [f"${cust_data_2018['Spend'].sum():,.0f}", f"${total_profit_2018:,.0f}", f"{n_cust_2018:,}"],
+    "2019": [f"${total_spend_2019:,.0f}", f"${total_profit_2019:,.0f}", f"{n_cust_2019:,}"],
+    "Δ": [(total_spend_2019 - cust_data_2018['Spend'].sum()) / cust_data_2018['Spend'].sum(),
+          profit_yoy, (n_cust_2019 - n_cust_2018) / n_cust_2018],
+})
+print(md_table(_yoy, formats={"Δ": "pct1"}, left=[""]))
+```
+
+Only **`{python} f"{repeat_rate_2018:.0%}"`** of 2018's buyers returned in 2019; the headline growth sits on top of heavy replacement.
+:::
+::::
+
+::: {.takeaway}
+The net change is small relative to the gross flows beneath it — sustaining profit depends on keeping **lapse** in check, not only on winning new customers.
+:::
+
+## How 2018 profit became 2019 profit — lapsed customers took out more than the surviving base lost
+
+::: {.eyebrow}
+Lens 2 · Profit bridge
+:::
+
+```{python}
+# | echo: false
+profit_by_group = cust_2018_2019.groupby("Status").agg(
+    Y2018=("Profit_2018", lambda s: s.sum(min_count=1)),
+    Y2019=("Profit_2019", lambda s: s.sum(min_count=1)))
+both_18 = profit_by_group.loc["Active both years", "Y2018"]
+both_19 = profit_by_group.loc["Active both years", "Y2019"]
+only_18 = profit_by_group.loc["2018 only (lapsed)", "Y2018"]
+only_19 = profit_by_group.loc["2019 only (new/reactivated)", "Y2019"]
+tot_18, tot_19 = both_18 + only_18, both_19 + only_19
+
+steps = pd.DataFrame([
+    ("2018", 0.0, tot_18, "Total"),
+    ("Lapsed", both_18, tot_18, "Decrease"),
+    ("Both-years Δ", min(both_18, both_19), max(both_18, both_19),
+     "Decrease" if both_19 < both_18 else "Increase"),
+    ("New / react.", both_19, tot_19, "Increase"),
+    ("2019", 0.0, tot_19, "Total"),
+], columns=["Step", "Start", "End", "Kind"]).assign(
+    Delta=lambda d: np.where(d["Kind"] == "Total", d["End"],
+        np.where(d["Kind"] == "Decrease", -(d["End"] - d["Start"]), d["End"] - d["Start"])))
+_ord = list(steps["Step"])
+_bars = alt.Chart(steps).mark_bar(size=52).encode(
+    x=alt.X("Step:N", sort=_ord, title=None, axis=alt.Axis(labelAngle=0)),
+    y=alt.Y("Start:Q", title="Profit", axis=alt.Axis(format="$.2s")), y2="End:Q",
+    color=alt.Color("Kind:N", scale=alt.Scale(
+        domain=["Total", "Increase", "Decrease"], range=[MUTED, NAVY, RED]), legend=None),
+    tooltip=[alt.Tooltip("Step:N"), alt.Tooltip("Delta:Q", format="$,.0f")])
+_lab = alt.Chart(steps).mark_text(dy=-6, fontSize=11, color=INK).encode(
+    x=alt.X("Step:N", sort=_ord), y="End:Q", text=alt.Text("Delta:Q", format="$,.3s"))
+(_bars + _lab).properties(width="container", height=CHART_H)
+```
+
+::: {.takeaway}
+The both-years group shrank; new customers more than covered it. **Replacement, not the surviving base, drives the year-on-year line.**
+:::
+
+# Lens 3 — How does a single cohort evolve? {.divider background-color="#1f3a5f"}
+
+## Cohort revenue decays through fewer active buyers — not weaker spending
+
+::: {.eyebrow}
+Lens 3 · Revenue decomposition · Q1 2016 cohort
+:::
+
+```{python}
+# | echo: false
+cohort_q = (cust_data.query("Cohort == 'y2016_q1'").groupby(["Year", "Quarter"])
+            .agg(ActiveCust=("CustomerID", "count"), TotalTrans=("NumTrans", "sum"),
+                 TotalSpend=("Spend", "sum"), TotalProfit=("Profit", "sum")))
+cohort_size = cohort_q.xs((2016, 1))["ActiveCust"]
+cohort_q = cohort_q.assign(
+    Pct_Active=cohort_q["ActiveCust"] / cohort_size,
+    ASPAC=cohort_q["TotalSpend"] / cohort_q["ActiveCust"] / 100,
+    AOF=cohort_q["TotalTrans"] / cohort_q["ActiveCust"],
+    AOV=cohort_q["TotalSpend"] / cohort_q["TotalTrans"] / 100)
+_labels = {"Pct_Active": "% active", "ASPAC": "Spend per active", "AOF": "AOF", "AOV": "AOV"}
+comp_long = (cohort_q.reset_index()
+    .assign(Period=lambda d: (d["Year"] - 2016) * 4 + (d["Quarter"] - 1))
+    .melt(id_vars="Period", value_vars=list(_labels), var_name="Component", value_name="Value")
+    .assign(Component=lambda d: d["Component"].map(_labels)))
+
+alt.Chart(comp_long).mark_line(point=alt.OverlayMarkDef(size=25, filled=True)).encode(
+    x=alt.X("Period:Q", title="Quarters since acquisition", axis=alt.Axis(tickMinStep=4)),
+    y=alt.Y("Value:Q", title=None),
+    tooltip=[alt.Tooltip("Component:N"), alt.Tooltip("Period:Q", title="Quarter"),
+             alt.Tooltip("Value:Q", format=",.2f")],
+).properties(width=200, height=CHART_H).facet(
+    facet=alt.Facet("Component:N", title=None, sort=list(_labels.values())), columns=4
+).resolve_scale(y="independent")
+```
+
+::: {.takeaway}
+The customers who remain keep behaving normally; the base shrinks because **fewer of them remain** — the lever is repeat buying, not spend stimulation.
+:::
+
+## Most repeat buying is decided early — the second-purchase curve flattens within a year
+
+::: {.eyebrow}
+Lens 3 · Time to second purchase · Q1 2016 cohort
+:::
+
+```{python}
+# | echo: false
+q_matrix = (cust_data.query("Cohort == 'y2016_q1'").sort_values(["Year", "Quarter"])
+    .pivot_table(index="CustomerID", columns=["Year", "Quarter"], values="NumTrans",
+                 aggfunc="sum", fill_value=0))
+q_periods = [f"Y{y} Q{q}" for y, q in q_matrix.columns]
+_first = q_matrix.columns.min()
+_thr = pd.Series(1, index=q_matrix.columns).mask(q_matrix.columns != _first, 0)
+_second = q_matrix.gt(_thr).cummax(axis=1)
+cum_pct = _second.mean()
+never_second = 1 - cum_pct.iloc[-1]
+second_df = pd.DataFrame({"Period": q_periods, "Cumulative": cum_pct.to_numpy()})
+
+alt.Chart(second_df).mark_area(line={"color": NAVY, "strokeWidth": 2}, opacity=0.15, color=NAVY).encode(
+    x=alt.X("Period:N", sort=q_periods, title=None, axis=alt.Axis(labelAngle=-45)),
+    y=alt.Y("Cumulative:Q", title="Share of cohort", axis=alt.Axis(format=".0%"),
+            scale=alt.Scale(domain=[0, 1])),
+    tooltip=[alt.Tooltip("Period:N"), alt.Tooltip("Cumulative:Q", format=".1%")],
+).properties(width="container", height=CHART_H,
+    title=alt.TitleParams(f"{1 - never_second:.0%} of the cohort ever came back — most within a year",
+        subtitle="The curve flattens hard after the first year: a second purchase happens early or not at all", anchor="start"))
+```
+
+::: {.takeaway}
+Early experience is decisive — invest in the **first few quarters** of a customer's life, where the repeat decision is actually made.
+:::
+
+# Lens 4 — How does the base grow and stay healthy? {.divider background-color="#1f3a5f"}
+
+## Growth is bought with acquisition — every cohort's contribution decays a year later
+
+::: {.eyebrow}
+Lens 4 · Annual profit by acquisition cohort
+:::
+
+```{python}
+# | echo: false
+cohort_year = (cust_data.assign(
+        CohortYear=lambda d: np.where(d["Cohort"] == "pre_y2016", "pre-2016", d["Cohort"].str[1:5]))
+    .groupby(["Year", "CohortYear"], as_index=False).agg(Profit=("Profit", "sum"))
+    .assign(Profit=lambda d: d["Profit"] / 100))
+cohort_order = ["pre-2016", "2016", "2017", "2018", "2019"]
+alt.Chart(cohort_year).mark_bar().encode(
+    x=alt.X("Year:O", title=None, axis=alt.Axis(labelAngle=0)),
+    y=alt.Y("Profit:Q", title="Profit", axis=alt.Axis(format="$.2s")),
+    color=alt.Color("CohortYear:N", sort=cohort_order,
+        scale=alt.Scale(domain=cohort_order, range=COHORT_RAMP),
+        legend=alt.Legend(title="Acquired")),
+    order=alt.Order("CohortYear:N", sort="descending"),
+    tooltip=[alt.Tooltip("Year:O"), alt.Tooltip("CohortYear:N", title="Cohort"),
+             alt.Tooltip("Profit:Q", format="$,.0f")],
+).properties(width="container", height=CHART_H + 20)
+```
+
+::: {.takeaway}
+Each year's profit rests on a **stack of older cohorts** whose contribution roughly halves a year on; new acquisition tops it up. A healthy base carries a thick still-active tail — repeat buying compounds.
+:::
+
+## Four moves follow directly from the audit {background-color="#ffffff"}
+
+::: {.eyebrow}
+Implications
+:::
+
+<ul class="points">
+<li><b>Treat the base as a portfolio.</b> Segment by value and manage the high-value minority explicitly — the average hides them.</li>
+<li><b>Make repeat buying the first lever.</b> Cohort decay is driven by fewer active customers, so small repeat-buying gains compound across every cohort.</li>
+<li><b>Win the second purchase early.</b> Repeat behaviour is largely set in the first few quarters — invest in early-life experience.</li>
+<li><b>Acquire more of the right customers.</b> Per-customer behaviour is stable, so growth comes mainly from adding customers like the ones you keep.</li>
+</ul>
+
+::: {.takeaway}
+None of these require an “average customer.” They require managing a heterogeneous base **by value and by age**.
+:::
+
+# Appendix {.divider background-color="#1f3a5f"}
+
+## A definitions note — keep the two “average transaction” numbers apart
+
+::: {.eyebrow}
+Appendix · Method
+:::
+
+<ul class="points">
+<li><b>AOV — ratio of totals.</b> Total spend ÷ total transactions (≈ $`{python} f"{aov_2019:,.0f}"`). A <b>transaction-weighted</b> average, so frequent buyers dominate it.</li>
+<li><b>Mean of per-customer averages.</b> Average each customer's own spend-per-transaction, then average across customers (≈ $`{python} f"{cust_data_2019['AvgSpendPerTrans'].mean():,.0f}"`). Every customer counts equally, so one-and-done buyers pull it up.</li>
+</ul>
+
+The two are equal only if every customer transacts the same number of times, which never happens. Here the weighted figure sits **below** the unweighted one, so heavier buyers have smaller baskets than light buyers.
+
+::: {.source}
+Convention used throughout: “AOV” always means the transaction-weighted ratio of totals · Source: Madrigal transaction sample, 2016–2019
+:::
+
+## A wording note — “retention” vs “repeat-buying rate” vs “% cohort active”
+
+::: {.eyebrow}
+Appendix · Method
+:::
+
+<ul class="points">
+<li><b>Why not “retention” here.</b> Madrigal is <b>noncontractual</b> — a customer who skips a period has not necessarily left. “Retention” properly describes contractual renewal / survival, where a cancellation is actually observed; using it here invites false “we lost them” conclusions.</li>
+<li><b>% of cohort active.</b> The share of a cohort that buys in a period — <b>unconditional</b>, and it includes one-time buyers (the diagonal of the cohort chart).</li>
+<li><b>Repeat-buying rate.</b> The <b>conditional</b> quantity — the share of customers active in one period who buy again the next.</li>
+<li><b>Carryover.</b> For value, a cohort's profit in one year relative to the year before (what the profit-flow chart annotates).</li>
+</ul>
+
+The three are not interchangeable; only in a contractual setting does “retention rate” have a single, well-defined meaning.
+
+::: {.source}
+After Fader, Hardie & Ross, *The Customer-Base Audit* (2022), Ch. 9 — “Be Wary of the ‘R’ Word”
+:::

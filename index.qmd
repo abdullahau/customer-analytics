@@ -148,6 +148,7 @@ Descriptive work that precedes and motivates the models — *describe* the custo
 base before fitting anything to it.
 
 - [The Customer-Base Audit](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-base-audit) — the full audit: growth, unit economics, retention, heterogeneity, cohorted sales (the "C3").
+- [The Customer-Base Audit — Slide Deck](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-base-audit-slides) — the same audit as a consulting-style **reveal.js** presentation: action-title slides, one story per lens, with exhibits and takeaways.
 - [Analysing Buyer Behaviour Using Consumer Panel Data](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-panel-data) — penetration, buying rate, and the summaries panel data supports.
 - [Analysing Buyer Behaviour Using Transaction Logs](https://abdullahau.github.io/customer-analytics/notebooks/analyses/buyer-behavior-summary-transaction-log) — the same summaries from a raw transaction log.
 - [Calculating Customer Acquisition Cost](https://abdullahau.github.io/customer-analytics/notebooks/analyses/customer-acquisition-cost) — CAC from marketing spend and acquisition counts.

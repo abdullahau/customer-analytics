@@ -1,0 +1,165 @@
+/*-- scss:defaults --*/
+// ===========================================================================
+// Consulting-deck reveal.js theme for the Customer-Base Audit slides.
+// Emulates a top-tier strategy-deck look (navy action titles, ochre accent,
+// clean 16:9 exhibits, source footnotes). Not affiliated with any firm.
+// ===========================================================================
+
+$navy: #1f3a5f;
+$navy-dark: #122336;
+$accent: #c4703a;
+$ink: #1f2328;
+$muted: #6b7280;
+$rule: #e6e8eb;
+
+$font-family-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
+$presentation-font-size-root: 26px;
+$presentation-line-height: 1.4;
+
+$body-color: $ink;
+$body-bg: #ffffff;
+$link-color: $navy;
+$link-color-hover: $accent;
+$selection-bg: rgba(31, 58, 95, 0.2);
+
+$presentation-heading-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
+$presentation-heading-color: $navy;
+$presentation-heading-font-weight: 700;
+$presentation-heading-line-height: 1.18;
+$presentation-h1-font-size: 2.1em;
+$presentation-h2-font-size: 1.35em;
+$presentation-h3-font-size: 1.0em;
+$presentation-title-slide-text-align: left;
+
+/*-- scss:rules --*/
+
+.reveal {
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+.reveal .slides,
+.reveal .slides section {
+  text-align: left;
+}
+
+// ---- action title (##) with a short navy rule underneath -----------------
+.reveal h2 {
+  text-transform: none;
+  margin-bottom: 0.15em;
+}
+.reveal h2::after {
+  content: "";
+  display: block;
+  width: 58px;
+  height: 3px;
+  background: $navy;
+  margin: 0.32em 0 0.5em;
+}
+// on divider slides we don't want the h2 rule
+.reveal section.divider h2::after { display: none; }
+
+// ---- eyebrow / kicker above the title ------------------------------------
+.reveal .eyebrow {
+  font-size: 0.46em;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: $muted;
+  font-weight: 700;
+  margin-bottom: 0.15em;
+}
+
+// ---- takeaway strip -------------------------------------------------------
+.reveal .takeaway {
+  margin-top: 0.6em;
+  padding: 0.45em 0.7em;
+  background: #f3f6fa;
+  border-left: 3px solid $accent;
+  font-size: 0.6em;
+  color: $ink;
+  line-height: 1.4;
+}
+.reveal .takeaway b { color: $navy; }
+
+// ---- source footnote (bottom-left); page number is reveal's slide-number --
+.reveal .source {
+  position: absolute;
+  bottom: 14px;
+  left: 42px;
+  font-size: 0.36em;
+  font-style: italic;
+  color: $muted;
+}
+
+// ---- bullet lists ---------------------------------------------------------
+.reveal .points { list-style: none; margin: 0.1em 0 0; padding: 0; }
+.reveal .points li {
+  position: relative;
+  padding: 0.34em 0 0.34em 1.1em;
+  border-bottom: 1px solid #f1f3f5;
+  font-size: 0.7em;
+  line-height: 1.4;
+}
+.reveal .points li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.72em;
+  width: 9px;
+  height: 9px;
+  background: $accent;
+  border-radius: 1px;
+}
+.reveal .points b { color: $navy; }
+
+// numbered agenda
+.reveal .agenda { list-style: none; margin: 0.2em 0 0; padding: 0; }
+.reveal .agenda li {
+  display: flex;
+  gap: 0.7em;
+  align-items: baseline;
+  padding: 0.5em 0;
+  border-bottom: 1px solid #eef1f4;
+  font-size: 0.82em;
+}
+.reveal .agenda .n { color: $accent; font-weight: 700; min-width: 1.1em; }
+.reveal .agenda .q { color: $muted; font-size: 0.72em; margin-left: auto; text-align: right; }
+
+// ---- divider / section slides --------------------------------------------
+.reveal section.divider,
+.reveal .divider {
+  background: linear-gradient(135deg, #{$navy} 0%, #{$navy-dark} 100%);
+}
+.reveal section.divider h1,
+.reveal section.divider h2,
+.reveal section.divider h3,
+.reveal .divider h1,
+.reveal .divider h2,
+.reveal .divider h3 { color: #ffffff; }
+.reveal section.divider .eyebrow,
+.reveal .divider .eyebrow { color: #d68a5a; }
+
+// ---- title slide ----------------------------------------------------------
+#title-slide .title { color: #ffffff; font-size: 1.9em; font-weight: 700; }
+#title-slide .subtitle { color: #cdd7e3; font-weight: 400; }
+#title-slide .quarto-title-authors,
+#title-slide .date,
+#title-slide .author { color: #93a6bc; font-size: 0.6em; }
+
+// ---- exhibit captions + column tidy --------------------------------------
+.reveal .exhibit-cap {
+  font-size: 0.42em;
+  color: $muted;
+  font-style: italic;
+  text-align: center;
+  margin-top: 0.1em;
+}
+.reveal .columns { align-items: center; }
+
+// tighten tables so they fit a 16:9 slide
+.reveal table { font-size: 0.5em; margin: 0.2em 0; }
+.reveal table th { color: #ffffff; background: $navy; font-weight: 700; border: none; }
+.reveal table td, .reveal table th { padding: 0.28em 0.6em; }
+.reveal .slides section .cell-output-display { margin: 0 auto; }
+
+// slide-number bottom-right, subtle
+.reveal .slide-number { background: transparent; color: $muted; font-weight: 700; }

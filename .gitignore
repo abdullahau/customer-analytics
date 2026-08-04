@@ -6,8 +6,9 @@ __pycache__/
 *$py.class
 *.pyc
 
-# Jupyter Notebook
+# Notebooks
 .ipynb_checkpoints
+__marimo__
 
 # IPython
 profile_default/

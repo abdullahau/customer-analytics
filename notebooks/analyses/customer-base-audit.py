@@ -3,7 +3,6 @@ import marimo
 __generated_with = "0.23.16"
 app = marimo.App(
     width="medium",
-    layout_file="layouts/customer-base-audit.slides.json",
 )
 
 
@@ -1168,7 +1167,8 @@ def _(mo):
     \frac{1}{I}\sum_{i=1}^{I}\frac{\text{spend}_i}{\text{trans}_i}
     $$
 
-    The one-and-done buyers (63% of the base) count as much as the customer with
+    The one-and-done-in-2019 buyers (63% of the base, i.e. exactly one transaction
+    that year) count as much as the customer with
     58 transactions.
 
     The two numbers are equal **only** when every customer makes the same number
@@ -1696,7 +1696,7 @@ def _(mo):
     mo.md(r"""
     Spend and profit both grew, and the active count grew with them. The question
     for the rest of Lens 2 is whether that growth came from existing customers
-    buying more, or from acquisition outrunning churn.
+    buying more, or from acquisition outrunning lapse.
     """)
     return
 
@@ -2012,7 +2012,7 @@ def _(mo):
     removes the profit of the lapsed group, applies the small change in the
     both-years group, adds the profit of the new group, and arrives at 2019 total
     profit. The picture makes the source of growth explicit: **the firm grows by
-    replacing lost customers with new ones, not by growing the retained base.**
+    replacing lost customers with new ones, not by growing the returning base.**
     """)
     return
 
@@ -2066,7 +2066,7 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     Apply the profit identity to each group in each year. This shows **why** the
-    retained group is over-represented in profit relative to its headcount: it
+    returning group is over-represented in profit relative to its headcount: it
     buys more often (higher AOF) and spends more per order (higher AOV) than the
     one-year-only groups. The table reports active customers, transactions, spend,
     profit, and the derived AOF, AOV, and margin.
@@ -2174,7 +2174,7 @@ def _(mo):
     customers present in one year only.
 
     The mass sits on and just below the diagonal, so most customers hold their
-    rank. The large `2018 Only` column is concentrated in the low deciles: churn
+    rank. The large `2018 Only` column is concentrated in the low deciles: lapse
     is heaviest among low-value customers, but decile 1 is not immune. A common set
     of cut-offs makes the matrix readable but means each decile no longer holds
     exactly 10% of a year's profit; year-specific cut-offs keep that property at
@@ -2271,8 +2271,8 @@ def _(mo):
     Read this as a diagnosis of the both-years block. The largest positive group is
     up-up-up-up; the largest negative group is down-down-down-down. But both are
     small next to the two one-year blocks: the 2018-only block removes about
-    \$1.1M and the 2019-only block adds about \$1.6M. **Acquisition and churn, not
-    the movement of retained customers, dominate the change in profit.**
+    \$1.1M and the 2019-only block adds about \$1.6M. **Acquisition and lapse, not
+    the movement of returning customers, dominate the change in profit.**
 
     Three points guide the build:
 
@@ -2297,7 +2297,7 @@ def _(how):
     3. Group the customers by the four flags.
     4. Add the customers and the profit in each group.
 
-    **Purpose:** Sort the retained customers by how their behaviour moved.
+    **Purpose:** Sort the returning customers by how their behaviour moved.
     **Goal:** Feed the up-down table.
     """)
     return
@@ -2647,7 +2647,8 @@ def _(mo):
 
     The headline: **45% of the cohort never made a second purchase** by the end of
     2019. The always-active pattern (Y-Y-Y-Y) is about 8%. Most acquired customers
-    buy once and do not return. This one-and-done majority is the defining feature
+    buy once and do not return. This never-repeated majority (distinct from Lens 1's
+    one-and-done-in-2019 share) is the defining feature
     of a non-contractual base.
     """)
     return
@@ -3454,9 +3455,21 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     Lens 5 takes the firm-level view. It asks whether growth comes from a healthy
-    base or from acquisition outrunning churn. The working dataset groups customers
+    base or from acquisition outrunning lapse. The working dataset groups customers
     into annual cohorts (pre-2016, 2016, 2017, 2018, 2019) and builds an annual
     cohort-by-year grid of active customers, transactions, spend, and profit.
+
+    **A note on wording — "retention" vs "repeat-buying rate" vs "% of cohort
+    active".** Madrigal is a *noncontractual* business: a customer who skips a
+    period has not necessarily left, so this audit avoids the word *retention*,
+    which properly describes contractual renewal or survival (where a cancellation
+    is actually observed). Instead it uses **% of cohort active** — the share of a
+    cohort that buys in a given period (*unconditional*, and it includes one-time
+    buyers) — and, for value, **carryover** — a cohort's profit in one year relative
+    to the year before. The **repeat-buying rate** is the *conditional* quantity —
+    the share of customers active in one period who buy again in the next — and is
+    reported in Lens 3. The three are not interchangeable; only in a contractual
+    setting does "retention rate" have a single, well-defined meaning.
     """)
     return
 
@@ -3596,12 +3609,12 @@ def _(SEQ, go, pd, pretty_cohort):
         share = P.div(totals, axis=1)
         bottoms = P.cumsum(axis=0) - P
         gaps = [f"{years[i]}\u2192{years[i + 1]}" for i in range(len(years) - 1)]
-        # Per-cohort retention: a cohort's value next year / its value this year.
-        cohort_retention = pd.DataFrame(
+        # Per-cohort carryover: a cohort's value next year / its value this year.
+        cohort_carryover = pd.DataFrame(
             {gaps[i]: P[years[i + 1]] / P[years[i]] for i in range(len(gaps))},
             index=order,
         )
-        # Base retention (TCBA 6.2): of a year's whole base, the share still
+        # Base carryover (TCBA Ch. 7): of a year's whole base, the share still
         # delivered next year (the newest cohort of the next year is excluded).
         base = {}
         for i, g in enumerate(gaps):
@@ -3611,14 +3624,14 @@ def _(SEQ, go, pd, pretty_cohort):
             base[g] = (
                 (totals[y1] - new_next) / totals[y0] if totals[y0] else float("nan")
             )
-        base_retention = pd.Series(base, name="base_retention")
+        base_carryover = pd.Series(base, name="base_carryover")
         return {
             "values": P,
             "totals": totals,
             "share": share,
             "bottoms": bottoms,
-            "cohort_retention": cohort_retention,
-            "base_retention": base_retention,
+            "cohort_carryover": cohort_carryover,
+            "base_carryover": base_carryover,
             "years": years,
             "gaps": gaps,
         }
@@ -3629,7 +3642,7 @@ def _(SEQ, go, pd, pretty_cohort):
         # Pure renderer: every number comes from `data` (see cohort_flow_data).
         P, years, gaps = data["values"], data["years"], data["gaps"]
         totals, share, bottoms = data["totals"], data["share"], data["bottoms"]
-        cohort_ret, base_ret = data["cohort_retention"], data["base_retention"]
+        cohort_car, base_car = data["cohort_carryover"], data["base_carryover"]
         order = list(P.index)
         colors = dict(zip(order, SEQ[: len(order)]))
         text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
@@ -3697,7 +3710,7 @@ def _(SEQ, go, pd, pretty_cohort):
                 font=dict(size=12),
             )
         if flows:
-            # Middle labels: each cohort's own retention on its ribbon.
+            # Middle labels: each cohort's own carryover on its ribbon.
             for c in order:
                 for i in range(len(years) - 1):
                     v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
@@ -3709,20 +3722,20 @@ def _(SEQ, go, pd, pretty_cohort):
                     fig.add_annotation(
                         x=i + 0.5,
                         y=float(0.5 * ((b1 + v1 / 2) + (b2 + v2 / 2))),
-                        text=f"{cohort_ret.loc[c, gaps[i]]:.0%}",
+                        text=f"{cohort_car.loc[c, gaps[i]]:.0%}",
                         showarrow=False,
                         font=dict(size=9, color="#374151"),
                     )
-            # Top label: base retention between bars (TCBA 6.2), boxed.
+            # Top label: base carryover between bars, boxed.
             for i, g in enumerate(gaps):
-                if pd.isna(base_ret[g]):
+                if pd.isna(base_car[g]):
                     continue
                 base_top = totals[years[i]]
-                retained = base_top * base_ret[g]
+                carried = base_top * base_car[g]
                 fig.add_annotation(
                     x=i + 0.5,
-                    y=float(0.5 * (base_top + retained)),
-                    text=f"{base_ret[g]:.0%}",
+                    y=float(0.5 * (base_top + carried)),
+                    text=f"{base_car[g]:.0%}",
                     showarrow=False,
                     font=dict(size=11, color="#374151"),
                     bgcolor="rgba(255,255,255,0.82)",
@@ -3757,7 +3770,7 @@ def _(mo):
 
     The label in each band is the share of that year from the cohort. The label
     above each bar is the year total. The number between two bars is the
-    retention of the base. It is the part of one year's value that the cohorts
+    carryover of the base. It is the part of one year's value that the cohorts
     from that year still give in the next year. It leaves out the customers who
     join in the next year.
 
@@ -3833,7 +3846,7 @@ def _(mo):
     The numbers for the three flow charts are computed first, as tables, so you
     can review them before plotting. `cohort_flow_data` returns the values, the
     per-year totals, the share of each year, the per-cohort year-to-year
-    retention, and the base retention. The plot function only draws them.
+    carryover, and the base carryover. The plot function only draws them.
     """)
     return
 
@@ -3861,8 +3874,8 @@ def _(annual_cohort_combined, cohort_flow_data):
 
 @app.cell
 def _(flow_profit):
-    # Review: each cohort's year-to-year retention for profit (%).
-    (flow_profit["cohort_retention"] * 100).round(0)
+    # Review: each cohort's year-to-year carryover of profit (%).
+    (flow_profit["cohort_carryover"] * 100).round(0)
     return
 
 
@@ -3904,11 +3917,11 @@ def _(mo):
     \$1,193,524 of \$1,871,911 (64%) came from the 2016 cohort, so 36% came from
     customers acquired earlier.
 
-    **(b) Year-on-year retention of profit from existing cohorts.** Profit in 2017
+    **(b) Year-on-year carryover of profit from existing cohorts.** Profit in 2017
     from cohorts acquired before 2017 was \$988,558, which is 53% of what the same
     cohorts delivered in 2016. Per cohort: the 2016 cohort delivered \$1,193,524 in
-    2016 and \$451,670 in 2017 (38% retention); the pre-2016 cohort delivered
-    \$678,387 then \$536,888 (79% retention).
+    2016 and \$451,670 in 2017 (38% carryover); the pre-2016 cohort delivered
+    \$678,387 then \$536,888 (79% carryover).
 
     The pattern generalizes. **New cohorts decay fast; old, self-selected
     survivors are far stickier.** Each existing cohort's profit falls by roughly

@@ -1,16 +1,10 @@
-# The Customer-Base Audit (Fader, Hardie & Ross, 2022) — Summary & Notebook Critique
+# The Customer-Base Audit (Fader, Hardie & Ross, 2022) — Summary
 
 Reading notes on *The Customer-Base Audit: The First Step on the Journey to
-Customer Centricity* (Wharton School Press, 2022), plus an assessment of how
-faithfully `notebooks/analyses/customer-base-audit.py` (and the reveal deck)
-implement it. The notebook's data **is the book's Madrigal example, sampled at
-1%** (the Q1/2016 cohort is 294,450 in the book → `FOCUS_COHORT_N = 2,944` in the
-notebook; the ~70k total is 1% of Madrigal's full base). So the book's
-*percentages* are the exact benchmarks the notebook should reproduce.
+Customer Centricity* (Wharton School Press, 2022). The book's running example is
+**Madrigal**, a US catalog→online retailer, analysed over 2016–2019.
 
 ---
-
-## PART A — Detailed summary of the book
 
 ### The premise (Introduction, Ch. 1)
 - Firms know product × time cold, but cannot answer basic customer questions
@@ -49,7 +43,7 @@ notebook; the ~70k total is 1% of Madrigal's full base). So the book's
   (`#trans/#cust`), AOV = spend/order (`revenue/#trans`), margin = profit/spend.
   avg spend/customer = AOF × AOV; avg profit/customer = avg spend × margin.
 
-### Lens 1 — How different are your customers? (Ch. 3)  *[benchmarks]*
+### Lens 1 — How different are your customers? (Ch. 3)
 - 2019: **$583M rev, $280M profit, 3,185,335 customers**, avg spend **$183**,
   **median $113**, **69% below the mean spend**. Distribution is **right-skewed**
   ("reverse-J") — *"purge 'the average customer' from your vocabulary."*
@@ -158,7 +152,7 @@ notebook; the ~70k total is 1% of Madrigal's full base). So the book's
   many *new* customers are needed to hit a growth target — the audit's bridge to
   planning. Health framed as **Acquisition / Retention / Development**.
 
-### Ch. 8 — Bringing back the product dimension  *(not implemented in the notebook)*
+### Ch. 8 — Bringing back the product dimension
 - Madrigal: 12,142 products, 23 categories. Higher-value deciles buy in **more
   categories / more SKUs**; their higher AOV comes from **more units per basket**
   (mostly more units *per category*, not more categories per trip); price/unit is
@@ -198,94 +192,3 @@ notebook; the ~70k total is 1% of Madrigal's full base). So the book's
   (pay-TV: *Times* 4× CAC but 5× value; Google: £12 avg CAC / £95 avg VTD hid most
   keywords >£30 CAC / <£30 value). **"Acquire customers, not transactions"**
   (Lands' End: "not a customer until the 2nd purchase"; nursery/welcome programs).
-
----
-
-## PART B — Assessment of the notebook (and reveal deck)
-
-### What is working well (faithful to the book)
-1. **Lens structure 1–5 matches Fig. 2.9 exactly**, and each lens uses the book's
-   own analyses (distributions → decomposition → decile; the "three Ds").
-2. **The multiplicative profit decomposition** (`profit = #cust × AOF × AOV ×
-   margin`) is implemented consistently (decile reports, Lens 2 group
-   decomposition, cohort decomposition).
-3. **The two "average transaction" numbers** are handled *exactly* as the book
-   does (Ch. 3, p.42): the notebook computes per-customer `AvgSpendPerTrans`
-   (unweighted-mean ingredient, ≈$99 sample) and **reserves "AOV" for the
-   transaction-weighted ratio of totals** (≈$96). This is one of the most-often
-   botched distinctions in practice — the notebook gets it right and even
-   documents it. (This is exactly why we did **not** rename `AvgSpendPerTrans →
-   AOV`.)
-4. **Lens 2** reproduces the book's full sequence: overlap Venn, additive profit
-   decomposition by activity group, multiplicative temporal decomposition
-   (incl. the **both-years higher-AOF selection effect**), **common decile
-   cut-offs across years**, decile migration, and up-down analysis. The status
-   labels ("Lapsed", "New/Reactivated") correctly avoid "lost/new."
-5. **Lens 3** covers revenue decomposition (size × %active × AOF × AOV), the
-   16-pattern annual buying table, second-purchase timing, VTD distribution +
-   decile, and RFM with the **R > F > M** framing.
-6. **Lens 5** builds the **C3 (customer cohort chart)** and lands the book's
-   headline: *growth is driven by base size, not per-customer value.*
-7. **"No average customer" / celebrate heterogeneity / value concentration** is
-   the notebook's and deck's governing thought — the book's core message.
-8. Data lineage is faithful: it **is** the 1% Madrigal sample (Q1/2016 cohort
-   `= 2,944 = 1% × 294,450`), so the book's percentages are directly checkable.
-
-### What is wrong / at odds with the book
-1. **"Retention" is misused in a noncontractual setting (the biggest issue).**
-   The book (Ch. 9, "Be Wary of the 'R' Word") is emphatic that *retention /
-   retained* should be used **only** in contractual settings; in noncontractual
-   retail the correct terms are **"repeat-buying rate"** and **"% of cohort
-   active."** The CBA notebook uses *retention/retained* **40+ times** (and the
-   reveal deck ~8×, incl. takeaways like "retention is the lever" / "retention
-   compounds"). **Fix:** rename to "repeat-buying rate" / "% active," or add the
-   book's explicit caveat where the word is unavoidable. (The *separate*
-   `models/retention/*` and `subscription-retention` essays are genuinely
-   contractual — "retention" is correct **there**, just not in the CBA.)
-2. **Verify the numbers against the book's benchmarks.** Because the notebook is
-   the 1% sample, it should reproduce (within sampling noise): **69%** below-mean
-   spend & profit; **63%** one-transaction; AOV **$98 unweighted / $96 weighted**;
-   profit mean **$88** / median **$52**; margin mean **46%** / median **48%**;
-   **decile 1 = 40%** of profit, **deciles 1+2 = 58%**, **top 1% = 10%**; Lens 3
-   **45%** never-repeat, repeat rates **25 / 56 / 57%**, VTD mean **$171** /
-   median **$78**, VTD-decile-1 AOF **≈36**. Add an assertion/checks cell that
-   flags material drift from these — it turns the notebook into a self-validating
-   reproduction. (Not a claimed error; a recommended guardrail.)
-3. **Don't conflate the two "one-and-done" numbers.** Lens 1's **63%** (one
-   transaction *in a period*) and Lens 3's **45%** (cohort *never* makes a 2nd
-   purchase) are different quantities; keep them clearly labelled (the deck's
-   "63% bought exactly once" is the Lens-1 one — correct; make sure Lens-3 copy
-   says "never made a second purchase," not "one-and-done in 2019").
-
-### What is missing / incomplete (vs a "full" audit)
-4. **Product dimension (Ch. 8) is entirely absent** — explicitly out of scope in
-   `CLAUDE.md`, so intentional, but it is the single biggest gap: category
-   penetration, `category profit = #active × penetration × ACOF × ACOV × margin`,
-   **53% sole-category buyers**, co-purchasing/duplication, and the **"sign-flip"**
-   acquisition-doorway insight are where much action lives.
-5. **Lens 3 depth-of-repeat family.** The book's Fig. 5.8 (time from purchase
-   *n* to *n+1* for n = 1…9) demonstrating heterogeneity is richer than a single
-   second-purchase curve — worth adding (the repo already has a
-   `models/acquisition/depth-of-repeat` essay to borrow from).
-6. **Lens 4 like-for-like completeness.** Ensure Lens 4 shows **both** comparison
-   types (same-year different-quarter *and* same-quarter different-year) and the
-   **age-aligned vs calendar-time margin lesson** (a margin gap that vanishes when
-   time-aligned is a pricing artifact, not cohort quality). Age-alignment is
-   present; the explicit margin/time-alignment teaching point may not be.
-7. **Customer-centric planning bridge (Ch. 7 / Conclusion).** The book's payoff is
-   the **back-of-envelope** "how many new customers to fill the gap" using
-   acquisition + repeat rates. The notebook's Lens-5 "two ratios that matter"
-   should surface this planning view explicitly (it is the audit→action step).
-8. **Precision on "% active" vs "repeat-buying rate" in Lens 5.** Mirror the
-   book's Table 7.3 (cumulative 2nd-purchase by cohort) and Table 7.4 (conditional
-   repeat-buying rate) as distinct exhibits, and label the C3 diagonal as
-   *% active*, not *retention*.
-
-### Net
-The notebook is a **faithful, well-built reproduction of Lenses 1–5** on the exact
-Madrigal data, and it nails the subtle points practitioners usually miss (the two
-AOVs, heterogeneity, common decile cut-offs, the base-size growth story). The
-**highest-value corrections are terminological** — purge/caveat "retention" per
-Ch. 9 — plus a **benchmark-checking guardrail**; the **highest-value additions**
-are the **product dimension (Ch. 8)** and the **planning bridge** that turns the
-audit into action.

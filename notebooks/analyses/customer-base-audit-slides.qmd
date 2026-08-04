@@ -184,7 +184,7 @@ fit(
         title="",
         x_title="Annual Spend ($)",
     ),
-    width=560, height=390,
+    width=560, height=440,
 )
 ```
 ::: {.exhibit-cap}
@@ -201,7 +201,7 @@ fit(
         x_title="Annual Profit ($)",
         color="#c4703a",
     ),
-    width=560, height=390,
+    width=560, height=440,
 )
 ```
 ::: {.exhibit-cap}
@@ -245,7 +245,7 @@ Madrigal transaction sample; deciles by annual profit
 ::: {.column width="60%"}
 ```{python}
 # | echo: false
-fit(profit_bridge_chart(profit_by_group), width=660, height=430)
+fit(profit_bridge_chart(profit_by_group), width=660, height=462)
 ```
 :::
 ::: {.column width="40%"}
@@ -288,7 +288,7 @@ fit(
         width=520,
         height=420,
     ),
-    width=660, height=430,
+    width=660, height=462,
 )
 ```
 ::: {.exhibit-cap}
@@ -329,7 +329,7 @@ fit(
         "% active",
         tickformat=".0%",
     ),
-    width=555, height=205,
+    width=556, height=232,
 )
 ```
 :::
@@ -345,7 +345,7 @@ fit(
         "ASPAC ($)",
         tickformat="$,.0f",
     ),
-    width=555, height=205,
+    width=556, height=232,
 )
 ```
 :::
@@ -364,7 +364,7 @@ fit(
         "AOF",
         tickformat=".2f",
     ),
-    width=555, height=205,
+    width=556, height=232,
 )
 ```
 :::
@@ -380,7 +380,7 @@ fit(
         "AOV ($)",
         tickformat="$,.0f",
     ),
-    width=555, height=205,
+    width=556, height=232,
 )
 ```
 :::
@@ -402,7 +402,7 @@ Cumulative share of the cohort that has made a second purchase, by quarter
 
 ```{python}
 # | echo: false
-fit(second_purchase_chart(second_purchase), width=1150, height=430)
+fit(second_purchase_chart(second_purchase), width=1150, height=470)
 ```
 
 ::: {.takeaway}
@@ -425,7 +425,7 @@ Every acquisition cohort, indexed to quarters since acquisition
 ::: {.column width="50%"}
 ```{python}
 # | echo: false
-fit(cohort_lines(cohort_df, "PctActive", align=True, tickformat=".0%"), width=560, height=390)
+fit(cohort_lines(cohort_df, "PctActive", align=True, tickformat=".0%"), width=560, height=440)
 ```
 ::: {.exhibit-cap}
 % active by quarters since acquisition
@@ -434,7 +434,7 @@ fit(cohort_lines(cohort_df, "PctActive", align=True, tickformat=".0%"), width=56
 ::: {.column width="50%"}
 ```{python}
 # | echo: false
-fit(cohort_lines(cohort_df, "AOV", align=True, tickformat="$,.0f"), width=560, height=390)
+fit(cohort_lines(cohort_df, "AOV", align=True, tickformat="$,.0f"), width=560, height=440)
 ```
 ::: {.exhibit-cap}
 Average order value by quarters since acquisition
@@ -458,7 +458,7 @@ Madrigal transaction sample; all acquisition cohorts aligned by age
 ::: {.column width="33%"}
 ```{python}
 # | echo: false
-fit(acquisitions_bar_chart(annual_cohort_combined), width=370, height=310)
+fit(acquisitions_bar_chart(annual_cohort_combined), width=372, height=378)
 ```
 ::: {.exhibit-cap}
 New customers
@@ -467,7 +467,7 @@ New customers
 ::: {.column width="33%"}
 ```{python}
 # | echo: false
-fit(active_customers_bar_chart(annual_cohort_combined), width=370, height=310)
+fit(active_customers_bar_chart(annual_cohort_combined), width=372, height=378)
 ```
 ::: {.exhibit-cap}
 Active customers
@@ -476,7 +476,7 @@ Active customers
 ::: {.column width="34%"}
 ```{python}
 # | echo: false
-fit(spend_profit_bar_chart(annual_cohort_combined), width=370, height=310)
+fit(spend_profit_bar_chart(annual_cohort_combined), width=372, height=378)
 ```
 ::: {.exhibit-cap}
 Spend & profit
@@ -502,7 +502,7 @@ Annual profit split by acquisition-year cohort
 # | echo: false
 fit(
     cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.2f}"),
-    width=1150, height=430,
+    width=1150, height=470,
 )
 ```
 
@@ -546,7 +546,7 @@ fit(
         title="",
         x_title="Annual Transactions",
     ),
-    width=560, height=390,
+    width=560, height=440,
 )
 ```
 ::: {.exhibit-cap}
@@ -563,7 +563,7 @@ fit(
         x_title="Margin (%)",
         color="#4c8b6f",
     ),
-    width=560, height=390,
+    width=560, height=440,
 )
 ```
 ::: {.exhibit-cap}

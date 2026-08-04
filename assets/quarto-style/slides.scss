@@ -13,7 +13,7 @@ $muted: #6b7280;
 $rule: #e6e8eb;
 
 $font-family-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
-$presentation-font-size-root: 26px;
+$presentation-font-size-root: 20px;
 $presentation-line-height: 1.4;
 
 $body-color: $ink;
@@ -26,8 +26,8 @@ $presentation-heading-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
 $presentation-heading-color: $navy;
 $presentation-heading-font-weight: 700;
 $presentation-heading-line-height: 1.18;
-$presentation-h1-font-size: 2.1em;
-$presentation-h2-font-size: 1.35em;
+$presentation-h1-font-size: 2.4em;
+$presentation-h2-font-size: 1.5em;
 $presentation-h3-font-size: 1.0em;
 $presentation-title-slide-text-align: left;
 
@@ -81,34 +81,33 @@ $presentation-title-slide-text-align: left;
 .reveal .takeaway b { color: $navy; }
 
 // ---- source footnote (bottom-left); page number is reveal's slide-number --
-.reveal .source {
-  position: absolute;
-  bottom: 14px;
-  left: 42px;
-  font-size: 0.36em;
-  font-style: italic;
-  color: $muted;
-}
+// (.source retired — per-slide credits now use Quarto's `.footer` div)
 
 // ---- bullet lists ---------------------------------------------------------
 .reveal .points { list-style: none; margin: 0.1em 0 0; padding: 0; }
 .reveal .points li {
   position: relative;
-  padding: 0.34em 0 0.34em 1.1em;
+  padding: 0.5em 0 0.5em 1.7em;
   border-bottom: 1px solid #f1f3f5;
-  font-size: 0.7em;
-  line-height: 1.4;
+  font-size: 0.78em;
+  line-height: 1.5;
 }
+// marker is em-based so it tracks the text, and the gutter is wide enough that
+// it can never collide with the label
 .reveal .points li::before {
   content: "";
   position: absolute;
-  left: 2px;
-  top: 0.72em;
-  width: 9px;
-  height: 9px;
+  left: 0.15em;
+  top: 0.95em;
+  width: 0.44em;
+  height: 0.44em;
   background: $accent;
   border-radius: 1px;
 }
+// IMPORTANT: `.note` already shrinks its contents — without this the two
+// font-sizes multiply (0.62 x 0.7 = 0.43em) and the appendix text becomes
+// unreadable with the bullet marker jammed into the label.
+.reveal .note .points li { font-size: 1em; }
 .reveal .points b { color: $navy; }
 
 // numbered agenda
@@ -125,10 +124,11 @@ $presentation-title-slide-text-align: left;
 .reveal .agenda .q { color: $muted; font-size: 0.72em; margin-left: auto; text-align: right; }
 
 // ---- divider / section slides --------------------------------------------
-.reveal section.divider,
-.reveal .divider {
-  background: linear-gradient(135deg, #{$navy} 0%, #{$navy-dark} 100%);
-}
+// NOTE: the divider background comes solely from `data-background-color` on the
+// slide (reveal paints that on its background layer). Do NOT also set a
+// background here — the section box would paint a second, slightly different
+// navy behind the text only.
+.reveal section.divider { background: transparent; }
 .reveal section.divider h1,
 .reveal section.divider h2,
 .reveal section.divider h3,
@@ -163,3 +163,100 @@ $presentation-title-slide-text-align: left;
 
 // slide-number bottom-right, subtle
 .reveal .slide-number { background: transparent; color: $muted; font-weight: 700; }
+
+// ===========================================================================
+// Parity with the marimo deck (customer-base-audit-slides.py).
+// Element order is eyebrow → title → subtitle → rule → body → takeaway → footer.
+// The eyebrow is emitted INSIDE the heading as a block-level span, so no
+// flexbox/order overrides are needed (reveal's own layout rules win those, and
+// making sections flex containers broke navigation + the agenda layout).
+// ===========================================================================
+.reveal h2 .eyebrow,
+.reveal h1 .divider-num {
+  display: block;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 0.35em;
+}
+.reveal h2 .eyebrow {
+  font-size: 0.42em;
+  letter-spacing: 0.16em;
+  color: $muted;
+}
+.reveal h1 .divider-num {
+  font-size: 0.3em;
+  letter-spacing: 0.22em;
+  color: #d68a5a;
+}
+
+// subtitle under the action title (marimo .mck-sub)
+.reveal .slide-sub {
+  font-size: 0.52em;
+  color: $muted;
+  margin: -0.1em 0 0;
+}
+// the navy rule sits AFTER the subtitle when one is present
+.reveal section:has(.slide-sub) h2::after { display: none; }
+.reveal .slide-sub::after {
+  content: "";
+  display: block;
+  width: 58px;
+  height: 3px;
+  background: $navy;
+  margin: 0.5em 0 0.6em;
+}
+
+// pseudo-heading inside note blocks (replaces #### which created sub-slides)
+.reveal .note-h {
+  display: block;
+  color: $navy;
+  font-weight: 700;
+  font-size: 1.08em;
+  margin: 0 0 0.4em;
+}
+.reveal .note { font-size: 0.8em; line-height: 1.6; }
+.reveal .note b { color: $navy; }
+.reveal .note .note { font-size: 1em; }
+
+// ---- slide footer: source bottom-left + hairline, page number bottom-right --
+// Quarto's own per-slide footer relies on its JS (which does not run for print
+// / PDF export), so the credit line is positioned here in pure CSS instead.
+// Sections are given full height so `bottom:` anchors to the slide edge rather
+// than to the end of the content box.
+.reveal .slides > section,
+.reveal .slides > section > section {
+  height: 100%;
+  box-sizing: border-box;
+}
+.reveal .footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 10px;
+  margin: 0;
+  padding-top: 7px;
+  border-top: 1px solid $rule;
+  font-style: italic;
+  color: $muted;
+  font-size: 0.4em;
+  text-align: left;
+}
+.reveal .footer p { margin: 0; }
+
+// dark slides (cover + dividers): hairline and text pick up the marimo tones
+.reveal section.divider .footer,
+#title-slide .footer {
+  border-top-color: rgba(255, 255, 255, 0.18);
+  color: #93a6bc;
+}
+.reveal section.divider .slide-number,
+.reveal section.divider ~ .slide-number { color: #93a6bc; }
+
+// (bullet spacing lives with the .points rules above — no duplicate override)
+
+// agenda must run edge to edge
+.reveal .agenda { width: 100%; }
+.reveal .agenda li { width: 100%; }
+
+// exhibit columns
+.reveal .columns { align-items: flex-start; }

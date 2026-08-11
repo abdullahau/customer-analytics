@@ -5,10 +5,10 @@ import pandas
 from ..stan_model_base import Parameter, StanModelBase
 from .value_model import ValueModel
 
-__all__ = ('GammaGamma',)
+__all__ = ("GammaGamma",)
 
 
-class GammaGamma(StanModelBase, ValueModel, model_name='gamma_gamma'):
+class GammaGamma(StanModelBase, ValueModel, model_name="gamma_gamma"):
     logger: Logger
     p: Parameter
     q: Parameter
@@ -19,10 +19,10 @@ class GammaGamma(StanModelBase, ValueModel, model_name='gamma_gamma'):
 
         if (self.q <= 1).any():
             self.logger.warning(
-                'Posterior distribution for q contains values in (0, 1], '
-                'for which the conditional expectation of Gamma-Gamma is '
-                'not defined. Consider filtering these values out before '
-                'using the model.'
+                "Posterior distribution for q contains values in (0, 1], "
+                "for which the conditional expectation of Gamma-Gamma is "
+                "not defined. Consider filtering these values out before "
+                "using the model."
             )
 
         freq = data.frequency.values.reshape(-1, 1)
@@ -35,12 +35,6 @@ class GammaGamma(StanModelBase, ValueModel, model_name='gamma_gamma'):
             self.p * (self.mu + freq * val) / (self.p * freq + self.q - 1)
         ).mean(1)
 
-        return (
-            pandas.DataFrame(
-                data={
-                    'id': data.id,
-                    'value': expected_value
-                }
-            )
-            .round({'value': 2})
+        return pandas.DataFrame(data={"id": data.id, "value": expected_value}).round(
+            {"value": 2}
         )

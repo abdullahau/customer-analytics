@@ -3,7 +3,8 @@
 # add top level ballast to system path
 import os
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join('..', '..')))
+
+sys.path.insert(0, os.path.abspath(os.path.join("..", "..")))
 
 # import ballast as a check
 import numpy as np
@@ -31,7 +32,7 @@ def simulate_customer(lambda_param, mu, n):
     tau = np.random.exponential(1 / mu)
 
     minT = min(n, tau)
-    num_draws = max(10, int(minT*(1/lambda_param)))
+    num_draws = max(10, int(minT * (1 / lambda_param)))
 
     itts = np.zeros(num_draws)
     count = 0
@@ -43,7 +44,7 @@ def simulate_customer(lambda_param, mu, n):
         else:
             count += 1
             if scalar == NUM_TRANS_SCALAR[3]:
-                raise UserWarning('not enough inter-transaction time sampled')
+                raise UserWarning("not enough inter-transaction time sampled")
 
     trans_times = np.cumsum([0] + list(itts))
     valid_trans_times = trans_times[trans_times < tau]
@@ -52,9 +53,9 @@ def simulate_customer(lambda_param, mu, n):
     x = len(train_trans_times) - 1
     tx = max(train_trans_times)
     if x > 0 and tx == 0.0:
-        raise UserWarning('when x > 0, tx should be greater than 0')
+        raise UserWarning("when x > 0, tx should be greater than 0")
     if n < tx:
-        raise UserWarning('n should be greater than tx, something is wrong')
+        raise UserWarning("n should be greater than tx, something is wrong")
     return x, tx
 
 
@@ -62,9 +63,9 @@ def generate_pareto_nbd_data(parameters, num_customer):
     rng = np.random.RandomState()
     rng.seed(1)
     # notice that numpy gamma parametrizes differently: np.random.gamma(k, theta, size), k = r, theta = 1/a
-    lambda_params = rng.gamma(parameters['r'], 1 / parameters['a'], num_customer)
+    lambda_params = rng.gamma(parameters["r"], 1 / parameters["a"], num_customer)
     rng.seed(2)
-    mus = rng.gamma(parameters['s'], 1 / parameters['b'], num_customer)
+    mus = rng.gamma(parameters["s"], 1 / parameters["b"], num_customer)
     rng.seed(3)
     ns = [rng.uniform(0.001, 1) * N_MAX for _ in range(num_customer)]
 
@@ -77,12 +78,10 @@ def generate_pareto_nbd_data(parameters, num_customer):
         x, tx = simulate_customer(lambda_param, mu, n)
 
         if counter % 10000 == 0:
-            print x, tx, n
+            print(x, tx, n)
 
         xtxn.append((x, tx, n))
 
-    xtxn_df = pd.DataFrame(xtxn, columns=['x', 't.x', 'T.cal'])
+    xtxn_df = pd.DataFrame(xtxn, columns=["x", "t.x", "T.cal"])
 
     return xtxn_df
-
-

@@ -5,35 +5,34 @@ import sys
 
 from pystan import StanModel
 
-sys.path.append('/app')
-STAN_MODELS_PACKAGE = 'clv_model.stan_models'
+sys.path.append("/app")
+STAN_MODELS_PACKAGE = "clv_model.stan_models"
 
 
 def compile_stan_model(model_filename: str) -> StanModel:
     model_name = os.path.splitext(model_filename)[0]
     with resources.open_text(
-        package=STAN_MODELS_PACKAGE,
-        resource=model_filename
+        package=STAN_MODELS_PACKAGE, resource=model_filename
     ) as model_file:
         return StanModel(model_file, model_name=model_name)
 
 
 def is_compiled(model_filename: str):
     with resources.path(STAN_MODELS_PACKAGE, model_filename) as model_path:
-        return model_path.with_suffix('.pkl').is_file()
+        return model_path.with_suffix(".pkl").is_file()
 
 
 def pickle_model(model_filename: str, stan_model_: StanModel) -> None:
     with resources.path(STAN_MODELS_PACKAGE, model_filename) as path:
-        pickle_path = path.with_suffix('.pkl')
-    with open(pickle_path, 'wb') as pickle_file:
+        pickle_path = path.with_suffix(".pkl")
+    with open(pickle_path, "wb") as pickle_file:
         pickle.dump(stan_model_, pickle_file, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     for file_ in resources.contents(STAN_MODELS_PACKAGE):
         extension = os.path.splitext(file_)[1]
-        if extension != '.stan':
+        if extension != ".stan":
             continue
 
         if is_compiled(file_):

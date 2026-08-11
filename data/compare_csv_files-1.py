@@ -1,11 +1,13 @@
 import csv
 
+
 # Function to read CSV files and skip the first column
 def read_csv(file_path):
-    with open(file_path, mode='r') as file:
+    with open(file_path, mode="r") as file:
         reader = csv.reader(file)
-        data = [row for row in reader] 
+        data = [row for row in reader]
     return data
+
 
 # Function to compare two CSV files and print the differing lines
 def compare_csv_files(file1, file2):
@@ -27,9 +29,10 @@ def compare_csv_files(file1, file2):
     if not differences_found:
         print("The data in both CSV files are identical.")
 
+
 # Replace these paths with the actual file paths
-file1 = 'x_python.csv'
-file2 = 'x.csv'
+file1 = "x_python.csv"
+file2 = "x.csv"
 
 # Compare the files
 compare_csv_files(file1, file2)

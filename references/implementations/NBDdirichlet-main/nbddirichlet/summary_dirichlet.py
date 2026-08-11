@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 
+
 def summary_dirichlet(dobj):
     M = dobj.M  # Use the current M value
     result = {}
@@ -20,19 +21,29 @@ def summary_dirichlet(dobj):
                 r[j, 1] = dobj.brand_buyrate(j)
                 r[j, 2] = dobj.wp(j)
 
-            result[tt] = pd.DataFrame(r, index=dobj.brand_name, 
-                                      columns=["pen_brand", "pur_brand", "pur_cat"]).round(digits)
+            result[tt] = pd.DataFrame(
+                r, index=dobj.brand_name, columns=["pen_brand", "pur_brand", "pur_cat"]
+            ).round(digits)
 
         elif tt == "freq":
+
             def prob_r(r, j):
-                return sum(dobj.Pn(n) * dobj.p_rj_n(r, n, j) for n in range(r, dobj.nstar + 1))
+                return sum(
+                    dobj.Pn(n) * dobj.p_rj_n(r, n, j) for n in range(r, dobj.nstar + 1)
+                )
 
             r = np.zeros((dobj.nbrand, freq_cutoff + 2))
             for j in range(dobj.nbrand):
-                r[j, :] = [prob_r(r, j) for r in range(freq_cutoff + 1)] + [sum(prob_r(r, j) for r in range(freq_cutoff + 1, dobj.nstar + 1))]
+                r[j, :] = [prob_r(r, j) for r in range(freq_cutoff + 1)] + [
+                    sum(prob_r(r, j) for r in range(freq_cutoff + 1, dobj.nstar + 1))
+                ]
 
-            result[tt] = pd.DataFrame(r, index=dobj.brand_name, 
-                                      columns=[str(i) for i in range(freq_cutoff + 1)] + [f"{freq_cutoff+1}+"]).round(digits)
+            result[tt] = pd.DataFrame(
+                r,
+                index=dobj.brand_name,
+                columns=[str(i) for i in range(freq_cutoff + 1)]
+                + [f"{freq_cutoff + 1}+"],
+            ).round(digits)
 
         elif tt == "heavy":
             Pn_sum = sum(dobj.Pn(n) for n in heavy_limit)
@@ -40,9 +51,15 @@ def summary_dirichlet(dobj):
             for j in range(dobj.nbrand):
                 p0 = 1 - dobj.brand_pen(j, limit=heavy_limit)
                 r[j, 0] = 1 - p0 / Pn_sum
-                r[j, 1] = dobj.brand_buyrate(j, limit=heavy_limit) * dobj.brand_pen(j) / (Pn_sum - p0)
+                r[j, 1] = (
+                    dobj.brand_buyrate(j, limit=heavy_limit)
+                    * dobj.brand_pen(j)
+                    / (Pn_sum - p0)
+                )
 
-            result[tt] = pd.DataFrame(r, index=dobj.brand_name, columns=["Penetration", "Avg Purchase Freq"]).round(digits)
+            result[tt] = pd.DataFrame(
+                r, index=dobj.brand_name, columns=["Penetration", "Avg Purchase Freq"]
+            ).round(digits)
 
         elif tt == "dup":
             k = dup_brand
@@ -52,7 +69,10 @@ def summary_dirichlet(dobj):
             others = [j for j in range(dobj.nbrand) if j != k]
 
             for j in others:
-                p0 = sum(dobj.Pn(i) * dobj.p_rj_n(0, i, [k, j]) for i in range(dobj.nstar + 1))
+                p0 = sum(
+                    dobj.Pn(i) * dobj.p_rj_n(0, i, [k, j])
+                    for i in range(dobj.nstar + 1)
+                )
                 b_j_k = 1 - p0
                 b_j = dobj.brand_pen(j)
                 b_jk = b_j + b_k - b_j_k

@@ -4,7 +4,7 @@ import pandas
 
 from .value_model import ValueModel
 
-__all__ = ('LocalMeanValue',)
+__all__ = ("LocalMeanValue",)
 
 
 @dataclass
@@ -16,4 +16,4 @@ class LocalMeanValue(ValueModel):
         return True
 
     def predict(self, data: pandas.DataFrame) -> pandas.DataFrame:
-        return data[['id', 'value']]
+        return data[["id", "value"]]

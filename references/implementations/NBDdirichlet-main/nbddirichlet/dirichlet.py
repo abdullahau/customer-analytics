@@ -4,9 +4,21 @@ import numpy as np
 from scipy import stats, special, optimize
 import pandas as pd  # Add this import statement
 
+
 class Dirichlet:
-    def __init__(self, cat_pen, cat_buyrate, brand_share, brand_pen_obs, brand_name=None,
-                 cat_pur_var=None, nstar=50, max_S=30, max_K=30, check=False):
+    def __init__(
+        self,
+        cat_pen,
+        cat_buyrate,
+        brand_share,
+        brand_pen_obs,
+        brand_name=None,
+        cat_pur_var=None,
+        nstar=50,
+        max_S=30,
+        max_K=30,
+        check=False,
+    ):
         """
         Initializes the Dirichlet model with the given parameters.
 
@@ -30,7 +42,11 @@ class Dirichlet:
         self.brand_share = brand_share
         self.brand_pen_obs = brand_pen_obs
         self.nbrand = len(brand_pen_obs)
-        self.brand_name = brand_name if brand_name is not None else [f"B{i+1}" for i in range(self.nbrand)]
+        self.brand_name = (
+            brand_name
+            if brand_name is not None
+            else [f"B{i + 1}" for i in range(self.nbrand)]
+        )
         self.cat_pur_var = cat_pur_var
         self.nstar = nstar
         self.max_S = max_S
@@ -51,10 +67,12 @@ class Dirichlet:
         if self.cat_pur_var is None:
             cp = np.log(1 - self.cat_pen)
             eq1 = lambda K: (K * np.log(1 + self.M / K) + cp) ** 2
-            r = optimize.minimize_scalar(eq1, bounds=(0.0001, self.max_K), method='bounded')
+            r = optimize.minimize_scalar(
+                eq1, bounds=(0.0001, self.max_K), method="bounded"
+            )
             return r.x
         else:
-            return self.M ** 2 / (self.cat_pur_var - self.M)
+            return self.M**2 / (self.cat_pur_var - self.M)
 
     def _estimate_S(self):
         """
@@ -63,6 +81,7 @@ class Dirichlet:
         Returns:
             float: The estimated value of S.
         """
+
         def eq2(S, j):
             """
             Calculate the squared difference between the target penetration rate and the observed penetration rate for a given brand.
@@ -74,21 +93,34 @@ class Dirichlet:
             Returns:
                 float: The squared difference between the target penetration rate and the observed penetration rate.
             """
-            t_pen = 1 - sum(self.Pn(i) * self.pzeron(i, j, S) for i in range(self.nstar + 1))
+            t_pen = 1 - sum(
+                self.Pn(i) * self.pzeron(i, j, S) for i in range(self.nstar + 1)
+            )
             o_pen = self.brand_pen_obs[j]
             return (t_pen - o_pen) ** 2
 
-        Sall = [optimize.minimize_scalar(eq2, args=(j,), bounds=(0.0001, self.max_S), method='bounded').x
-                for j in range(self.nbrand)]
+        Sall = [
+            optimize.minimize_scalar(
+                eq2, args=(j,), bounds=(0.0001, self.max_S), method="bounded"
+            ).x
+            for j in range(self.nbrand)
+        ]
 
         bp = np.percentile(Sall, [25, 75])
-        outliers = [s for s in Sall if s < bp[0] - 1.5 * (bp[1] - bp[0]) or s > bp[1] + 1.5 * (bp[1] - bp[0])]
+        outliers = [
+            s
+            for s in Sall
+            if s < bp[0] - 1.5 * (bp[1] - bp[0]) or s > bp[1] + 1.5 * (bp[1] - bp[0])
+        ]
         schoose = [s for s in Sall if s not in outliers]
-        
+
         if not schoose:  # If all values are outliers, use the median
             return np.median(Sall)
-        
-        return np.average(schoose, weights=[self.brand_share[i] for i, s in enumerate(Sall) if s in schoose])
+
+        return np.average(
+            schoose,
+            weights=[self.brand_share[i] for i, s in enumerate(Sall) if s in schoose],
+        )
 
     def pzeron(self, n, j, S):
         """
@@ -114,18 +146,26 @@ class Dirichlet:
     def p_rj_n(self, rj, n, j):
         """
         Calculate the probability of choosing a certain brand given the number of events, brand share, and total parameter S.
-        
+
         Parameters:
             self: Instance of the Dirichlet class.
             rj (int): Number of events for brand j.
             n (int): The total number of events.
             j (int or list): The index or indices of the brand(s).
-        
+
         Returns:
             float: The probability of choosing the specified brand(s) given the parameters.
         """
-        alphaj = self.S * np.sum([self.brand_share[x] for x in j]) if isinstance(j, (list, np.ndarray)) else self.S * self.brand_share[j]
-        return special.comb(n, rj) * special.beta(alphaj + rj, self.S - alphaj + n - rj) / special.beta(alphaj, self.S - alphaj)
+        alphaj = (
+            self.S * np.sum([self.brand_share[x] for x in j])
+            if isinstance(j, (list, np.ndarray))
+            else self.S * self.brand_share[j]
+        )
+        return (
+            special.comb(n, rj)
+            * special.beta(alphaj + rj, self.S - alphaj + n - rj)
+            / special.beta(alphaj, self.S - alphaj)
+        )
 
     def Pn(self, n):
         """
@@ -141,17 +181,21 @@ class Dirichlet:
             return np.exp(-self.K * np.log(1 + self.M / self.K))
         a = np.arange(n)
         g = np.sum(np.log(self.K + a) - np.log(1 + a))
-        return np.exp(-self.K * np.log(1 + self.M / self.K) + g + n * np.log(self.M / (self.M + self.K)))
+        return np.exp(
+            -self.K * np.log(1 + self.M / self.K)
+            + g
+            + n * np.log(self.M / (self.M + self.K))
+        )
 
     def brand_pen(self, j, limit=None):
         """
         Calculate the brand penetration given the brand index j and an optional limit.
-        
+
         Parameters:
             self: The Dirichlet object.
             j (int): The index of the brand.
             limit (range, optional): The range of values to consider. Defaults to None.
-        
+
         Returns:
             float: The brand penetration.
         """
@@ -173,7 +217,7 @@ class Dirichlet:
         """
         if limit is None:
             limit = range(1, self.nstar + 1)
-        
+
         def buyrate_n(n, j):
             rate = np.arange(1, n + 1)
             return np.sum(rate * self.p_rj_n(rate, n, j))
@@ -216,7 +260,9 @@ class Dirichlet:
         Returns:
             None
         """
-        print(f"Multiple of Base Time Period: {self.M/self.M0:.2f}, Current M = {self.M}")
+        print(
+            f"Multiple of Base Time Period: {self.M / self.M0:.2f}, Current M = {self.M}"
+        )
 
     def __str__(self):
         """
@@ -230,10 +276,10 @@ class Dirichlet:
     def chi_square_test(self):
         observed = np.array(self.brand_pen_obs)
         expected = np.array([self.brand_pen(j) for j in range(self.nbrand)])
-        
+
         # Normalize expected frequencies to sum to the same total as observed
         expected = expected * (observed.sum() / expected.sum())
-        
+
         chi2, p_value = stats.chisquare(observed, expected)
         return chi2, p_value
 
@@ -245,7 +291,7 @@ class Dirichlet:
     def rmse(self):
         observed = np.array(self.brand_pen_obs)
         predicted = np.array([self.brand_pen(j) for j in range(self.nbrand)])
-        return np.sqrt(np.mean((observed - predicted)**2))
+        return np.sqrt(np.mean((observed - predicted) ** 2))
 
     def correlation(self):
         observed = np.array(self.brand_pen_obs)

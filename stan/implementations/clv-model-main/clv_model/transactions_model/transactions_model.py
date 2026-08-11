@@ -4,25 +4,19 @@ from dataclasses import dataclass
 
 import pandas
 
-__all__ = ('TransactionsModel',)
+__all__ = ("TransactionsModel",)
 
 
 @dataclass
 class TransactionsModel(ABC):
     @abstractmethod
-    def fit(self, data: pandas.DataFrame, **kwargs) -> TransactionsModel:
-        ...
+    def fit(self, data: pandas.DataFrame, **kwargs) -> TransactionsModel: ...
 
     @abstractmethod
-    def is_fitted(self) -> bool:
-        ...
+    def is_fitted(self) -> bool: ...
 
     @abstractmethod
-    def predict(
-        self,
-        data: pandas.DataFrame,
-        periods: int
-    ) -> pandas.DataFrame:
+    def predict(self, data: pandas.DataFrame, periods: int) -> pandas.DataFrame:
         """
         Should predict the number of purchases the customer will make
         over the next `periods` periods. That is, previous purchases are
@@ -38,4 +32,4 @@ class TransactionsModel(ABC):
 
     def _check_fit(self) -> None:
         if not self.is_fitted():
-            raise ValueError('Model is not fit.')
+            raise ValueError("Model is not fit.")

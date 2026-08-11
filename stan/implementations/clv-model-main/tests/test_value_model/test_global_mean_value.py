@@ -10,9 +10,9 @@ class TestGlobalMeanValue(unittest.TestCase):
     def test_fit(self) -> None:
         data = pandas.DataFrame(
             data={
-                'id': [0, 1],
-                'frequency': [2, 1],
-                'value': [5, 10],
+                "id": [0, 1],
+                "frequency": [2, 1],
+                "value": [5, 10],
             }
         )
         model = GlobalMeanValue()
@@ -24,17 +24,12 @@ class TestGlobalMeanValue(unittest.TestCase):
         model = GlobalMeanValue(global_mean=9)
         data = pandas.DataFrame(
             data={
-                'id': [0, 1],
-                'frequency': [3, 1],
+                "id": [0, 1],
+                "frequency": [3, 1],
             }
         )
         actual = model.predict(data)
-        expected = pandas.DataFrame(
-            data={
-                'id': [0, 1],
-                'value': [9, 9]
-            }
-        )
+        expected = pandas.DataFrame(data={"id": [0, 1], "value": [9, 9]})
 
         assert_frame_equal(actual, expected)
 

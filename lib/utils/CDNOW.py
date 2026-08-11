@@ -63,9 +63,7 @@ class CDNOW(RFM):
             ).drop("CustID")
         return data
 
-    def filter_unauthorized(
-        self, data: pl.LazyFrame, threshold: int = 4000
-    ):
+    def filter_unauthorized(self, data: pl.LazyFrame, threshold: int = 4000):
         "Remove unauthorized resellers with total repeat spend exceeding exceeding $4,000."
         unauthorized_resellers = (
             data.filter(pl.col("DoR") != 0)

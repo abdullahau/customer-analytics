@@ -1,9 +1,7 @@
 import marimo
 
 __generated_with = "0.23.16"
-app = marimo.App(
-    width="medium",
-)
+app = marimo.App(width="medium")
 
 
 @app.cell
@@ -95,7 +93,13 @@ def _(GT, pd, style_table):
             fmt = lambda v: f"{v:,.2f}"
         t = pd.DataFrame(
             {
-                "Statistic": ["Minimum", "Maximum", "Mean", "Median", "% below mean"],
+                "Statistic": [
+                    "Minimum",
+                    "Maximum",
+                    "Mean",
+                    "Median",
+                    "% below mean",
+                ],
                 label: [
                     fmt(stats["min"]),
                     fmt(stats["max"]),
@@ -121,12 +125,53 @@ def _(GT, pd, style_table):
         if fmt == "currency":
             gt = gt.fmt_currency(columns="Value", decimals=2)
         elif fmt == "pct":
-            gt = gt.fmt_percent(columns="Value", decimals=2)
+            gt = gt.fmt_percent(columns="Value", decimals=2, scale_values=False)
         elif fmt == "float":
             gt = gt.fmt_number(columns="Value", decimals=2)
         return gt
 
     return create_percentile_table, customer_descriptives, stat_badges
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Binning & Distribution
+    """)
+    return
+
+
+@app.cell
+def _(np, pd):
+    def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
+        if min_cutoff is None:
+            min_cutoff, lower_bins, lower_labels = 0, [], []
+        else:
+            lower_bins, lower_labels = [-np.inf], [f"<{min_cutoff}"]
+        bins = (
+            lower_bins
+            + list(range(min_cutoff, max_cutoff + bin_width, bin_width))
+            + [np.inf]
+        )
+        labels = (
+            lower_labels
+            + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
+            + [f"{max_cutoff}+"]
+        )
+        return {"bins": bins, "labels": labels}
+
+    def create_distribution(df, column, bins, labels):
+        dist = (
+            pd.cut(df[column], bins=bins, labels=labels, right=False)
+            .value_counts()
+            .sort_index()
+            .reset_index()
+            .rename(columns={"count": "Customers", column: f"{column} Range"})
+        )
+        dist["Percent"] = dist["Customers"] / dist["Customers"].sum()
+        return dist
+
+    return create_bins_labels, create_distribution
 
 
 @app.cell(hide_code=True)
@@ -206,47 +251,6 @@ def _(GT, np, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Binning & Distribution
-    """)
-    return
-
-
-@app.cell
-def _(np, pd):
-    def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
-        if min_cutoff is None:
-            min_cutoff, lower_bins, lower_labels = 0, [], []
-        else:
-            lower_bins, lower_labels = [-np.inf], [f"<{min_cutoff}"]
-        bins = (
-            lower_bins
-            + list(range(min_cutoff, max_cutoff + bin_width, bin_width))
-            + [np.inf]
-        )
-        labels = (
-            lower_labels
-            + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
-            + [f"{max_cutoff}+"]
-        )
-        return {"bins": bins, "labels": labels}
-
-    def create_distribution(df, column, bins, labels):
-        dist = (
-            pd.cut(df[column], bins=bins, labels=labels, right=False)
-            .value_counts()
-            .sort_index()
-            .reset_index()
-            .rename(columns={"count": "Customers", column: f"{column} Range"})
-        )
-        dist["Percent"] = dist["Customers"] / dist["Customers"].sum()
-        return dist
-
-    return create_bins_labels, create_distribution
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
     ### Plotly Theme
     """)
     return
@@ -257,8 +261,22 @@ def _(go, pio):
     # Consultant / academic palette: navy primary, ochre secondary.
     INK, MUTED, GRID = "#1f2328", "#6b7280", "#ececec"
     ACCENT, ACCENT2 = "#1f3a5f", "#c4703a"
-    CAT = ["#1f3a5f", "#c4703a", "#4c8b6f", "#6b7280", "#8a6bb0", "#b0563b", "#c9a227"]
-    SEQ = ["#0d3b66", "#2b5f8f", "#4a86b8", "#7aa9d0", "#a3c7e8"]  # dark→light blue
+    CAT = [
+        "#1f3a5f",
+        "#c4703a",
+        "#4c8b6f",
+        "#6b7280",
+        "#8a6bb0",
+        "#b0563b",
+        "#c9a227",
+    ]
+    SEQ = [
+        "#0d3b66",
+        "#2b5f8f",
+        "#4a86b8",
+        "#7aa9d0",
+        "#a3c7e8",
+    ]  # dark→light blue
     FONT = "Helvetica Neue, Helvetica, Arial, sans-serif"
     W, H = 820, 400
 
@@ -307,7 +325,9 @@ def _(go, pio):
             "gridwidth": 1,
         },
         legend=dict(
-            title=dict(font=dict(size=11)), font=dict(size=11), bgcolor="rgba(0,0,0,0)"
+            title=dict(font=dict(size=11)),
+            font=dict(size=11),
+            bgcolor="rgba(0,0,0,0)",
         ),
         hoverlabel=dict(font=dict(family=FONT, size=12), bgcolor="white"),
     )
@@ -317,8 +337,17 @@ def _(go, pio):
     # Hide the modebar, scroll/pinch-zoom and the plotly logo for every bare figure.
     # marimo reads a figure's render config from the default renderer (forced to
     # "browser" in-session), so setting it there locks down all charts at once.
-    _LOCK = {"displayModeBar": False, "scrollZoom": False, "displaylogo": False}
-    for _r in ("browser", "notebook", "notebook_connected", "plotly_mimetype"):
+    _LOCK = {
+        "displayModeBar": False,
+        "scrollZoom": False,
+        "displaylogo": False,
+    }
+    for _r in (
+        "browser",
+        "notebook",
+        "notebook_connected",
+        "plotly_mimetype",
+    ):
         if _r in pio.renderers:
             pio.renderers[_r].config = _LOCK
     return ACCENT, ACCENT2, FONT, GRID, H, INK, MUTED, SEQ, W
@@ -517,7 +546,11 @@ def _(ACCENT, ACCENT2, H, W, go):
             bargap=0.2,
             bargroupgap=0.05,
             legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1.0,
             ),
         )
         fig.update_xaxes(
@@ -716,8 +749,6 @@ def _(how):
 @app.cell
 def _(cust_data, pretty_cohort):
     # Single source of truth for the years and focus cohort the audit reports on.
-    # Titles, subtitles, and explainers reference these instead of hard-coded text,
-    # so the whole notebook re-labels itself if a parameter changes.
     YEAR_CURR = 2019  # the "current" year Lens 1 audits
     YEAR_PRIOR = 2018  # the comparison year for Lens 2
     FOCUS_COHORT = "y2016_q1"  # the acquisition cohort followed in Lens 3
@@ -735,7 +766,7 @@ def _(cust_data, pretty_cohort):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Convert Wide to Long Format Data
+    ### Optional: Convert Wide to Long Format Data
     """)
     return
 
@@ -821,7 +852,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Lens 1 — How do customers differ from one another?
+    ---
+    # Lens 1 — How do customers differ from one another?
     """)
     return
 
@@ -840,7 +872,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Data prep
+    ## Data prep
     """)
     return
 
@@ -851,6 +883,20 @@ def _(mo):
     Keep the rows for 2019, group by `CustomerID`, and sum transactions, spend,
     and profit. Only customers with at least one 2019 transaction appear. The
     totals below are fixed reference points for the rest of Lens 1.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Keep the rows for one year. Group them by customer.
+    2. Add the transactions, the spend, and the profit for each customer.
+    3. Add the average spend per transaction and the margin.
+    4. Add all customers together to get the year totals.
+
+    **Purpose:** Make one row for each active customer, with the year totals.
+    **Goal:** Fix the reference numbers for the rest of Lens 1.
     """)
     return
 
@@ -882,20 +928,6 @@ def _(np):
         )
 
     return add_customer_ratios, annual_customer_totals
-
-
-@app.cell(hide_code=True)
-def _(how):
-    how(r"""
-    1. Keep the rows for one year. Group them by customer.
-    2. Add the transactions, the spend, and the profit for each customer.
-    3. Add the average spend per transaction and the margin.
-    4. Add all customers together to get the year totals.
-
-    **Purpose:** Make one row for each active customer, with the year totals.
-    **Goal:** Fix the reference numbers for the rest of Lens 1.
-    """)
-    return
 
 
 @app.cell
@@ -966,7 +998,7 @@ def _(cust_data_2019, customer_descriptives):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Distribution of spend
+    ## Distribution of spend
     """)
     return
 
@@ -1026,7 +1058,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Distribution of profit
+    ## Distribution of profit
     """)
     return
 
@@ -1050,6 +1082,18 @@ def _(YEAR_CURR, profit_stats, stat_badges):
 
 
 @app.cell
+def _(YEAR_CURR, create_percentile_table, profit_stats):
+    create_percentile_table(
+        profit_stats,
+        "Profit",
+        "Customer Profit Percentiles",
+        f"Annual Profit · {YEAR_CURR}",
+        fmt="currency",
+    )
+    return
+
+
+@app.cell
 def _(
     YEAR_CURR,
     bar_distribution,
@@ -1068,7 +1112,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Distribution of the number of transactions
+    ## Distribution of the number of transactions
     """)
     return
 
@@ -1094,6 +1138,17 @@ def _(YEAR_CURR, stat_badges, trans_stats):
         "Transactions",
         money=False,
         title=f"Transactions per Customer ({YEAR_CURR})",
+    )
+    return
+
+
+@app.cell
+def _(YEAR_CURR, create_percentile_table, trans_stats):
+    create_percentile_table(
+        trans_stats,
+        "Transactions",
+        "Customer Transactions Percentiles",
+        f"Annual Transactions · {YEAR_CURR}",
     )
     return
 
@@ -1126,7 +1181,7 @@ def _(YEAR_CURR, bar_distribution, create_distribution, cust_data_2019, np):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Distribution of average spend per transaction
+    ## Distribution of average spend per transaction
     """)
     return
 
@@ -1136,9 +1191,21 @@ def _(mo):
     mo.md(r"""
     For each customer, average spend per transaction is $\text{spend}/\text{trans}$.
     Bin at width \$25 and censor at \$500.
+    """)
+    return
 
-    #### Two different "average transaction" numbers
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Two different "average transaction" numbers
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Two quantities are both called "average spend per transaction". They are not
     equal, and both appear in practice.
 
@@ -1153,8 +1220,14 @@ def _(mo):
 
     $$
     \frac{\frac{1}{I}\sum_{i=1}^{I}\text{spend}_i}{\frac{1}{I}\sum_{i=1}^{I}\text{trans}_i}
-    = \frac{\sum_{i=1}^{I}\text{spend}_i}{\sum_{i=1}^{I}\text{trans}_i}
-    = \sum_{i=1}^{I}\left(\frac{\text{trans}_i}{\sum_{j}\text{trans}_j}\right)\frac{\text{spend}_i}{\text{trans}_i}
+    =\frac{\sum_{i=1}^{I}\text{spend}_i}{\sum_{i=1}^{I}\text{trans}_i}
+    $$
+
+    Now rewrite the numerator by multiplying and dividing each customer's spend by their transaction count:
+
+    $$
+    =\frac{\sum_{i=1}^{I}\text{trans}_i\times\dfrac{\text{spend}_i}{\text{trans}_i}}{\sum_{i=1}^{I}\text{trans}_i}
+    =\sum_{i=1}^{I}\left(\frac{\text{trans}_i}{\sum_{j=1}^{I}\text{trans}_j}\right)\frac{\text{spend}_i}{\text{trans}_i}
     $$
 
     The last form shows that **AOV is a transaction-weighted average** of the
@@ -1193,6 +1266,18 @@ def _(YEAR_CURR, avg_spend_stats, stat_badges):
 
 
 @app.cell
+def _(YEAR_CURR, avg_spend_stats, create_percentile_table):
+    create_percentile_table(
+        avg_spend_stats,
+        "AvgSpendPerTrans",
+        "Average Spend per Transactions Percentiles",
+        f"Annual Transactions · {YEAR_CURR}",
+        fmt="currency",
+    )
+    return
+
+
+@app.cell
 def _(
     YEAR_CURR,
     bar_distribution,
@@ -1213,7 +1298,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### Average spend per transaction, by transaction level
+    ### Average spend per transaction, by transaction level
     """)
     return
 
@@ -1273,7 +1358,7 @@ def _(GT, cust_data_2019, np, pd, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Distribution of average margin
+    ## Distribution of average margin
     """)
     return
 
@@ -1306,6 +1391,18 @@ def _(YEAR_CURR, avg_margin_stats, stat_badges):
 
 
 @app.cell
+def _(YEAR_CURR, avg_margin_stats, create_percentile_table):
+    create_percentile_table(
+        avg_margin_stats,
+        "Margin",
+        "Average Margin (%) Percentiles",
+        f"Annual Marging (%) · {YEAR_CURR}",
+        fmt="pct",
+    )
+    return
+
+
+@app.cell
 def _(
     YEAR_CURR,
     bar_distribution,
@@ -1315,7 +1412,9 @@ def _(
 ):
     bar_distribution(
         create_distribution(
-            cust_data_2019.query("Spend > 0"), "Margin", **create_bins_labels(5, 100, 0)
+            cust_data_2019.query("Spend > 0"),
+            "Margin",
+            **create_bins_labels(5, 100, 0),
         ),
         title=f"Average Margin Distribution ({YEAR_CURR})",
         x_title="Margin (%)",
@@ -1326,7 +1425,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Decile analyses
+    ## Decile analyses
     """)
     return
 
@@ -1336,8 +1435,55 @@ def _(mo):
     mo.md(r"""
     A decile report splits the customer base into ten groups and applies the
     profit identity to each group. It shows how concentrated value is, and which
-    of the four factors drives that concentration. Two versions exist, and they
-    answer different questions.
+    of the four factors drives that concentration.
+
+    | Column | Formula |
+    |---|---|
+    | % of customers | decile customers / total customers |
+    | % of transactions | decile trans / total trans |
+    | % of revenue | decile spend / total spend |
+    | % of profit | decile profit / total profit |
+    | Avg spend per customer | decile spend / decile customers |
+    | Avg profit per customer | decile profit / decile customers |
+    | AOF | decile trans / decile customers |
+    | AOV | decile spend / decile trans |
+    | Avg margin | decile profit / decile spend |
+
+    The bottom row (totals) gives the firm-level AOF/AOV/margin.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.mermaid(
+        """
+        flowchart LR
+        P["Profit"] --> X1(("×"))
+        X1 --> NC["# Customers"]
+        X1 --> APC["Average profit<br/>per customer"]
+
+        APC --> X2(("×"))
+        X2 --> AM["Average<br/>margin"]
+        X2 --> ASC["Average spend<br/>per customer"]
+
+        ASC --> X3(("×"))
+        X3 --> AOF["Average order<br/>frequency (AOF)"]
+        X3 --> AOV["Average order<br/>value (AOV)"]
+
+        classDef box fill:#ffffff,stroke:#333,stroke-width:1.5px,color:#000
+        classDef op fill:#333,stroke:#333,color:#fff
+        class P,NC,APC,AM,ASC,AOF,AOV box
+        class X1,X2,X3 op
+        """
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Two versions exist, and they answer different questions.
 
     **Customer decile** — each decile holds 10% of *customers*, ranked by profit.
     This shows how much of total profit the top-ranked tenth of customers
@@ -1374,7 +1520,9 @@ def _(DECILE_FIELDS, cust_data_2019, decile_report, decile_report_gt, pd):
     _ranked = cust_data_2019.assign(
         CustDecile=lambda d: (
             pd.qcut(
-                d["Profit"].rank(method="first", ascending=False), q=10, labels=False
+                d["Profit"].rank(method="first", ascending=False),
+                q=10,
+                labels=False,
             )
             + 1
         )
@@ -1395,7 +1543,10 @@ def _(
     _labelled = decile_labels(cust_data_2019, "Profit")[0]
     profit_decile_rep, _f = decile_report(_labelled, "ProfitDecile")
     decile_report_gt(
-        profit_decile_rep, DECILE_FIELDS, "Profit decile report", pct_decimals=2
+        profit_decile_rep,
+        DECILE_FIELDS,
+        "Profit decile report",
+        pct_decimals=2,
     )
     return
 
@@ -1419,7 +1570,8 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Lens 2 — What changed between two periods?
+    ---
+    # Lens 2 — What changed between two periods?
     """)
     return
 
@@ -1440,210 +1592,9 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Data prep
+    ## Data prep
     """)
     return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    #### Venn diagram
-    """)
-    return
-
-
-@app.cell
-def _(ACCENT, ACCENT2, brentq, go, np):
-    def venn_two(n_a, n_b, n_both, label_a, label_b, title, width=560, height=460):
-        R = 1.0
-        r = np.sqrt(n_b / n_a)
-        a_target = np.pi * (n_both / n_a)
-
-        def lens_area(d):
-            if d >= R + r:
-                return 0.0
-            if d <= abs(R - r):
-                return np.pi * min(R, r) ** 2
-            p1 = R**2 * np.arccos(np.clip((d**2 + R**2 - r**2) / (2 * d * R), -1, 1))
-            p2 = r**2 * np.arccos(np.clip((d**2 + r**2 - R**2) / (2 * d * r), -1, 1))
-            p3 = 0.5 * np.sqrt(
-                max((-d + r + R) * (d - r + R) * (d + r - R) * (d + r + R), 0.0)
-            )
-            return p1 + p2 - p3
-
-        d = brentq(lambda x: lens_area(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
-        cy = max(R, r)
-        cx1, cx2 = R, R + d
-        xlens = R + (d**2 + R**2 - r**2) / (2 * d)
-        fig = go.Figure()
-        fig.add_shape(
-            type="circle",
-            x0=cx1 - R,
-            y0=cy - R,
-            x1=cx1 + R,
-            y1=cy + R,
-            line_color=ACCENT,
-            fillcolor=ACCENT,
-            layer="below",
-        )
-        fig.add_shape(
-            type="circle",
-            x0=cx2 - r,
-            y0=cy - r,
-            x1=cx2 + r,
-            y1=cy + r,
-            line_color=ACCENT2,
-            fillcolor=ACCENT2,
-            layer="below",
-        )
-
-        _th = np.linspace(0, 2 * np.pi, 361)
-        _c1 = np.column_stack([cx1 + R * np.cos(_th), cy + R * np.sin(_th)])
-        _c1 = _c1[(_c1[:, 0] - cx2) ** 2 + (_c1[:, 1] - cy) ** 2 <= r**2]
-        _c2 = np.column_stack([cx2 + r * np.cos(_th), cy + r * np.sin(_th)])
-        _c2 = _c2[(_c2[:, 0] - cx1) ** 2 + (_c2[:, 1] - cy) ** 2 <= R**2]
-        _lens = np.vstack([_c1, _c2])
-        _ctr = _lens.mean(axis=0)
-        _lens = _lens[
-            np.argsort(np.arctan2(_lens[:, 1] - _ctr[1], _lens[:, 0] - _ctr[0]))
-        ]
-        _rgb = tuple(int(ACCENT[k : k + 2], 16) for k in (1, 3, 5))
-        fig.add_scatter(
-            x=_lens[:, 0],
-            y=_lens[:, 1],
-            fill="toself",
-            mode="lines",
-            line=dict(width=0),
-            fillcolor=f"rgba{(*_rgb, 0.55)}",
-            hoverinfo="skip",
-            showlegend=False,
-        )
-        for x, txt in [
-            (cx1 - 0.45 * R, f"{label_a}<br>{n_a - n_both:,}"),
-            (xlens, f"Both<br>{n_both:,}"),
-            (cx2 + 0.45 * r, f"{label_b}<br>{n_b - n_both:,}"),
-        ]:
-            fig.add_annotation(
-                x=x,
-                y=cy,
-                text=txt,
-                showarrow=False,
-                font=dict(size=13, color="white"),
-                align="center",
-            )
-        fig.update_layout(
-            template="cba",
-            title=title,
-            width=width,
-            height=height,
-            plot_bgcolor="white",
-            margin=dict(l=10, r=10, t=54, b=10),
-        )
-        fig.update_xaxes(visible=False, range=[-0.25, R + d + r + 0.25])
-        fig.update_yaxes(
-            visible=False,
-            range=[cy - r - 0.25, cy + r + 0.25],
-            scaleanchor="x",
-            scaleratio=1,
-        )
-        return fig
-
-    return (venn_two,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    #### Profit bridge (waterfall)
-    """)
-    return
-
-
-@app.cell
-def _(ACCENT, ACCENT2, INK, MUTED, YEAR_CURR, go):
-    def profit_bridge_chart(pbg, width=760, height=460, scale=1_000):
-        both18 = pbg.loc["Active Both Years", "Y2018"] / scale
-        both19 = pbg.loc["Active Both Years", "Y2019"] / scale
-        only18 = pbg.loc["2018 Only (Lapsed)", "Y2018"] / scale
-        only19 = pbg.loc["2019 Only (New/Reactivated)", "Y2019"] / scale
-        tot18 = pbg.loc["Total", "Y2018"] / scale
-        tot19 = pbg.loc["Total", "Y2019"] / scale
-        delta = both19 - both18
-        lo = min(both18, both19)
-        money = lambda v: f"${v:,.0f}K"
-        fig = go.Figure()
-        # Solid consultant fills (no borders, no opacity): slate for the
-        # carried-over base, navy for the 2018 flow, ochre for the 2019 flow.
-        # All three are dark enough for white in-bar labels.
-        _both = dict(marker_color="#64748b")
-        _b18 = dict(marker_color=ACCENT, marker_line=dict(color="white", width=1))
-        _b19 = dict(marker_color=ACCENT2, marker_line=dict(color="white", width=1))
-        w = 0.62
-        fig.add_bar(x=[0], y=[both18], base=0, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18)
-        fig.add_bar(x=[1], y=[only18], base=both18, width=w, showlegend=False, **_b18)
-        fig.add_bar(x=[2], y=[abs(delta)], base=lo, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[3], y=[only19], base=both19, width=w, showlegend=False, **_b19)
-        fig.add_bar(x=[4], y=[both19], base=0, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[4], y=[only19], base=both19, width=w, showlegend=False, **_b19)
-
-        def hline(x0, x1, y):
-            fig.add_shape(
-                type="line",
-                x0=x0,
-                x1=x1,
-                y0=y,
-                y1=y,
-                line=dict(color=MUTED, width=1, dash="dot"),
-            )
-
-        hline(0 + w / 2, 1 - w / 2, tot18)
-        hline(3 + w / 2, 4 - w / 2, tot19)
-        hline(0 + w / 2, 2 - w / 2, both18)
-        hline(2 + w / 2, 4 - w / 2, both19)
-
-        def ann(x, y, t, yshift=0, yanchor="middle", color="white"):
-            fig.add_annotation(
-                x=x,
-                y=y,
-                text=t,
-                showarrow=False,
-                yshift=yshift,
-                yanchor=yanchor,
-                font=dict(size=12, color=color),
-            )
-
-        # In-bar labels are white; the three that float over the white canvas
-        # (the two year totals and the delta) stay dark so they stay readable.
-        ann(0, tot18, money(tot18), yshift=10, yanchor="bottom", color=INK)
-        ann(4, tot19, money(tot19), yshift=10, yanchor="bottom", color=INK)
-        ann(0, both18 / 2, "Both<br>years")
-        ann(0, both18 + only18 / 2, "2018<br>only")
-        ann(4, both19 / 2, "Both<br>years")
-        ann(4, both19 + only19 / 2, "2019<br>only")
-        ann(1, both18 + only18 / 2, money(only18))
-        ann(2, lo, f"−{money(abs(delta))}", yshift=-8, yanchor="top", color=INK)
-        ann(3, both19 + only19 / 2, money(only19))
-        fig.update_layout(
-            template="cba",
-            title=f"Decomposition of Annual Customer Profit ({YEAR_CURR})",
-            width=width,
-            height=height,
-            barmode="overlay",
-            bargap=0.35,
-        )
-        fig.update_xaxes(
-            tickvals=[0, 4],
-            ticktext=["2018", "2019"],
-            range=[-0.7, 4.7],
-            showline=True,
-            linecolor=MUTED,
-        )
-        fig.update_yaxes(visible=False, range=[0, tot19 * 1.14])
-        return fig
-
-    return (profit_bridge_chart,)
 
 
 @app.cell(hide_code=True)
@@ -1686,7 +1637,7 @@ def _(cust_data_2018, cust_data_2019):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Headline
+    ## Headline
     """)
     return
 
@@ -1725,37 +1676,41 @@ def _(
     pd,
     style_table,
 ):
-    _yoy = pd.concat(
-        [
-            (
-                cust_2018_2019.filter(like="_2018")
-                .sum(numeric_only=True)
-                .rename(lambda c: c.removesuffix("_2018"))
-                .rename("2018")
-            ),
-            (
-                cust_2018_2019.filter(like="_2019")
-                .sum(numeric_only=True)
-                .rename(lambda c: c.removesuffix("_2019"))
-                .rename("2019")
-            ),
-        ],
-        axis=1,
-    )
+    _func_cols = {
+        "NumTrans": "sum",
+        "Spend": "sum",
+        "Profit": "sum",
+        "AvgSpendPerTrans": "mean",
+        "Margin": "mean",
+    }
+
+    def _summarize(df, year):
+        suffix = f"_{year}"
+        sub = df.filter(like=suffix)
+        funcs = {c: _func_cols[c.removesuffix(suffix)] for c in sub.columns}
+        return sub.agg(funcs).rename(lambda c: c.removesuffix(suffix)).rename(str(year))
+
+    _yoy = pd.concat([_summarize(cust_2018_2019, y) for y in (2018, 2019)], axis=1)
     _yoy["Δ"] = (_yoy["2019"] - _yoy["2018"]) / _yoy["2018"]
     _a18 = cust_data_2018["CustomerID"].nunique()
     _a19 = cust_data_2019["CustomerID"].nunique()
     _yoy.loc["Active customers"] = [_a18, _a19, (_a19 - _a18) / _a18]
-    _yoy = _yoy.drop(index="NumTrans").reset_index(names="")
     (
-        GT(_yoy)
+        GT(_yoy.reset_index(names=""))
         .tab_header(
             title="Spend, Profit and Active-Customer Summary",
             subtitle=f"{YEAR_PRIOR} to {YEAR_CURR}",
         )
         .fmt_percent(columns=["Δ"], decimals=1)
         .fmt_currency(columns=["2018", "2019"], decimals=0)
-        .fmt_number(columns=["2018", "2019"], rows=[2], decimals=0)
+        .fmt_currency(columns=["2018", "2019"], rows=[3], decimals=2)
+        .fmt_number(columns=["2018", "2019"], rows=[0, -1], decimals=0)
+        .fmt_percent(
+            columns=["2018", "2019"],
+            rows=[-2],
+            decimals=2,
+            scale_values=False,
+        )
         .pipe(style_table)
     )
     return
@@ -1764,7 +1719,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Overlaid distributions
+    ## Overlaid distributions
     """)
     return
 
@@ -1884,10 +1839,14 @@ def _(
     overlay_bar_distribution(
         [
             create_distribution(
-                cust_data_2018, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+                cust_data_2018,
+                "AvgSpendPerTrans",
+                **create_bins_labels(25, 500),
             ),
             create_distribution(
-                cust_data_2019, "AvgSpendPerTrans", **create_bins_labels(25, 500)
+                cust_data_2019,
+                "AvgSpendPerTrans",
+                **create_bins_labels(25, 500),
             ),
         ],
         labels=("2018", "2019"),
@@ -1930,7 +1889,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Customer overlap
+    ## Customer overlap
     """)
     return
 
@@ -1939,8 +1898,8 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     Split the two years into three groups: active in both years, 2018 only, and
-    2019 only. Of the 26,254 customers active in 2018, only 9,871 returned in
-    2019. Repeat buyers are 38% of the 2018 base and 31% of the 2019 base. The
+    2019 only. Of the 26,254 customers active in 2018, only 9,871 returned in 2019.
+    Repeat buyers are 38% of the 2018 base and 31% of the 2019 base. The
     area-proportional Venn diagram below shows the three groups to scale;
     Appendix A gives the geometry.
     """)
@@ -1978,6 +1937,116 @@ def _(GT, cust_2018_2019, style_table):
     return (overlap,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Venn diagram
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ACCENT, ACCENT2, brentq, go, np):
+    def venn_two(n_a, n_b, n_both, label_a, label_b, title, width=560, height=460):
+        R = 1.0
+        r = np.sqrt(n_b / n_a)
+        a_target = np.pi * (n_both / n_a)
+
+        def lens_area(d):
+            if d >= R + r:
+                return 0.0
+            if d <= abs(R - r):
+                return np.pi * min(R, r) ** 2
+            p1 = R**2 * np.arccos(np.clip((d**2 + R**2 - r**2) / (2 * d * R), -1, 1))
+            p2 = r**2 * np.arccos(np.clip((d**2 + r**2 - R**2) / (2 * d * r), -1, 1))
+            p3 = 0.5 * np.sqrt(
+                max(
+                    (-d + r + R) * (d - r + R) * (d + r - R) * (d + r + R),
+                    0.0,
+                )
+            )
+            return p1 + p2 - p3
+
+        d = brentq(lambda x: lens_area(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
+        cy = max(R, r)
+        cx1, cx2 = R, R + d
+        xlens = R + (d**2 + R**2 - r**2) / (2 * d)
+        fig = go.Figure()
+        fig.add_shape(
+            type="circle",
+            x0=cx1 - R,
+            y0=cy - R,
+            x1=cx1 + R,
+            y1=cy + R,
+            line_color=ACCENT,
+            fillcolor=ACCENT,
+            layer="below",
+        )
+        fig.add_shape(
+            type="circle",
+            x0=cx2 - r,
+            y0=cy - r,
+            x1=cx2 + r,
+            y1=cy + r,
+            line_color=ACCENT2,
+            fillcolor=ACCENT2,
+            layer="below",
+        )
+
+        _th = np.linspace(0, 2 * np.pi, 361)
+        _c1 = np.column_stack([cx1 + R * np.cos(_th), cy + R * np.sin(_th)])
+        _c1 = _c1[(_c1[:, 0] - cx2) ** 2 + (_c1[:, 1] - cy) ** 2 <= r**2]
+        _c2 = np.column_stack([cx2 + r * np.cos(_th), cy + r * np.sin(_th)])
+        _c2 = _c2[(_c2[:, 0] - cx1) ** 2 + (_c2[:, 1] - cy) ** 2 <= R**2]
+        _lens = np.vstack([_c1, _c2])
+        _ctr = _lens.mean(axis=0)
+        _lens = _lens[
+            np.argsort(np.arctan2(_lens[:, 1] - _ctr[1], _lens[:, 0] - _ctr[0]))
+        ]
+        _rgb = tuple(int(ACCENT[k : k + 2], 16) for k in (1, 3, 5))
+        fig.add_scatter(
+            x=_lens[:, 0],
+            y=_lens[:, 1],
+            fill="toself",
+            mode="lines",
+            line=dict(width=0),
+            fillcolor=f"rgba{(*_rgb, 0.55)}",
+            hoverinfo="skip",
+            showlegend=False,
+        )
+        for x, txt in [
+            (cx1 - 0.45 * R, f"{label_a}<br>{n_a - n_both:,}"),
+            (xlens, f"Both<br>{n_both:,}"),
+            (cx2 + 0.45 * r, f"{label_b}<br>{n_b - n_both:,}"),
+        ]:
+            fig.add_annotation(
+                x=x,
+                y=cy,
+                text=txt,
+                showarrow=False,
+                font=dict(size=13, color="white"),
+                align="center",
+            )
+        fig.update_layout(
+            template="cba",
+            title=title,
+            width=width,
+            height=height,
+            plot_bgcolor="white",
+            margin=dict(l=10, r=10, t=54, b=10),
+        )
+        fig.update_xaxes(visible=False, range=[-0.25, R + d + r + 0.25])
+        fig.update_yaxes(
+            visible=False,
+            range=[cy - r - 0.25, cy + r + 0.25],
+            scaleanchor="x",
+            scaleratio=1,
+        )
+        return fig
+
+    return (venn_two,)
+
+
 @app.cell
 def _(overlap, venn_two):
     venn_two(
@@ -1994,7 +2063,7 @@ def _(overlap, venn_two):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Profit by activity group and the profit bridge
+    ## Profit by activity group and the profit bridge
     """)
     return
 
@@ -2048,6 +2117,107 @@ def _(GT, bold_totals, cust_2018_2019, style_table):
     return (profit_by_group,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Profit bridge (waterfall)
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ACCENT, ACCENT2, INK, MUTED, YEAR_CURR, go):
+    def profit_bridge_chart(pbg, width=760, height=460, scale=1_000):
+        both18 = pbg.loc["Active Both Years", "Y2018"] / scale
+        both19 = pbg.loc["Active Both Years", "Y2019"] / scale
+        only18 = pbg.loc["2018 Only (Lapsed)", "Y2018"] / scale
+        only19 = pbg.loc["2019 Only (New/Reactivated)", "Y2019"] / scale
+        tot18 = pbg.loc["Total", "Y2018"] / scale
+        tot19 = pbg.loc["Total", "Y2019"] / scale
+        delta = both19 - both18
+        lo = min(both18, both19)
+        money = lambda v: f"${v:,.0f}K"
+        fig = go.Figure()
+        # Solid consultant fills (no borders, no opacity): slate for the
+        # carried-over base, navy for the 2018 flow, ochre for the 2019 flow.
+        # All three are dark enough for white in-bar labels.
+        _both = dict(marker_color="#64748b")
+        _b18 = dict(marker_color=ACCENT, marker_line=dict(color="white", width=1))
+        _b19 = dict(marker_color=ACCENT2, marker_line=dict(color="white", width=1))
+        w = 0.62
+        fig.add_bar(x=[0], y=[both18], base=0, width=w, showlegend=False, **_both)
+        fig.add_bar(x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18)
+        fig.add_bar(x=[1], y=[only18], base=both18, width=w, showlegend=False, **_b18)
+        fig.add_bar(x=[2], y=[abs(delta)], base=lo, width=w, showlegend=False, **_both)
+        fig.add_bar(x=[3], y=[only19], base=both19, width=w, showlegend=False, **_b19)
+        fig.add_bar(x=[4], y=[both19], base=0, width=w, showlegend=False, **_both)
+        fig.add_bar(x=[4], y=[only19], base=both19, width=w, showlegend=False, **_b19)
+
+        def hline(x0, x1, y):
+            fig.add_shape(
+                type="line",
+                x0=x0,
+                x1=x1,
+                y0=y,
+                y1=y,
+                line=dict(color=MUTED, width=1, dash="dot"),
+            )
+
+        hline(0 + w / 2, 1 - w / 2, tot18)
+        hline(3 + w / 2, 4 - w / 2, tot19)
+        hline(0 + w / 2, 2 - w / 2, both18)
+        hline(2 + w / 2, 4 - w / 2, both19)
+
+        def ann(x, y, t, yshift=0, yanchor="middle", color="white"):
+            fig.add_annotation(
+                x=x,
+                y=y,
+                text=t,
+                showarrow=False,
+                yshift=yshift,
+                yanchor=yanchor,
+                font=dict(size=12, color=color),
+            )
+
+        # In-bar labels are white; the three that float over the white canvas
+        # (the two year totals and the delta) stay dark so they stay readable.
+        ann(0, tot18, money(tot18), yshift=10, yanchor="bottom", color=INK)
+        ann(4, tot19, money(tot19), yshift=10, yanchor="bottom", color=INK)
+        ann(0, both18 / 2, "Both<br>years")
+        ann(0, both18 + only18 / 2, "2018<br>only")
+        ann(4, both19 / 2, "Both<br>years")
+        ann(4, both19 + only19 / 2, "2019<br>only")
+        ann(1, both18 + only18 / 2, money(only18))
+        ann(
+            2,
+            lo,
+            f"−{money(abs(delta))}",
+            yshift=-8,
+            yanchor="top",
+            color=INK,
+        )
+        ann(3, both19 + only19 / 2, money(only19))
+        fig.update_layout(
+            template="cba",
+            title=f"Decomposition of Annual Customer Profit ({YEAR_CURR})",
+            width=width,
+            height=height,
+            barmode="overlay",
+            bargap=0.35,
+        )
+        fig.update_xaxes(
+            tickvals=[0, 4],
+            ticktext=["2018", "2019"],
+            range=[-0.7, 4.7],
+            showline=True,
+            linecolor=MUTED,
+        )
+        fig.update_yaxes(visible=False, range=[0, tot19 * 1.14])
+        return fig
+
+    return (profit_bridge_chart,)
+
+
 @app.cell
 def _(profit_bridge_chart, profit_by_group):
     profit_bridge_chart(profit_by_group)
@@ -2057,7 +2227,7 @@ def _(profit_bridge_chart, profit_by_group):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Performance decomposition by group
+    ## Performance decomposition by group
     """)
     return
 
@@ -2121,6 +2291,7 @@ def _(GT, cust_2018_2019, style_table):
     _g["AOF"] = _g["NumTrans"] / _g["NumCust"]
     _g["AOV"] = _g["Spend"] / _g["NumTrans"]
     _g["Margin"] = _g["Profit"] / _g["Spend"]
+
     _crosstab = (
         _g.stack()
         .rename("Value")
@@ -2131,7 +2302,8 @@ def _(GT, cust_2018_2019, style_table):
     (
         GT(_crosstab, groupname_col="Status", rowname_col="Metric")
         .tab_header(
-            title="Performance Summary and Decomposition", subtitle="By Group and Year"
+            title="Performance Summary and Decomposition",
+            subtitle="By Group and Year",
         )
         .fmt_number(columns=["2018", "2019"], decimals=2)
         .fmt_number(
@@ -2158,7 +2330,7 @@ def _(GT, cust_2018_2019, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Decile change analysis
+    ## Decile change analysis
     """)
     return
 
@@ -2200,6 +2372,7 @@ def _(
 ):
     _, _t18, _b18 = decile_labels(cust_data_2018, "Profit", n=10)
     _, _t19, _b19 = decile_labels(cust_data_2019, "Profit", n=10)
+
     _avg_bnd = np.round((_b19 + _b18) / 2 / 5) * 5
 
     def _decile(s):
@@ -2208,29 +2381,39 @@ def _(
         return np.where(np.isnan(v), np.nan, out)
 
     _dc = cust_2018_2019.assign(
-        Row=lambda d: _decile(d["Profit_2018"]), Col=lambda d: _decile(d["Profit_2019"])
+        Row=lambda d: _decile(d["Profit_2018"]),
+        Col=lambda d: _decile(d["Profit_2019"]),
     ).fillna({"Row": "2019 Only", "Col": "2018 Only"})
+
     _or = [*range(1, 11), "2019 Only"]
     _oc = [*range(1, 11), "2018 Only"]
+
     _tbl = pd.crosstab(
         _dc["Row"], _dc["Col"], margins=True, margins_name="Total"
     ).reindex(index=[*_or, "Total"], columns=[*_oc, "Total"], fill_value=0)
+
     _tbl.columns = [str(c) for c in _tbl.columns]
     _tbl.index = [str(i) for i in _tbl.index]
+
     _tbl["% 2018"] = _tbl["Total"] / cust_data_2018["CustomerID"].count()
     _tbl.loc[["2019 Only", "Total"], "% 2018"] = np.nan
+
     _tbl.loc["% 2019"] = _tbl.loc["Total"] / cust_data_2019["CustomerID"].count()
     _tbl.loc["% 2019", ["2018 Only", "Total", "% 2018"]] = np.nan
+
     _tbl = _tbl.reset_index(names="2018 decile")
 
     _dcols = [str(c) for c in range(1, 11)]
     _ccols = _dcols + ["2018 Only", "Total"]
+
     _is_pct = lambda d: d["2018 decile"].eq("% 2019")
     _is_total = lambda d: d["2018 decile"].eq("Total")
+
     (
         GT(_tbl, rowname_col="2018 decile")
         .tab_header(
-            title="Profit Decile Change", subtitle=f"{YEAR_PRIOR} to {YEAR_CURR}"
+            title="Profit Decile Change",
+            subtitle=f"{YEAR_PRIOR} to {YEAR_CURR}",
         )
         .tab_spanner(label="2019 decile", columns=_dcols)
         .fmt_number(columns=_ccols, decimals=0, use_seps=True)
@@ -2243,9 +2426,13 @@ def _(
             palette=["#ffffff", "#c6dbef", "#4292c6", "#08306b"],
             na_color="white",
         )
-        .tab_style(style=style.text(weight="bold"), locations=loc.body(rows=_is_total))
         .tab_style(
-            style=style.text(weight="bold"), locations=loc.body(columns=["Total"])
+            style=style.text(weight="bold"),
+            locations=loc.body(rows=_is_total),
+        )
+        .tab_style(
+            style=style.text(weight="bold"),
+            locations=loc.body(columns=["Total"]),
         )
         .pipe(style_table, font_size="11px", row_padding="3px")
     )
@@ -2255,7 +2442,7 @@ def _(
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Up-down analysis
+    ## Up-down analysis
     """)
     return
 
@@ -2283,8 +2470,9 @@ def _(mo):
       impossible; the full dataset contains them.
     - **Use three states for transactions.** With a "≥" rule, 3,273 of the 6,524
       customers marked "up" on transactions in fact had the **same** count in both
-      years. Split transactions into up / same / down, and keep two states for the
-      other three quantities. (Ties are rare for profit and spend.)
+      years (a third of the repeat base). Split transactions into up / same / down,
+      and keep two states for the other three quantities.
+      (Ties are rare for profit and spend, 4 and 41 customers respectively)
     """)
     return
 
@@ -2359,7 +2547,8 @@ def _(GT, YEAR_CURR, YEAR_PRIOR, cust_2018_2019, np, pd, style_table):
         cust_2018_2019["Status"] == "2018 Only (Lapsed)", "Profit_2018"
     ].sum()
     _o19p = cust_2018_2019.loc[
-        cust_2018_2019["Status"] == "2019 Only (New/Reactivated)", "Profit_2019"
+        cust_2018_2019["Status"] == "2019 Only (New/Reactivated)",
+        "Profit_2019",
     ].sum()
     _blank = {"Profit": "", "# Trans": "", "ASPT": ""}
     _tail = pd.DataFrame(
@@ -2419,7 +2608,8 @@ def _(GT, YEAR_CURR, YEAR_PRIOR, cust_2018_2019, np, pd, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Lens 3 — How does a cohort evolve?
+    ___
+    # Lens 3 — How does a cohort evolve?
     """)
     return
 
@@ -2437,99 +2627,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Data prep
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    #### Time-to-second-purchase chart
-    """)
-    return
-
-
-@app.cell
-def _(ACCENT, ACCENT2, FOCUS_COHORT_QTR, GRID, go):
-    def second_purchase_chart(sp, width=None, height=360):
-        fig = go.Figure()
-        fig.add_bar(
-            x=sp["Period"],
-            y=sp["inc_pct"],
-            name="Incremental",
-            marker_color=ACCENT,
-            marker_line_width=0,
-            yaxis="y",
-            hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
-        )
-        fig.add_scatter(
-            x=sp["Period"],
-            y=sp["cum_pct"],
-            name="Cumulative",
-            mode="lines+markers",
-            line=dict(width=1.8, color=ACCENT2),
-            marker=dict(size=6, color=ACCENT2),
-            yaxis="y2",
-            hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
-        )
-        # width=None + autosize lets the figure fill the cell; automargin keeps
-        # each axis title clear of its tick labels as the width changes. Axis
-        # titles are tinted to match their series (navy bars, ochre line).
-        fig.update_layout(
-            template="cba",
-            title=f"Second-Purchase Rate by Quarter ({FOCUS_COHORT_QTR} Cohort)",
-            autosize=True,
-            width=width,
-            height=height,
-            bargap=0.25,
-            legend=dict(
-                orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0
-            ),
-            yaxis=dict(
-                title="Incremental",
-                tickformat=".0%",
-                showgrid=True,
-                gridcolor=GRID,
-                fixedrange=True,
-                automargin=True,
-            ),
-            yaxis2=dict(
-                title="Cumulative",
-                tickformat=".0%",
-                overlaying="y",
-                side="right",
-                showgrid=False,
-                range=[0, 1],
-                fixedrange=True,
-                automargin=True,
-            ),
-        )
-        fig.update_xaxes(type="category", tickangle=-45, automargin=True)
-        return fig
-
-    return (second_purchase_chart,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Revenue decomposition over time
-
-    Cohort revenue in each quarter factors as:
-
-    $$
-    \text{Revenue}_t \;=\; (\text{cohort size}) \times (\%\,\text{active}_t) \times \text{ASPAC}_t,
-    \qquad \text{ASPAC}_t = \text{AOF}_t \times \text{AOV}_t
-    $$
-
-    where ASPAC is the average spend per active member. Plot each factor by
-    quarter. Revenue drops sharply in the quarter **after** acquisition, then
-    declines slowly with a small Q4 bump each year. The key result: **the decline
-    is driven almost entirely by the fall in the fraction active, not by any
-    erosion in spend per active buyer.** ASPAC, AOF, and AOV stay broadly flat.
-    The customers who remain keep behaving normally; the base shrinks because
-    fewer of them remain.
+    ## Data prep
     """)
     return
 
@@ -2577,6 +2675,35 @@ def _(cust_data):
     return (cohort_q1_decomp,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Revenue decomposition over time
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Cohort revenue in each quarter factors as:
+
+    $$
+    \text{Revenue}_t \;=\; (\text{cohort size}) \times (\%\,\text{active}_t) \times \text{ASPAC}_t,
+    \qquad \text{ASPAC}_t = \text{AOF}_t \times \text{AOV}_t
+    $$
+
+    where ASPAC is the average spend per active member. Plot each factor by
+    quarter. Revenue drops sharply in the quarter **after** acquisition, then
+    declines slowly with a small Q4 bump each year. The key result: **the decline
+    is driven almost entirely by the fall in the fraction active, not by any
+    erosion in spend per active buyer.** ASPAC, AOF, and AOV stay broadly flat.
+    The customers who remain keep behaving normally; the base shrinks because
+    fewer of them remain.
+    """)
+    return
+
+
 @app.cell
 def _(cohort_q1_decomp, line_chart):
     line_chart(
@@ -2621,6 +2748,19 @@ def _(cohort_q1_decomp, line_chart):
     line_chart(
         cohort_q1_decomp,
         "Period",
+        "AOF",
+        "Average order frequency by quarter",
+        "AOF",
+        tickformat=",.2f",
+    )
+    return
+
+
+@app.cell
+def _(cohort_q1_decomp, line_chart):
+    line_chart(
+        cohort_q1_decomp,
+        "Period",
         "AOV",
         "Average order value by quarter",
         "AOV ($)",
@@ -2632,7 +2772,7 @@ def _(cohort_q1_decomp, line_chart):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Annual repeat-buying patterns
+    ## Annual repeat-buying patterns
     """)
     return
 
@@ -2645,8 +2785,8 @@ def _(mo):
     purchase beyond acquisition. The 2017–2019 flags record any activity in the
     year. The four flags give 16 patterns.
 
-    The headline: **45% of the cohort never made a second purchase** by the end of
-    2019. The always-active pattern (Y-Y-Y-Y) is about 8%. Most acquired customers
+    The headline: **45% of the cohort never made a second purchase** by the end of 2019.
+    The always-active pattern (Y-Y-Y-Y) is about 8%. Most acquired customers
     buy once and do not return. This never-repeated majority (distinct from Lens 1's
     one-and-done-in-2019 share) is the defining feature
     of a non-contractual base.
@@ -2690,7 +2830,11 @@ def _(FOCUS_COHORT_N, FOCUS_COHORT_QTR, GT, cust_data, pd, style_table):
         .assign(Pct=lambda d: d["NumCust"] / d["NumCust"].sum())
     )
     _body = pd.concat(
-        [_rp[_years].replace({True: "Y", False: "N"}), _rp[["NumCust", "Pct"]]], axis=1
+        [
+            _rp[_years].replace({True: "Y", False: "N"}),
+            _rp[["NumCust", "Pct"]],
+        ],
+        axis=1,
     )
     _tail = pd.DataFrame(
         [
@@ -2722,7 +2866,7 @@ def _(FOCUS_COHORT_N, FOCUS_COHORT_QTR, GT, cust_data, pd, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Time to second purchase
+    ## Time to second purchase
     """)
     return
 
@@ -2784,6 +2928,76 @@ def _(cust_data, pd):
     return (second_purchase,)
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Time-to-second-purchase chart
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(ACCENT, ACCENT2, FOCUS_COHORT_QTR, GRID, go):
+    def second_purchase_chart(sp, width=None, height=360):
+        fig = go.Figure()
+        fig.add_bar(
+            x=sp["Period"],
+            y=sp["inc_pct"],
+            name="Incremental",
+            marker_color=ACCENT,
+            marker_line_width=0,
+            yaxis="y",
+            hovertemplate="%{x}<br>Incremental: %{y:.1%}<extra></extra>",
+        )
+        fig.add_scatter(
+            x=sp["Period"],
+            y=sp["cum_pct"],
+            name="Cumulative",
+            mode="lines+markers",
+            line=dict(width=1.8, color=ACCENT2),
+            marker=dict(size=6, color=ACCENT2),
+            yaxis="y2",
+            hovertemplate="%{x}<br>Cumulative: %{y:.1%}<extra></extra>",
+        )
+        fig.update_layout(
+            template="cba",
+            title=f"Second-Purchase Rate by Quarter ({FOCUS_COHORT_QTR} Cohort)",
+            autosize=True,
+            width=width,
+            height=height,
+            bargap=0.25,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1.0,
+            ),
+            yaxis=dict(
+                title="Incremental",
+                tickformat=".0%",
+                showgrid=True,
+                gridcolor=GRID,
+                fixedrange=True,
+                automargin=True,
+            ),
+            yaxis2=dict(
+                title="Cumulative",
+                tickformat=".0%",
+                overlaying="y",
+                side="right",
+                showgrid=False,
+                range=[0, 1],
+                fixedrange=True,
+                automargin=True,
+            ),
+        )
+        fig.update_xaxes(type="category", tickangle=-45, automargin=True)
+        return fig
+
+    return (second_purchase_chart,)
+
+
 @app.cell
 def _(second_purchase, second_purchase_chart):
     second_purchase_chart(second_purchase)
@@ -2793,7 +3007,7 @@ def _(second_purchase, second_purchase_chart):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Quarter-to-quarter repeat-buying rate
+    ## Quarter-to-quarter repeat-buying rate
     """)
     return
 
@@ -2871,7 +3085,7 @@ def _(FOCUS_COHORT_QTR, cust_data, line_chart):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Value to date (VTD) and its concentration
+    ## Value to date (VTD) and its concentration
     """)
     return
 
@@ -2891,6 +3105,14 @@ def _(mo):
     come back.** The final table confirms the mechanism — the top deciles stay
     active across all four years, while the bottom deciles disappear after year
     one.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### VTD distribution
     """)
     return
 
@@ -2931,6 +3153,14 @@ def _(
         x_title="Value to Date ($)",
     )
     return (vtd_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### VTD decile analysis
+    """)
+    return
 
 
 @app.cell(hide_code=True)
@@ -2996,6 +3226,14 @@ def _(GT, decile_labels, style_table, vtd_df):
 
 
 @app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Annual % active by VTD decile
+    """)
+    return
+
+
+@app.cell(hide_code=True)
 def _(how):
     how(r"""
     1. Mark each cohort customer active or not in each year.
@@ -3044,7 +3282,8 @@ def _(FOCUS_COHORT_QTR, GT, bold_totals, cust_data, style_table, vtd_decile):
     (
         GT(_tbl, rowname_col="Decile")
         .tab_header(
-            title="Annual % Active by VTD Decile", subtitle=f"{FOCUS_COHORT_QTR} cohort"
+            title="Annual % Active by VTD Decile",
+            subtitle=f"{FOCUS_COHORT_QTR} cohort",
         )
         .tab_spanner(label="% active", columns=_yr)
         .fmt_percent(columns=["% Cohort"] + _yr, decimals=1)
@@ -3058,7 +3297,7 @@ def _(FOCUS_COHORT_QTR, GT, bold_totals, cust_data, style_table, vtd_decile):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### RFM analysis
+    ## RFM analysis
     """)
     return
 
@@ -3068,9 +3307,17 @@ def _(mo):
     mo.md(r"""
     Compute recency, frequency, and monetary value at the end of the window.
     Recency is the index of the last active quarter (1 = Q1 2016 … 16 = Q4 2019).
-    Frequency is total transactions. Monetary value is average profit per
-    transaction (total profit / total transactions). State the monetary
-    definition, because several are in use.
+    Frequency is total transactions over the analysis window. Monetary value is
+    average profit per transaction (total profit / total transactions).
+    State the monetary definition, because several are in use.
+
+    | Dim | Bins |
+    |---|---|
+    | R | Q1; Q2–Q8; Q9–Q15; Q16 |
+    | F | 1; 2–4; 5–10; 11+ |
+    | M | ≤ \$25; (\$25, \$50]; (\$50, \$75]; > \$75 |
+
+    Cross-tab: rows = R × M, columns = F.
 
     The cross-tab has 64 cells, but only 52 are structurally possible: a customer
     with frequency 1 made that single purchase in the acquisition quarter, so
@@ -3124,7 +3371,11 @@ def _(FOCUS_COHORT_QTR, GT, cust_data, np, pd, style_table):
         ),
         F=lambda d: pd.Categorical(
             np.select(
-                [d["Frequency"].eq(1), d["Frequency"].le(4), d["Frequency"].le(10)],
+                [
+                    d["Frequency"].eq(1),
+                    d["Frequency"].le(4),
+                    d["Frequency"].le(10),
+                ],
                 ["1", "2-4", "5-10"],
                 default="11+",
             ),
@@ -3133,7 +3384,11 @@ def _(FOCUS_COHORT_QTR, GT, cust_data, np, pd, style_table):
         ),
         M=lambda d: pd.Categorical(
             np.select(
-                [d["Monetary"].le(25), d["Monetary"].le(50), d["Monetary"].le(75)],
+                [
+                    d["Monetary"].le(25),
+                    d["Monetary"].le(50),
+                    d["Monetary"].le(75),
+                ],
                 ["<$25", "$25-50", "$50-75"],
                 default="$75+",
             ),
@@ -3162,7 +3417,8 @@ def _(FOCUS_COHORT_QTR, GT, cust_data, np, pd, style_table):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Lens 4 — Comparing cohorts
+    ___
+    # Lens 4 — Comparing cohorts
     """)
     return
 
@@ -3182,7 +3438,57 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Data prep
+    ## Data prep
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Group every customer by cohort and quarter.
+    2. Add the customers, the transactions, the spend, and the profit.
+    3. Build the factors: orders, order value, and margin.
+    4. Divide by each cohort's start size to get the percent active.
+
+    **Purpose:** Build the full quarterly record for every cohort.
+    **Goal:** Feed all the Lens 4 cohort charts.
+    """)
+    return
+
+
+@app.cell
+def _(cust_data):
+    cohort_df = (
+        cust_data.groupby(["Cohort", "YearQuarter"])
+        .agg(
+            TotalCust=("CustomerID", "nunique"),
+            TotalTrans=("NumTrans", "sum"),
+            TotalSpend=("Spend", lambda s: s.sum() / 100),
+            TotalProfit=("Profit", lambda s: s.sum() / 100),
+        )
+        .assign(
+            AOF=lambda d: d["TotalTrans"] / d["TotalCust"],
+            AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
+            AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"],
+        )
+    )
+    _idx = cohort_df.index
+    _csize = (
+        cohort_df["TotalCust"]
+        .loc[_idx.get_level_values("Cohort") == _idx.get_level_values("YearQuarter")]
+        .droplevel("YearQuarter")
+    )
+    cohort_df = cohort_df.assign(
+        PctActive=lambda d: d["TotalCust"].div(_csize, level="Cohort")
+    )
+    return (cohort_df,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Workflow
     """)
     return
 
@@ -3190,7 +3496,29 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### Cohort trajectory lines
+    Cohorts differ in size, so raw comparison is misleading. The Q3 2016 cohort
+    has 2,842 members and the Q4 2016 cohort has 6,162: the Q4 cohort produces more
+    profit only because it is larger. Follow three steps:
+
+    1. Plot **raw** quarterly profit. The larger cohort dominates.
+    2. **Index** each cohort's profit to its own acquisition-quarter value (= 100).
+       This removes size but does not explain the difference in decay.
+    3. **Decompose.** Plot % active, AOF, AOV, and margin for each cohort on the
+       same axes. This is where the insight is: it tells you whether a cohort
+       underperforms because fewer return, they return less often, they spend less
+       per order, or they buy lower-margin goods. Those are four different problems
+       with four different responses.
+
+    Repeat step 3 for a like-for-like seasonal pair (Q4 2016 vs Q4 2017), aligned
+    by quarters since acquisition.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Cohort trajectory lines
     """)
     return
 
@@ -3244,15 +3572,21 @@ def _(go, pretty_cohort):
             "TotalSpend": "Total Spend",
             "NumActive": "Active Customers",
             "PctActive": "% Active",
-            "AOF": "Orders per Active Customer",
+            "AOF": "Average Order Frequency",
             "AOV": "Average Order Value",
+            "AvgMargin": "Average Profit Margin",
             "ASPAC": "Spend per Active Customer",
         }
         _mlabel = _labels.get(metric, metric)
         y_title = f"{_mlabel} (Acq. Qtr = 100)" if index else _mlabel
         if title is None:
             _bits = [
-                b for b in ("Aligned" if align else "", "Indexed" if index else "") if b
+                b
+                for b in (
+                    "Aligned" if align else "",
+                    "Indexed" if index else "",
+                )
+                if b
             ]
             title = f"{_mlabel} by Cohort" + (f" ({', '.join(_bits)})" if _bits else "")
         fig = go.Figure()
@@ -3292,73 +3626,7 @@ def _(go, pretty_cohort):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Workflow
-
-    Cohorts differ in size, so raw comparison is misleading. The Q3 2016 cohort
-    has 2,842 members and the Q4 2016 cohort has 6,162: the Q4 cohort produces more
-    profit only because it is larger. Follow three steps:
-
-    1. Plot **raw** quarterly profit. The larger cohort dominates.
-    2. **Index** each cohort's profit to its own acquisition-quarter value (= 100).
-       This removes size but does not explain the difference in decay.
-    3. **Decompose.** Plot % active, AOF, AOV, and margin for each cohort on the
-       same axes. This is where the insight is: it tells you whether a cohort
-       underperforms because fewer return, they return less often, they spend less
-       per order, or they buy lower-margin goods. Those are four different problems
-       with four different responses.
-
-    Repeat step 3 for a like-for-like seasonal pair (Q4 2016 vs Q4 2017), aligned
-    by quarters since acquisition.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(how):
-    how(r"""
-    1. Group every customer by cohort and quarter.
-    2. Add the customers, the transactions, the spend, and the profit.
-    3. Build the factors: orders, order value, and margin.
-    4. Divide by each cohort's start size to get the percent active.
-
-    **Purpose:** Build the full quarterly record for every cohort.
-    **Goal:** Feed all the Lens 4 cohort charts.
-    """)
-    return
-
-
-@app.cell
-def _(cust_data):
-    cohort_df = (
-        cust_data.groupby(["Cohort", "YearQuarter"])
-        .agg(
-            TotalCust=("CustomerID", "nunique"),
-            TotalTrans=("NumTrans", "sum"),
-            TotalSpend=("Spend", lambda s: s.sum() / 100),
-            TotalProfit=("Profit", lambda s: s.sum() / 100),
-        )
-        .assign(
-            AOF=lambda d: d["TotalTrans"] / d["TotalCust"],
-            AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
-            AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"],
-        )
-    )
-    _idx = cohort_df.index
-    _csize = (
-        cohort_df["TotalCust"]
-        .loc[_idx.get_level_values("Cohort") == _idx.get_level_values("YearQuarter")]
-        .droplevel("YearQuarter")
-    )
-    cohort_df = cohort_df.assign(
-        PctActive=lambda d: d["TotalCust"].div(_csize, level="Cohort")
-    )
-    return (cohort_df,)
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    #### Q3 2016 vs Q4 2016 — raw profit, then indexed, then decomposed
+    ## Q3 2016 vs Q4 2016 — raw profit, then indexed, then decomposed
     """)
     return
 
@@ -3366,7 +3634,10 @@ def _(mo):
 @app.cell
 def _(cohort_df, cohort_lines):
     cohort_lines(
-        cohort_df, "TotalProfit", cohorts=["y2016_q3", "y2016_q4"], tickformat="$,.0f"
+        cohort_df,
+        "TotalProfit",
+        cohorts=["y2016_q3", "y2016_q4"],
+        tickformat="$,.0f",
     )
     return
 
@@ -3380,8 +3651,17 @@ def _(cohort_df, cohort_lines):
 @app.cell
 def _(cohort_df, cohort_lines):
     cohort_lines(
-        cohort_df, "PctActive", cohorts=["y2016_q3", "y2016_q4"], tickformat=".0%"
+        cohort_df,
+        "PctActive",
+        cohorts=["y2016_q3", "y2016_q4"],
+        tickformat=".0%",
     )
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(cohort_df, "AOF", cohorts=["y2016_q3", "y2016_q4"], tickformat=",.1f")
     return
 
 
@@ -3391,10 +3671,21 @@ def _(cohort_df, cohort_lines):
     return
 
 
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(
+        cohort_df,
+        "AvgMargin",
+        cohorts=["y2016_q3", "y2016_q4"],
+        tickformat=".0%",
+    )
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### Q4 2016 vs Q4 2017 — like-for-like, aligned by quarters since acquisition
+    ## Q4 2016 vs Q4 2017 — like-for-like, aligned by quarters since acquisition
     """)
     return
 
@@ -3423,11 +3714,53 @@ def _(cohort_df, cohort_lines):
     return
 
 
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(
+        cohort_df,
+        "AOF",
+        cohorts=["y2016_q4", "y2017_q4"],
+        align=True,
+        tickformat=",.1f",
+    )
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(
+        cohort_df,
+        "AOV",
+        cohorts=["y2016_q4", "y2017_q4"],
+        align=True,
+        tickformat="$,.0f",
+    )
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(
+        cohort_df,
+        "AvgMargin",
+        cohorts=["y2016_q4", "y2017_q4"],
+        align=True,
+        tickformat=".0%",
+    )
+    return
+
+
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### All cohorts, aligned by quarters since acquisition
+    ## All cohorts, aligned by quarters since acquisition
     """)
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(cohort_df, "TotalProfit", align=True, index=True, tickformat="$,.0f")
     return
 
 
@@ -3439,14 +3772,27 @@ def _(cohort_df, cohort_lines):
 
 @app.cell
 def _(cohort_df, cohort_lines):
+    cohort_lines(cohort_df, "AOF", align=True, tickformat=",.1f")
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
     cohort_lines(cohort_df, "AOV", align=True, tickformat="$,.0f")
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_lines):
+    cohort_lines(cohort_df, "AvgMargin", align=True, tickformat=".0%")
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Lens 5 — Health of the customer base
+    ___
+    # Lens 5 — Health of the customer base
     """)
     return
 
@@ -3477,7 +3823,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Data prep
+    ## Data prep
     """)
     return
 
@@ -3485,7 +3831,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### Annual summary bars
+    ### Annual summary bars
     """)
     return
 
@@ -3584,7 +3930,7 @@ def _(ACCENT, ACCENT2, go):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    #### Cohort stack and flow
+    ### Cohort stack and flow
     """)
     return
 
@@ -3637,12 +3983,24 @@ def _(SEQ, go, pd, pretty_cohort):
         }
 
     def cohort_flow_chart(
-        data, y_title="", total_fmt="{:.2f}", flows=True, width=820, height=520
+        data,
+        y_title="",
+        total_fmt="{:.2f}",
+        flows=True,
+        width=820,
+        height=520,
     ):
         # Pure renderer: every number comes from `data` (see cohort_flow_data).
         P, years, gaps = data["values"], data["years"], data["gaps"]
-        totals, share, bottoms = data["totals"], data["share"], data["bottoms"]
-        cohort_car, base_car = data["cohort_carryover"], data["base_carryover"]
+        totals, share, bottoms = (
+            data["totals"],
+            data["share"],
+            data["bottoms"],
+        )
+        cohort_car, base_car = (
+            data["cohort_carryover"],
+            data["base_carryover"],
+        )
         order = list(P.index)
         colors = dict(zip(order, SEQ[: len(order)]))
         text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
@@ -3656,7 +4014,10 @@ def _(SEQ, go, pd, pretty_cohort):
                     v1, v2 = P.loc[c, years[i]], P.loc[c, years[i + 1]]
                     if pd.isna(v1) or pd.isna(v2) or v1 == 0 or v2 == 0:
                         continue
-                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
+                    b1, b2 = (
+                        bottoms.loc[c, years[i]],
+                        bottoms.loc[c, years[i + 1]],
+                    )
                     fig.add_scatter(
                         x=[i + hw, i + 1 - hw, i + 1 - hw, i + hw],
                         y=[b1 + v1, b2 + v2, b2, b1],
@@ -3718,7 +4079,10 @@ def _(SEQ, go, pd, pretty_cohort):
                         continue
                     if share.loc[c, years[i]] < 0.05:
                         continue
-                    b1, b2 = bottoms.loc[c, years[i]], bottoms.loc[c, years[i + 1]]
+                    b1, b2 = (
+                        bottoms.loc[c, years[i]],
+                        bottoms.loc[c, years[i + 1]],
+                    )
                     fig.add_annotation(
                         x=i + 0.5,
                         y=float(0.5 * ((b1 + v1 / 2) + (b2 + v2 / 2))),
@@ -3752,8 +4116,14 @@ def _(SEQ, go, pd, pretty_cohort):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Annual performance
+    ## Annual performance
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     The three charts below use the same function, `cohort_flow_chart`. One chart
     shows active customers. One chart shows profit. One chart shows spend.
 
@@ -3835,7 +4205,7 @@ def _(annual_cohort_combined, spend_profit_bar_chart):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Prepared flow data
+    ## Prepared flow data
     """)
     return
 
@@ -3882,14 +4252,14 @@ def _(flow_profit):
 @app.cell
 def _(cohort_flow_chart, flow_active):
     cohort_flow_chart(
-        flow_active, y_title="Active Customers (000s)", total_fmt="{:.1f}"
+        flow_active, y_title="Active Customers (000s)", total_fmt="{:.3f}"
     )
     return
 
 
 @app.cell
 def _(cohort_flow_chart, flow_profit):
-    cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.2f}")
+    cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.3f}")
     return
 
 
@@ -3902,7 +4272,7 @@ def _(cohort_flow_chart, flow_spend):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Two ratios that matter
+    ## Two ratios that matter
     """)
     return
 
@@ -3934,7 +4304,102 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Further Lens 5 analyses (specifications)
+    ### The two percentages that matter
+
+    For the profit-by-cohort stack, annotate two different ratios — they answer different questions.
+
+    **(a) Share of a year's profit from that year's new customers.**
+    2016: \\$1,193,524 / \\$1,871,911 = **64%** → 36% of 2016 profit came from customers acquired earlier.
+
+    **(b) Year-on-year retention of profit from existing cohorts.**
+    Profit in 2017 from all cohorts acquired *before* 2017 = \\$1,953,229 – \\$964,671 = \\$988,558.
+    That's **53%** of what those same cohorts delivered in 2016 (\\$1,871,911).
+
+    And per-cohort:
+    - The 2016 cohort delivered \\$1,193,524 in 2016 and \\$451,670 in 2017 → **38%** retention of profit.
+    - The pre-2016 cohort delivered \\$678,387 in 2016 and \\$536,888 in 2017 → **79%** retention.
+
+    **The story:** new cohorts decay fast (38% in year two); old, self-selected surviving cohorts are far stickier (79%). Growth in total profit is being bought with acquisition, while the profit contributed by each existing cohort falls roughly by half annually. Repeat the same annotation for the active-customer stack.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Time to second purchase, by annual cohort
+
+    Cumulative % of each annual cohort that has made a second-ever purchase by end of each year.
+
+    Logic per customer × year cell:
+    - 0 if the year precedes the cohort year
+    - if year == cohort year: `1 if trans > 1 else 0` (repeat beyond the acquisition purchase)
+    - if year > cohort year: `max(previous_flag, 1 if trans > 0 else 0)`
+
+    Sum by cohort year, divide by cohort size. **Exclude the `pre 2016` cohort** — its size is unknown and its "acquisition year" is outside the window.
+
+    Result is a triangular table (each cohort's series starts in its acquisition year).
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Annual repeat-buying rate
+
+    ```
+    RBR(cohort, x→x+1) = # cohort members active in BOTH year x and x+1
+                         ÷ # cohort members active in year x
+    ```
+    Build pairwise activity indicators (16/17, 17/18, 18/19) at the customer level, sum by cohort year, then divide by the corresponding column of matrix (1).
+
+    Report per cohort **and** overall (all customers, not split by cohort).
+
+    Rows: pre-2016, 2016, 2017, 2018, Overall. **There is no 2019 row** — you'd need 2020 data. Expect the pre-2016 cohort's RBR to be substantially higher than any new cohort's: survivorship, not superiority.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Full cohort decomposition by
+
+    For each annual cohort × year:
+
+    | Table | Formula |
+    |---|---|
+    | **% active** | active / cohort size *(2016–2019 cohorts only; NaN for pre-2016)* |
+    | **Avg annual profit per active member** | profit / active |
+    | **Annual AOF** | trans / active |
+    | **Annual AOV** | spend / trans |
+    | **Annual avg margin** | profit / spend |
+
+    Plot each as a line chart, one line per cohort. Add a **Total** row (all customers) to each — the totals row of the last three gives you the **overall AOF, AOV and margin by year**, which is the firm-level summary of whether the business is changing shape.
+
+    **Note on plotting:** cells before a cohort exists must be **missing (NaN), not zero** — a zero will be plotted and will distort the line.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Quarterly version
+
+    Same three pictures, at quarterly granularity using quarterly cohorts (reuse the Lens 4 matrices):
+    1. Quarterly revenue and profit (column totals of the spend and profit matrices).
+    2. Quarterly profit **stacked by quarterly cohort** — the fine-grained version of §5.1.
+    3. Number of customers acquired each quarter (the diagonal).
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Further Lens 5 analyses (specifications)
     """)
     return
 
@@ -3978,6 +4443,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ___
+    # Appendix
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ## Appendix A — Area-proportional Venn diagram
     """)
     return
@@ -4001,7 +4475,8 @@ def _(mo):
     A^{\star} = \pi\left(\frac{9{,}871}{26{,}254}\right) \approx 1.1812
     $$
 
-    The intersection area of two circles a distance $d$ apart is:
+    The intersection area of two circles a distance $d$ (centre-to-centre distance) apart is
+    (ref: [circle-circle intersection](https://mathworld.wolfram.com/Circle-CircleIntersection.html)):
 
     $$
     \begin{split}

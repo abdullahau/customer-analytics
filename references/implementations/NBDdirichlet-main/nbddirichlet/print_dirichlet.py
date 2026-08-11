@@ -1,5 +1,6 @@
 # print_dirichlet
 
+
 def print_dirichlet(x):
     print("Dirichlet Model Parameters:")
     print(f"Category Penetration: {x.cat_pen}")

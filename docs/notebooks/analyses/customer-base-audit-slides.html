@@ -1,0 +1,1674 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="customer-base-audit-slides_files/libs/clipboard/clipboard.min.js"></script>
+<script src="customer-base-audit-slides_files/libs/quarto-html/tabby.min.js"></script>
+<script src="customer-base-audit-slides_files/libs/quarto-html/popper.min.js"></script>
+<script src="customer-base-audit-slides_files/libs/quarto-html/tippy.umd.min.js"></script>
+<link href="customer-base-audit-slides_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="customer-base-audit-slides_files/libs/quarto-html/light-border.css" rel="stylesheet">
+<link href="customer-base-audit-slides_files/libs/quarto-html/quarto-syntax-highlighting-64a204ab8560d761af7679ceaba22944.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
+  <meta name="generator" content="quarto-1.10.18">
+
+  <meta name="author" content="Abdullah Mahmood">
+  <meta name="dcterms.date" content="2026-08-04">
+  <title>Customer-Base Audit</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, minimal-ui">
+  <link rel="stylesheet" href="customer-base-audit-slides_files/libs/revealjs/dist/reset.css">
+  <link rel="stylesheet" href="customer-base-audit-slides_files/libs/revealjs/dist/reveal.css">
+  <style>
+    /* Default styles provided by pandoc.
+    ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+    */
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: 1.5em;}
+    div.column{flex: auto;}
+    @media screen {
+    div.columns{gap: min(4vw, 1.5em);}
+    div.column{overflow-x: auto;}
+    }
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+      vertical-align: middle;
+    }
+  </style>
+  <link rel="stylesheet" href="customer-base-audit-slides_files/libs/revealjs/dist/theme/quarto-8dc6aaaebcf950925c27be97e9c6dc2f.css">
+  <link href="customer-base-audit-slides_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
+  <link href="customer-base-audit-slides_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
+  <link href="customer-base-audit-slides_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
+  <link href="customer-base-audit-slides_files/libs/revealjs/plugin/quarto-support/footer.css" rel="stylesheet">
+  <style type="text/css">
+    .reveal div.sourceCode {
+      margin: 0;
+      overflow: auto;
+    }
+    .reveal div.hanging-indent {
+      margin-left: 1em;
+      text-indent: -1em;
+    }
+    .reveal .slide:not(.center) {
+      height: 100%;
+    }
+    .reveal .slide.scrollable {
+      overflow-y: auto;
+    }
+    .reveal .footnotes {
+      height: 100%;
+      overflow-y: auto;
+    }
+    .reveal .slide .absolute {
+      position: absolute;
+      display: block;
+    }
+    .reveal .footnotes ol {
+      counter-reset: ol;
+      list-style-type: none; 
+      margin-left: 0;
+    }
+    .reveal .footnotes ol li:before {
+      counter-increment: ol;
+      content: counter(ol) ". "; 
+    }
+    .reveal .footnotes ol li > p:first-child {
+      display: inline-block;
+    }
+    .reveal .slide ul,
+    .reveal .slide ol {
+      margin-bottom: 0.5em;
+    }
+    .reveal .slide ul li,
+    .reveal .slide ol li {
+      margin-top: 0.4em;
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide ul[role="tablist"] li {
+      margin-bottom: 0;
+    }
+    .reveal .slide ul li > *:first-child,
+    .reveal .slide ol li > *:first-child {
+      margin-block-start: 0;
+    }
+    .reveal .slide ul li > *:last-child,
+    .reveal .slide ol li > *:last-child {
+      margin-block-end: 0;
+    }
+    .reveal .slide .columns:nth-child(3) {
+      margin-block-start: 0.8em;
+    }
+    .reveal blockquote {
+      box-shadow: none;
+    }
+    .reveal .tippy-content>* {
+      margin-top: 0.2em;
+      margin-bottom: 0.7em;
+    }
+    .reveal .tippy-content>*:last-child {
+      margin-bottom: 0.2em;
+    }
+    .reveal .slide > img.stretch.quarto-figure-center,
+    .reveal .slide > img.r-stretch.quarto-figure-center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-left,
+    .reveal .slide > img.r-stretch.quarto-figure-left  {
+      display: block;
+      margin-left: 0;
+      margin-right: auto; 
+    }
+    .reveal .slide > img.stretch.quarto-figure-right,
+    .reveal .slide > img.r-stretch.quarto-figure-right  {
+      display: block;
+      margin-left: auto;
+      margin-right: 0; 
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+  
+  <script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+  <script>
+  window.PlotlyConfig = {MathJaxConfig: 'local'};
+  if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}
+  </script>
+  <script type="module">import "https://cdn.plot.ly/plotly-3.7.0.min"</script>
+
+</head>
+<body class="quarto-light">
+  <div class="reveal">
+    <div class="slides">
+
+<section id="title-slide" data-background-color="#1f3a5f" data-background-gradient="linear-gradient(135deg, #1f3a5f 0%, #122336 100%)" data-kicker="Descriptive customer analytics" data-meta="Madrigal transaction sample · 2016–2019 · Illustrative analysis" class="quarto-title-block center">
+  <h1 class="title">Customer-Base Audit</h1>
+  <p class="subtitle">How Madrigal’s customers differ — and how their behavior changes over time</p>
+
+<div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+Abdullah Mahmood
+</div>
+</div>
+</div>
+
+  <p class="date">2026-08-04</p>
+</section>
+<section id="contentsfive-lenses-on-the-same-customer-base" class="slide level2">
+<h2><span class="eyebrow">Contents</span>Five lenses on the same customer base</h2>
+<div class="slide-sub">
+<p>Each lens asks a different question of one transaction dataset</p>
+</div>
+<div class="body top">
+<ol class="agenda">
+<li>
+<span class="n">1</span><span>How do customers differ from one another?</span><span class="q">Heterogeneity within a single year</span>
+</li>
+<li>
+<span class="n">2</span><span>What changed between two periods?</span><span class="q">2018 vs 2019 performance bridge</span>
+</li>
+<li>
+<span class="n">3</span><span>How does a single cohort evolve?</span><span class="q">The Q1-2016 cohort over its life</span>
+</li>
+<li>
+<span class="n">4</span><span>How do cohorts compare to one another?</span><span class="q">Like-for-like by age</span>
+</li>
+<li>
+<span class="n">5</span><span>How healthy is the customer base overall?</span><span class="q">Acquisition, repeat buying, concentration</span>
+</li>
+</ol>
+</div>
+</section>
+<section id="executive-summarythe-average-customer-describes-no-one-value-is-concentrated-and-its-decay-is-driven-by-repeat-buying" class="slide level2">
+<h2><span class="eyebrow">Executive summary</span>The average customer describes no one — value is concentrated, and its decay is driven by repeat buying</h2>
+<div class="body top">
+<ul class="points">
+<li>
+<b>Value is concentrated.</b> A small share of customers accounts for most transactions, spend, and profit — the base is not uniform.
+</li>
+<li>
+<b>The “average customer” describes no one.</b> Every behavioural measure is right-skewed, so the mean sits well above the median and most customers fall below the mean.
+</li>
+<li>
+<b>Cohorts decay through fewer active buyers, not weaker spending.</b> Spend per active customer stays broadly flat; the base shrinks because fewer customers remain — so <b>repeat buying is the lever</b>.
+</li>
+<li>
+<b>Behaviour is stable and predictable</b> once heterogeneity is taken into account — the same patterns recur across periods and cohorts.
+</li>
+</ul>
+<div class="takeaway">
+<p>Manage the customer base as a portfolio: protect the high-value minority and lift repeat buying, rather than chase an “average” customer that does not exist.</p>
+</div>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, 2016–2019</p>
+</div>
+</section>
+<section id="approach-dataone-dataset-one-profit-identity-read-every-exhibit-through-its-four-factors" class="slide level2">
+<h2><span class="eyebrow">Approach &amp; data</span>One dataset, one profit identity — read every exhibit through its four factors</h2>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:50%;">
+<div class="note">
+<p><span class="note-h">The data</span></p>
+<p>A 1% sample of <strong>Madrigal</strong>’s transaction records — 70,041 customers, aggregated to the quarter, for 16 quarters (Q1 2016 – Q4 2019). Each customer carries transactions, spend, profit, and an acquisition cohort.</p>
+<p>The audit is <strong>descriptive</strong>: it summarises how customers behave, it does not forecast.</p>
+</div>
+</div><div class="column" style="width:50%;">
+<div class="note">
+<p><span class="note-h">One identity ties it together</span></p>
+<p><strong>Profit = N<sub>c</sub> × AOF × AOV × Margin</strong></p>
+<p><span style="color:#6b7280">(active customers × orders per customer × spend per order × profit margin)</span></p>
+<p>Every result below traces a change in profit to one of these factors — <strong>fewer customers</strong>, <strong>less frequent orders</strong>, <strong>smaller orders</strong>, or <strong>thinner margins</strong>.</p>
+</div>
+</div></div>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, 2016–2019</p>
+</div>
+</section>
+<section>
+<section id="lens-1-how-do-customers-differ-from-one-another" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Lens 1:</span> How do customers differ from one another?</h1>
+
+</section>
+<section id="lens-1-distributions-2019the-average-customer-describes-no-one-spend-and-profit-are-both-right-skewed" class="slide level2">
+<h2><span class="eyebrow">Lens 1 · Distributions · 2019</span>The average customer describes no one — spend and profit are both right-skewed</h2>
+<div class="slide-sub">
+<p>Share of active customers by annual spend (left) and annual profit (right)</p>
+</div>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:50%;">
+<div id="b44e7032" class="cell" data-execution_count="2">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="becf68f7-d874-4705-9e40-8b1f4846768c" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("becf68f7-d874-4705-9e40-8b1f4846768c")) {                    Plotly.newPlot(                        "becf68f7-d874-4705-9e40-8b1f4846768c",                        [{"customdata":{"dtype":"i2","bdata":"gAgkElERcAwRCw4JZQfUBeoEEQQrA70COgLgAdoBjQFBAQgB8wDEAMgAmwCjAJcAggB5AFsATwBaAFUAOAAsADkANAA2ACQAIgAfAB4AHAC3AQ==","shape":"41, 1"},"hovertemplate":"%{x}\u003cbr\u003eCustomers: %{customdata[0]:,}\u003cbr\u003eShare: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f","line":{"width":0}},"x":["0-25","25-50","50-75","75-100","100-125","125-150","150-175","175-200","200-225","225-250","250-275","275-300","300-325","325-350","350-375","375-400","400-425","425-450","450-475","475-500","500-525","525-550","550-575","575-600","600-625","625-650","650-675","675-700","700-725","725-750","750-775","775-800","800-825","825-850","850-875","875-900","900-925","925-950","950-975","975-1000","1000+"],"y":{"dtype":"f8","bdata":"KXrRsrt8sT+J07IsGqnCPzNR+AMO0ME\u002fVymYloOWuT9XjEfXZMS2P9dSBHrfoLI\u002f9tEuogVtrj+VBoOwDPunP0A1wgY5OKQ\u002f06nMS1i7oD\u002fEs9EO9BGaP01n1ke7iJY\u002fPIyK2LFSkj9Ym2IOHtyOPwGTNK5deY4\u002f8yc7MQ6GiT9Jvp4ZNKOEPwpv6YcQ+YA\u002fsKOQbt4+fz\u002f\u002fIGo2wzN5Px8sUmFut3k\u002f\u002fq6fvijucz89xW8Uf\u002fV0P9+jt5N9anM\u002feml18jq3cD\u002fooNaj8x1vPxL6PSDsZmc\u002fVrfNHulQZD+C9MmKFiVnP7TYhZ\u002fq22U\u002f227CYnHNXD9j6eFfa6FWP\u002fp5qo0cUV0\u002fXUIit8S+Wj+cWPIMG8ZbP2iQoQgShFI\u002fKXrRsrt8UT+XsTJkdONPP1ibYg4e3E4\u002f227CYnHNTD9XYn3SUDmMPw=="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":""},"width":531,"height":360,"bargap":0.12,"xaxis":{"title":{"text":"Annual Spend ($)"},"tickangle":-45,"automargin":true,"categoryorder":"array","categoryarray":["0-25","25-50","50-75","75-100","100-125","125-150","150-175","175-200","200-225","225-250","250-275","275-300","300-325","325-350","350-375","375-400","400-425","425-450","450-475","475-500","500-525","525-550","550-575","575-600","600-625","625-650","650-675","675-700","700-725","725-750","750-775","775-800","800-825","825-850","850-875","875-900","900-925","925-950","950-975","975-1000","1000+"],"tickmode":"array","tickvals":["0-25","100-125","200-225","300-325","400-425","500-525","600-625","700-725","800-825","900-925","1000+"],"ticktext":["0-25","100-125","200-225","300-325","400-425","500-525","600-625","700-725","800-825","900-925","1000+"]},"yaxis":{"title":{"text":"Customers (%)"},"tickformat":".0%","automargin":true},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('becf68f7-d874-4705-9e40-8b1f4846768c');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Annual spend per customer</p>
+</div>
+</div><div class="column" style="width:50%;">
+<div id="1dcb9fc8" class="cell" data-execution_count="3">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="5bf36fe1-1a61-409b-8a93-d720912844cc" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("5bf36fe1-1a61-409b-8a93-d720912844cc")) {                    Plotly.newPlot(                        "5bf36fe1-1a61-409b-8a93-d720912844cc",                        [{"customdata":{"dtype":"i2","bdata":"BwFoHqocKhLCDGAIxQUvBBQDXQK6AVQBGAHkAMgAjgB3AGIATwBLAC8AowE=","shape":"22, 1"},"hovertemplate":"%{x}\u003cbr\u003eCustomers: %{customdata[0]:,}\u003cbr\u003eShare: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#c4703a","line":{"width":0}},"x":["\u003c0","0-25","25-50","50-75","75-100","100-125","125-150","150-175","175-200","200-225","225-250","250-275","275-300","300-325","325-350","350-375","375-400","400-425","425-450","450-475","475-500","500+"],"y":{"dtype":"f8","bdata":"pm2MIpvogD9hJD8hGUfPP6CdvrdQfM0\u002fDrS1Mkavwj+Xd5HlNj+6P5p0XR3mOrE\u002fXkFmdFS9pz9BNAbEyDahP8cjJAGuVJk\u002fkSRmRrhykz+DZpQCsWqMP7TYhZ\u002fq24U\u002fSYW53WYAgj\u002f6eaqNHFF9Px8sUmFut3k\u002f2IotczxCcj\u002fIle54SJpuP\u002f8gajbDM2k\u002fVrfNHulQZD8Xof3IkkljP8EKmuBsLFg\u002fiUY55yTwij8="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":""},"width":531,"height":360,"bargap":0.12,"xaxis":{"title":{"text":"Annual Profit ($)"},"tickangle":-45,"automargin":true,"categoryorder":"array","categoryarray":["\u003c0","0-25","25-50","50-75","75-100","100-125","125-150","150-175","175-200","200-225","225-250","250-275","275-300","300-325","325-350","350-375","375-400","400-425","425-450","450-475","475-500","500+"],"tickmode":"array","tickvals":["\u003c0","25-50","75-100","125-150","175-200","225-250","275-300","325-350","375-400","425-450","475-500","500+"],"ticktext":["\u003c0","25-50","75-100","125-150","175-200","225-250","275-300","325-350","375-400","425-450","475-500","500+"]},"yaxis":{"title":{"text":"Customers (%)"},"tickformat":".0%","automargin":true},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('5bf36fe1-1a61-409b-8a93-d720912844cc');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Annual profit per customer</p>
+</div>
+</div></div>
+</div>
+<div class="takeaway">
+<p>About <strong>69%</strong> of customers spend below the mean and <strong>69%</strong> earn below the mean profit — a long right tail carries the base.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, active customers, 2019</p>
+</div>
+</section>
+<section id="lens-1-value-concentrationthe-top-deciles-capture-a-disproportionate-share-of-profit" class="slide level2">
+<h2><span class="eyebrow">Lens 1 · Value concentration</span>The top deciles capture a disproportionate share of profit</h2>
+<div class="slide-sub">
+<p>Customers ranked into ten equal groups by profit contribution</p>
+</div>
+<div class="body">
+<div id="20de510b" class="cell" data-execution_count="4">
+<div class="cell-output cell-output-display" data-execution_count="42">
+<div id="bjljkiacsd" style="padding-left:0px;padding-right:0px;padding-top:10px;padding-bottom:10px;overflow-x:auto;overflow-y:auto;width:auto;height:auto;">
+<style>
+#bjljkiacsd table {
+          font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
+#bjljkiacsd thead, tbody, tfoot, tr, td, th { border-style: none; }
+ tr { background-color: transparent; }
+#bjljkiacsd p { margin: 0; padding: 0; }
+ #bjljkiacsd .gt_table { display: table; border-collapse: collapse; line-height: normal; margin-left: auto; margin-right: auto; color: #1f2328; font-size: 12px; font-weight: normal; font-style: normal; background-color: #FFFFFF; width: auto; border-top-style: none; border-top-width: 2px; border-top-color: #A8A8A8; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 1px; border-bottom-color: #6b7280; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; }
+ #bjljkiacsd .gt_caption { padding-top: 4px; padding-bottom: 4px; }
+ #bjljkiacsd .gt_title { color: #1f2328; font-size: 125%; font-weight: initial; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; border-bottom-color: #FFFFFF; border-bottom-width: 0; }
+ #bjljkiacsd .gt_subtitle { color: #1f2328; font-size: 85%; font-weight: initial; padding-top: 3px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; border-top-color: #FFFFFF; border-top-width: 0; }
+ #bjljkiacsd .gt_heading { background-color: white; text-align: center; border-bottom-color: #FFFFFF; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #bjljkiacsd .gt_bottom_border { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #6b7280; }
+ #bjljkiacsd .gt_col_headings { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #1f3a5f; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; }
+ #bjljkiacsd .gt_col_heading { color: #FFFFFF; background-color: #1f3a5f; font-size: 100%; font-weight: normal; text-transform: inherit; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; padding-left: 5px; padding-right: 5px; overflow-x: hidden; }
+ #bjljkiacsd .gt_column_spanner_outer { color: #FFFFFF; background-color: #1f3a5f; font-size: 100%; font-weight: normal; text-transform: inherit; padding-top: 0; padding-bottom: 0; padding-left: 4px; padding-right: 4px; }
+ #bjljkiacsd .gt_column_spanner_outer:first-child { padding-left: 0; }
+ #bjljkiacsd .gt_column_spanner_outer:last-child { padding-right: 0; }
+ #bjljkiacsd .gt_column_spanner { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #1f3a5f; vertical-align: bottom; padding-top: 5px; padding-bottom: 5px; overflow-x: hidden; display: inline-block; width: 100%; }
+ #bjljkiacsd .gt_spanner_row { border-bottom-style: hidden; }
+ #bjljkiacsd .gt_group_heading { padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; color: #1f2328; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; text-align: left; }
+ #bjljkiacsd .gt_empty_group_heading { padding: 0.5px; color: #1f2328; background-color: #FFFFFF; font-size: 100%; font-weight: initial; border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; vertical-align: middle; }
+ #bjljkiacsd .gt_from_md> :first-child { margin-top: 0; }
+ #bjljkiacsd .gt_from_md> :last-child { margin-bottom: 0; }
+ #bjljkiacsd .gt_row { padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; margin: 10px; border-top-style: solid; border-top-width: 1px; border-top-color: #D3D3D3; border-left-style: none; border-left-width: 1px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 1px; border-right-color: #D3D3D3; vertical-align: middle; overflow-x: hidden; }
+ #bjljkiacsd .gt_stub { color: #1f2328; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; }
+ #bjljkiacsd .gt_indent_1 { text-indent: 5px; }
+ #bjljkiacsd .gt_indent_2 { text-indent: calc(5px * 2); }
+ #bjljkiacsd .gt_indent_3 { text-indent: calc(5px * 3); }
+ #bjljkiacsd .gt_indent_4 { text-indent: calc(5px * 4); }
+ #bjljkiacsd .gt_indent_5 { text-indent: calc(5px * 5); }
+ #bjljkiacsd .gt_stub_row_group { color: #1f2328; background-color: #FFFFFF; font-size: 100%; font-weight: initial; text-transform: inherit; border-right-style: solid; border-right-width: 2px; border-right-color: #D3D3D3; padding-left: 5px; padding-right: 5px; vertical-align: top; }
+ #bjljkiacsd .gt_row_group_first td { border-top-width: 2px; }
+ #bjljkiacsd .gt_row_group_first th { border-top-width: 2px; }
+ #bjljkiacsd .gt_striped { color: #1f2328; background-color: #f3f6fa; }
+ #bjljkiacsd .gt_table_body { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+ #bjljkiacsd .gt_summary_row { color: #1f2328; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+ #bjljkiacsd .gt_first_summary_row { border-top-style: solid; border-top-width: 2px; border-top-color: #D3D3D3; }
+ #bjljkiacsd .gt_last_summary_row_top { border-bottom-style: solid; border-bottom-width: 2px; border-bottom-color: #D3D3D3; }
+ #bjljkiacsd .gt_grand_summary_row { color: #1f2328; background-color: #FFFFFF; text-transform: inherit; padding-top: 8px; padding-bottom: 8px; padding-left: 5px; padding-right: 5px; }
+ #bjljkiacsd .gt_first_grand_summary_row_bottom { border-top-style: double; border-top-width: 6px; border-top-color: #D3D3D3; }
+ #bjljkiacsd .gt_last_grand_summary_row_top { border-bottom-style: double; border-bottom-width: 6px; border-bottom-color: #D3D3D3; }
+ #bjljkiacsd .gt_sourcenotes { color: #1f2328; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #bjljkiacsd .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+ #bjljkiacsd .gt_left { text-align: left; }
+ #bjljkiacsd .gt_center { text-align: center; }
+ #bjljkiacsd .gt_right { text-align: right; font-variant-numeric: tabular-nums; }
+ #bjljkiacsd .gt_font_normal { font-weight: normal; }
+ #bjljkiacsd .gt_font_bold { font-weight: bold; }
+ #bjljkiacsd .gt_font_italic { font-style: italic; }
+ #bjljkiacsd .gt_super { font-size: 65%; }
+ #bjljkiacsd .gt_footnotes { color: font-color(#FFFFFF); background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #bjljkiacsd .gt_footnote { margin: 0px; font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; }
+ #bjljkiacsd .gt_sourcenotes { color: #1f2328; background-color: #FFFFFF; border-bottom-style: none; border-bottom-width: 2px; border-bottom-color: #D3D3D3; border-left-style: none; border-left-width: 2px; border-left-color: #D3D3D3; border-right-style: none; border-right-width: 2px; border-right-color: #D3D3D3; }
+ #bjljkiacsd .gt_sourcenote { font-size: 90%; padding-top: 4px; padding-bottom: 4px; padding-left: 5px; padding-right: 5px; text-align: left; }
+ #bjljkiacsd .gt_footnote_marks { font-size: 75%; vertical-align: 0.4em; position: initial; }
+ #bjljkiacsd .gt_asterisk { font-size: 100%; vertical-align: 0; }
+ 
+</style>
+
+<table class="gt_table caption-top" data-quarto-bootstrap="false">
+<thead>
+<tr class="gt_heading header">
+<td colspan="10" class="gt_heading gt_title gt_font_normal"></td>
+</tr>
+<tr class="gt_col_headings even">
+<th id="Decile" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">Decile</th>
+<th id="%-Cust." class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">% Cust.</th>
+<th id="%-Trans." class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">% Trans.</th>
+<th id="%-Spend" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">% Spend</th>
+<th id="%-Profit" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">% Profit</th>
+<th id="Avg-Spend/Cust." class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">Avg Spend/Cust.</th>
+<th id="Avg.-Profit/Cust." class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">Avg. Profit/Cust.</th>
+<th id="AOF" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">AOF</th>
+<th id="AOV" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">AOV</th>
+<th id="Avg.-Margin" class="gt_col_heading gt_columns_bottom_border gt_right" data-quarto-table-cell-role="th" style="color: white; font-weight: bold" scope="col">Avg. Margin</th>
+</tr>
+</thead>
+<tbody class="gt_table_body">
+<tr class="odd">
+<td class="gt_row gt_right">1</td>
+<td class="gt_row gt_right">10.0%</td>
+<td class="gt_row gt_right">26.6%</td>
+<td class="gt_row gt_right">38.2%</td>
+<td class="gt_row gt_right">39.7%</td>
+<td class="gt_row gt_right">$700.50</td>
+<td class="gt_row gt_right">$348.93</td>
+<td class="gt_row gt_right">5.07</td>
+<td class="gt_row gt_right">$138.14</td>
+<td class="gt_row gt_right">49.8%</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_right gt_striped">2</td>
+<td class="gt_row gt_right gt_striped">10.0%</td>
+<td class="gt_row gt_right gt_striped">13.9%</td>
+<td class="gt_row gt_right gt_striped">17.2%</td>
+<td class="gt_row gt_right gt_striped">17.7%</td>
+<td class="gt_row gt_right gt_striped">$315.03</td>
+<td class="gt_row gt_right gt_striped">$155.44</td>
+<td class="gt_row gt_right gt_striped">2.66</td>
+<td class="gt_row gt_right gt_striped">$118.63</td>
+<td class="gt_row gt_right gt_striped">49.3%</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_right">3</td>
+<td class="gt_row gt_right">10.0%</td>
+<td class="gt_row gt_right">10.7%</td>
+<td class="gt_row gt_right">11.9%</td>
+<td class="gt_row gt_right">12.1%</td>
+<td class="gt_row gt_right">$217.76</td>
+<td class="gt_row gt_right">$106.70</td>
+<td class="gt_row gt_right">2.03</td>
+<td class="gt_row gt_right">$107.03</td>
+<td class="gt_row gt_right">49.0%</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_right gt_striped">4</td>
+<td class="gt_row gt_right gt_striped">10.0%</td>
+<td class="gt_row gt_right gt_striped">8.9%</td>
+<td class="gt_row gt_right gt_striped">9.0%</td>
+<td class="gt_row gt_right gt_striped">9.1%</td>
+<td class="gt_row gt_right gt_striped">$165.25</td>
+<td class="gt_row gt_right gt_striped">$79.72</td>
+<td class="gt_row gt_right gt_striped">1.70</td>
+<td class="gt_row gt_right gt_striped">$96.96</td>
+<td class="gt_row gt_right gt_striped">48.2%</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_right">5</td>
+<td class="gt_row gt_right">10.0%</td>
+<td class="gt_row gt_right">8.1%</td>
+<td class="gt_row gt_right">7.1%</td>
+<td class="gt_row gt_right">6.9%</td>
+<td class="gt_row gt_right">$129.31</td>
+<td class="gt_row gt_right">$60.55</td>
+<td class="gt_row gt_right">1.55</td>
+<td class="gt_row gt_right">$83.64</td>
+<td class="gt_row gt_right">46.8%</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_right gt_striped">6</td>
+<td class="gt_row gt_right gt_striped">10.0%</td>
+<td class="gt_row gt_right gt_striped">7.2%</td>
+<td class="gt_row gt_right gt_striped">5.4%</td>
+<td class="gt_row gt_right gt_striped">5.2%</td>
+<td class="gt_row gt_right gt_striped">$99.14</td>
+<td class="gt_row gt_right gt_striped">$45.69</td>
+<td class="gt_row gt_right gt_striped">1.37</td>
+<td class="gt_row gt_right gt_striped">$72.42</td>
+<td class="gt_row gt_right gt_striped">46.1%</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_right">7</td>
+<td class="gt_row gt_right">10.0%</td>
+<td class="gt_row gt_right">6.6%</td>
+<td class="gt_row gt_right">4.1%</td>
+<td class="gt_row gt_right">3.9%</td>
+<td class="gt_row gt_right">$75.89</td>
+<td class="gt_row gt_right">$34.05</td>
+<td class="gt_row gt_right">1.26</td>
+<td class="gt_row gt_right">$60.00</td>
+<td class="gt_row gt_right">44.9%</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_right gt_striped">8</td>
+<td class="gt_row gt_right gt_striped">10.0%</td>
+<td class="gt_row gt_right gt_striped">6.2%</td>
+<td class="gt_row gt_right gt_striped">3.1%</td>
+<td class="gt_row gt_right gt_striped">2.8%</td>
+<td class="gt_row gt_right gt_striped">$57.42</td>
+<td class="gt_row gt_right gt_striped">$24.88</td>
+<td class="gt_row gt_right gt_striped">1.18</td>
+<td class="gt_row gt_right gt_striped">$48.51</td>
+<td class="gt_row gt_right gt_striped">43.3%</td>
+</tr>
+<tr class="odd">
+<td class="gt_row gt_right">9</td>
+<td class="gt_row gt_right">10.0%</td>
+<td class="gt_row gt_right">5.9%</td>
+<td class="gt_row gt_right">2.3%</td>
+<td class="gt_row gt_right">1.9%</td>
+<td class="gt_row gt_right">$41.28</td>
+<td class="gt_row gt_right">$16.66</td>
+<td class="gt_row gt_right">1.12</td>
+<td class="gt_row gt_right">$36.94</td>
+<td class="gt_row gt_right">40.4%</td>
+</tr>
+<tr class="even">
+<td class="gt_row gt_right gt_striped">10</td>
+<td class="gt_row gt_right gt_striped">10.0%</td>
+<td class="gt_row gt_right gt_striped">5.9%</td>
+<td class="gt_row gt_right gt_striped">1.7%</td>
+<td class="gt_row gt_right gt_striped">0.7%</td>
+<td class="gt_row gt_right gt_striped">$30.64</td>
+<td class="gt_row gt_right gt_striped">$5.98</td>
+<td class="gt_row gt_right gt_striped">1.12</td>
+<td class="gt_row gt_right gt_striped">$27.41</td>
+<td class="gt_row gt_right gt_striped">19.5%</td>
+</tr>
+</tbody>
+</table>
+
+
+</div>
+</div>
+</div>
+</div>
+<div class="takeaway">
+<p>The most valuable decile contributes far more than one-tenth of profit, while the lowest deciles contribute little or are loss-making.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; deciles by annual profit</p>
+</div>
+</section></section>
+<section>
+<section id="lens-2-what-changed-between-two-periods" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Lens 2:</span> What changed between two periods?</h1>
+
+</section>
+<section id="lens-2-profit-bridge-20182019profit-growth-is-a-balance-of-returning-lapsed-and-newly-won-customers" class="slide level2">
+<h2><span class="eyebrow">Lens 2 · Profit bridge · 2018→2019</span>Profit growth is a balance of returning, lapsed, and newly-won customers</h2>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:60%;">
+<div id="17536664" class="cell" data-execution_count="5">
+<div class="cell-output cell-output-display">
+<div style="height:420px; width:637px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="1ecdcd31-1d10-431a-9173-798857599ca8" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("1ecdcd31-1d10-431a-9173-798857599ca8")) {                    Plotly.newPlot(                        "1ecdcd31-1d10-431a-9173-798857599ca8",                        [{"base":0,"marker":{"color":"#64748b"},"showlegend":false,"width":0.62,"x":[0],"y":[1216.39697265625],"type":"bar"},{"base":1216.39697265625,"marker":{"color":"#1f3a5f","line":{"color":"white","width":1}},"showlegend":false,"width":0.62,"x":[0],"y":[1073.94580078125],"type":"bar"},{"base":1216.39697265625,"marker":{"color":"#1f3a5f","line":{"color":"white","width":1}},"showlegend":false,"width":0.62,"x":[1],"y":[1073.94580078125],"type":"bar"},{"base":1183.77880859375,"marker":{"color":"#64748b"},"showlegend":false,"width":0.62,"x":[2],"y":[32.6181640625],"type":"bar"},{"base":1183.77880859375,"marker":{"color":"#c4703a","line":{"color":"white","width":1}},"showlegend":false,"width":0.62,"x":[3],"y":[1615.1248779296875],"type":"bar"},{"base":0,"marker":{"color":"#64748b"},"showlegend":false,"width":0.62,"x":[4],"y":[1183.77880859375],"type":"bar"},{"base":1183.77880859375,"marker":{"color":"#c4703a","line":{"color":"white","width":1}},"showlegend":false,"width":0.62,"x":[4],"y":[1615.1248779296875],"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"shapes":[{"line":{"color":"#6b7280","dash":"dot","width":1},"type":"line","x0":0.31,"x1":0.69,"y0":2290.3427734375,"y1":2290.3427734375},{"line":{"color":"#6b7280","dash":"dot","width":1},"type":"line","x0":3.31,"x1":3.69,"y0":2798.903564453125,"y1":2798.903564453125},{"line":{"color":"#6b7280","dash":"dot","width":1},"type":"line","x0":0.31,"x1":1.69,"y0":1216.39697265625,"y1":1216.39697265625},{"line":{"color":"#6b7280","dash":"dot","width":1},"type":"line","x0":2.31,"x1":3.69,"y0":1183.77880859375,"y1":1183.77880859375}],"annotations":[{"font":{"color":"#1f2328","size":12},"showarrow":false,"text":"$2,290K","x":0,"y":2290.3427734375,"yanchor":"bottom","yshift":10},{"font":{"color":"#1f2328","size":12},"showarrow":false,"text":"$2,799K","x":4,"y":2798.903564453125,"yanchor":"bottom","yshift":10},{"font":{"color":"white","size":12},"showarrow":false,"text":"Both\u003cbr\u003eyears","x":0,"y":608.198486328125,"yanchor":"middle","yshift":0},{"font":{"color":"white","size":12},"showarrow":false,"text":"2018\u003cbr\u003eonly","x":0,"y":1753.369873046875,"yanchor":"middle","yshift":0},{"font":{"color":"white","size":12},"showarrow":false,"text":"Both\u003cbr\u003eyears","x":4,"y":591.889404296875,"yanchor":"middle","yshift":0},{"font":{"color":"white","size":12},"showarrow":false,"text":"2019\u003cbr\u003eonly","x":4,"y":1991.34130859375,"yanchor":"middle","yshift":0},{"font":{"color":"white","size":12},"showarrow":false,"text":"$1,074K","x":1,"y":1753.369873046875,"yanchor":"middle","yshift":0},{"font":{"color":"#1f2328","size":12},"showarrow":false,"text":"\u2212$33K","x":2,"y":1183.77880859375,"yanchor":"top","yshift":-8},{"font":{"color":"white","size":12},"showarrow":false,"text":"$1,615K","x":3,"y":1991.34130859375,"yanchor":"middle","yshift":0}],"title":{"text":"Decomposition of Annual Customer Profit (2019)"},"width":637,"height":420,"barmode":"overlay","bargap":0.35,"xaxis":{"tickvals":[0,4],"ticktext":["2018","2019"],"range":[-0.7,4.7],"showline":true,"linecolor":"#6b7280"},"yaxis":{"visible":false,"range":[0,3190.75]},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('1ecdcd31-1d10-431a-9173-798857599ca8');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div><div class="column" style="width:40%;">
+<div class="note">
+<p><span class="note-h">Read the bridge</span></p>
+<p>Profit moves from 2018 to 2019 through three customer groups:</p>
+<ul class="points" style="margin-top:8px">
+<li>
+<b>Returning</b> customers, active in both years
+</li>
+<li>
+<b>Lapsed</b> customers, who leave (a drag)
+</li>
+<li>
+<b>New / reactivated</b> customers, who join (a lift)
+</li>
+</ul>
+</div>
+</div></div>
+</div>
+<div class="takeaway">
+<p>The net change is small relative to the gross flows beneath it — sustaining profit depends on keeping lapse in check, not only on winning new customers.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, 2018 and 2019</p>
+</div>
+</section>
+<section id="lens-2-customer-overlapeach-years-customer-base-is-substantially-replaced-not-merely-carried-forward" class="slide level2">
+<h2><span class="eyebrow">Lens 2 · Customer overlap</span>Each year’s customer base is substantially replaced, not merely carried forward</h2>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:60%;">
+<div id="e5da886a" class="cell" data-execution_count="6">
+<div class="cell-output cell-output-display">
+<div style="height:400px; width:637px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="ea546a51-045a-43f4-8a47-29b7d7d51217" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("ea546a51-045a-43f4-8a47-29b7d7d51217")) {                    Plotly.newPlot(                        "ea546a51-045a-43f4-8a47-29b7d7d51217",                        [{"fill":"toself","fillcolor":"rgba(31, 58, 95, 0.55)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":{"dtype":"f8","bdata":"7bDclwq68D8xcUqCurrwPyvo2zPKvPA\u002fQcpqgznA8D+Gf2UsCMXwP4981M41y\u002fA\u002fPr5h78HS8D\u002feZ2L3q9vwP\u002fOC4jTz5fA\u002foN+y2pbx8D\u002fFFHkAlv7wP2uewaLvDPE\u002fLxkUo6Ic8T8BmQnIrS3xP5cZZb0PQPE\u002fjAYuFMdT8T8w2cxC0mjxP8XJKaUvf\u002fE\u002fwpHNfN2W8T+cPATx2a\u002fxPz4EAg8jyvE\u002fgzYKyrbl8T9uIJj7kgLyPyb8iWO1IPI\u002fNd5NqBtA8j+bnhBXw2DyPxO67uOpgvI\u002fnycnqsyl8j+OHlDsKMryP67IjdS77\u002fI\u002fltzKdIIW8z9yG\u002fPGeT7zP+atL62eZ\u002fM\u002fPlsl8u2R8z8OljRJZL3zP15Zu07+6fM\u002fGNFYiLgX9D+dyDJlj0b0P+DZPD5\u002fdvQ\u002fxFeBVoSn9D+37Wvbmtn0PwzvFeW+DPU\u002f4E+UduxA9T+WQUd+H3b1P7JsK9ZTrPU\u002frsEsRIXj9T922np6rxv2P7vl3hfOVPY\u002fsxUTqNyO9j82ixuk1sn2P2+2oHK3Bfc\u002fCCZLaHpC9z+ovSDIGoD3Pzzoe7vHwfc\u002fAAAAAAAA+D+K736QmD34P5RuVp+Mevg\u002fjDu4a9e2+D+K\u002fghCdPL4P7wkPnxeLfk\u002fLq06gpFn+T9a3yrKCKH5P57k3ti\u002f2fk\u002fXz0kQrIR+j8OCx6p20j6P+knnMA3f\u002fo\u002f6gVxS8K0+j8WTsYcd+n6P4g5cBhSHfs\u002f5p0\u002fM09Q+z+bplJzaoL7P8I0ZPCfs\u002fs\u002fYd8Z1Ovj+z8bjlBaShP8PxyoZ9G3Qfw\u002fktGKmjBv\u002fD\u002fpMfopsZv8Pwo9UQc2x\u002fw\u002fVPrLzbvx\u002fD+iw4osPxv9P1N31Oa8Q\u002f0\u002f7hdX1DFr\u002fT+i1GbhmpH9P251Ow\u002f1tv0\u002fVCYsdD3b\u002fT\u002fknOk7cf79P4STtqeNIP4\u002fNpaeDpBB\u002fj9kHKvddWH+P7TrFpg8gP4\u002fy79\u002f1+Gd\u002fj83MxZMY7r+P6zly7y+1f4\u002fAtx\u002fB\u002fLv\u002fj+OFikh+wj\u002fP2Za\u002fxXYIP8\u002fgCqiCYc3\u002fz+P7T03Bk3\u002fP8A9r\u002fFTYf8\u002fil+ko250\u002fz8S3bzPVIb\u002fP4dDpxAFl\u002f8\u002fQAA9GX6m\u002fz9hW5y0vrT\u002fPwyOQMbFwf8\u002fLvIXSpLN\u002fz88SphUI9j\u002fP0Yf0RJ44f8\u002f4zN8yo\u002fp\u002fz\u002fRCgzaafD\u002fP\u002ft\u002fuLgF9v8\u002fDnOJ9mL6\u002fz+0gl88gf3\u002fP8XX+ktg\u002f\u002f8\u002fAAAAAAAAAEAAAAAAAAAAQMXX+ktg\u002f\u002f8\u002ftIJfPIH9\u002fz8Oc4n2Yvr\u002fP\u002ft\u002fuLgF9v8\u002f0QoM2mnw\u002fz\u002fjM3zKj+n\u002fP0Yf0RJ44f8\u002fPUqYVCPY\u002fz8u8hdKks3\u002fPwyOQMbFwf8\u002fYVuctL60\u002fz9AAD0Zfqb\u002fP4hDpxAFl\u002f8\u002fEt28z1SG\u002fz+KX6SjbnT\u002fP8A9r\u002fFTYf8\u002fkO09NwZN\u002fz+AKqIJhzf\u002fP2Za\u002fxXYIP8\u002fjhYpIfsI\u002fz8C3H8H8u\u002f+P6zly7y+1f4\u002fODMWTGO6\u002fj\u002fKv3\u002fX4Z3+P7TrFpg8gP4\u002fZRyr3XVh\u002fj82lp4OkEH+P4STtqeNIP4\u002f45zpO3H+\u002fT9WJix0Pdv9P291Ow\u002f1tv0\u002fotRm4ZqR\u002fT\u002fuF1fUMWv9P1J31Oa8Q\u002f0\u002fpMOKLD8b\u002fT9U+svNu\u002fH8Pwo9UQc2x\u002fw\u002f6DH6KbGb\u002fD+U0YqaMG\u002f8PxyoZ9G3Qfw\u002fHI5QWkoT\u002fD9h3xnU6+P7P8E0ZPCfs\u002fs\u002fnKZSc2qC+z\u002fmnT8zT1D7P4g5cBhSHfs\u002fFk7GHHfp+j\u002fsBXFLwrT6P+onnMA3f\u002fo\u002fDgseqdtI+j9fPSRCshH6P5zk3ti\u002f2fk\u002fXN8qygih+T8vrTqCkWf5P7wkPnxeLfk\u002fif4IQnTy+D+OO7hr17b4P5VuVp+Mevg\u002fiu9+kJg9+D8AAAAAAAD4Pzzoe7vHwfc\u002fqL0gyBqA9z8MJktoekL3P3C2oHK3Bfc\u002fNosbpNbJ9j+yFROo3I72P7zl3hfOVPY\u002fdtp6eq8b9j+wwSxEheP1P7FsK9ZTrPU\u002flkFHfh929T\u002fiT5R27ED1PwzvFeW+DPU\u002fuO1r25rZ9D\u002fDV4FWhKf0P+HZPD5\u002fdvQ\u002fnMgyZY9G9D8a0ViIuBf0P11Zu07+6fM\u002fDpY0SWS98z8+WyXy7ZHzP+etL62eZ\u002fM\u002fcxvzxnk+8z+W3Mp0ghbzP6\u002fIjdS77\u002fI\u002fjh5Q7CjK8j+gJyeqzKXyPxK67uOpgvI\u002fnJ4QV8Ng8j823k2oG0DyPyb8iWO1IPI\u002fbiCY+5IC8j+DNgrKtuXxPz8EAg8jyvE\u002fmzwE8dmv8T\u002fDkc183ZbxP8TJKaUvf\u002fE\u002fMNnMQtJo8T+NBi4Ux1PxP5cZZb0PQPE\u002fApkJyK0t8T8uGRSjohzxP2uewaLvDPE\u002fxRR5AJb+8D+g37LalvHwP\u002fOC4jTz5fA\u002f32di96vb8D8+vmHvwdLwP4981M41y\u002fA\u002fhn9lLAjF8D9BymqDOcDwPyvo2zPKvPA\u002fMXFKgrq68D8="},"y":{"dtype":"f8","bdata":"Yjn26s+f8T+c5pD4EVHxPwiqFipaAvE\u002fxAX4oq6z8D9mXbCFFWXwP6B+S\u002fOUFvA\u002f+YzWFWaQ7z\u002fX2ZrS6\u002fPuP9v\u002folDHV+4\u002fQjD+vAS87T\u002fQnxg9sCDtP+ENye3Vhew\u002fhfZe4oHr6z8eg7EjwFHrP8JLL6+cuOo\u002ffPzudSMg6j8G8cBbYIjpP03ZQTZf8eg\u002fu3nuyytb6D8tmTjT0cXnP20vnfFcMec\u002f7OW7utid5j9a\u002fW+vUAvmP6yp6jzQeeU\u002f1PbOu2Lp5D\u002fWR09vE1rkP66BTITty+M\u002fBfR2EPw+4z+TEHERSrPiP+sC9GviKOI\u002fYDn26s+f4T9g8NM+HRjhP6vQefzUkeA\u002fZbGRnAEN4D+MHGP1WhPfP2KEGanFD94\u002fHi1PklcP3T\u002f2bRqwJBLcP+wyEMFAGNs\u002fctS5Qb8h2j8MFhBrsy7ZPyZp+zAwP9g\u002fFpPZQEhT1z880wgADmvWPySmeIqThtU\u002fCkNAseql1D8Q7zr5JMnTP6ZCqplT8NI\u002fzHveeocb0j9++OQ00UrRPyrzPA5BftA\u002fwDYl9c1rzz+YRwEzpePNP\u002fTjZHj1Cs0\u002fYJhQtpMkzj+QH9bd1kbPP\u002faSPSbUONA\u002fyIV8WnjS0D88CIcQTHDRP\u002fbWrflCEtI\u002fMvyodFC40j9Y8ZOOZ2LTP+Qd8AN7ENQ\u002fNp+tQX3C1D8QRTpmYHjVPxKtlkIWMtY\u002f+mdxW5Dv1j+CEkjqv7DXPxJLjt6Vddg\u002f6G3a3gI+2T9e\u002fxdK9wnaPzKtvzhj2do\u002f1s0Ufjas2z\u002faRWipYILcP0a5YAfRW90\u002fAvBHo3Y43j8UU11IQBjfPxhoLYMc+98\u002fYhh30Xxw4D9GKXDd4uTgP7J12lG3WuE\u002fpvt7\u002fvDR4T+XlT+XhkriP6yT7rRuxOI\u002fvnLs1Z8\u002f4z9NovReELzjP4ZK2pu2OeQ\u002fwANKwIi45D\u002fab43ofDjlP5qmUBqJueU\u002fWmVpRaM75j\u002fs8p9Ewb7mP36ned7YQuc\u002fIAkFxt\u002fH5z\u002fIbKeby03oP9QL7O2R1Og\u002fGH5UOihc6T\u002fahyrug+TpP7ArU2eabeo\u002feu8i9WD36j96RDPZzIHrPyIBOUjTDOw\u002fgNzbammY7D8w2o5ehCTtP9+VaTYZse0\u002f4l0C\u002fBw+7j84C0mwhMvuP2qGYkxFWe8\u002f1eeEwlPn7z9QEWp\u002f0jrwP02UH\u002fQWgvA\u002fFruusHHJ8D+AeqYk3RDxP+wRSL5TWPE\u002fYDn26s+f8T9hOfbqz5\u002fxP9VgpBdM5\u002fE\u002fQvhFscIu8j+ptz0lLnbyP3TezOGIvfI\u002fcWGCVs0E8z\u002fY\u002fqn09UvzP44vuy\u002f9kvM\u002fJO3Hfd3Z8z\u002fQQ+tXkSD0P9KntzoTZ\u002fQ\u002fqwWlpl2t9D+AhH4ga\u002fP0PzDyzzE2OfU\u002fhdBSabl+9T8F+1pb78P1P+vcQqLSCPY\u002f0y7X3l1N9j+1M8K4i5H2P9hs9t5W1fY\u002fXrwYCLoY9z8w7unyr1v3PwGfr2Yznvc\u002fTHmcMz\u002fg9z8VwDczziH4P3YfxEjbYvg\u002f07qlYWGj+D\u002fhcMd1W+P4P39N\u002f4fEIvk\u002fnCFyppdh+T9hOfbqz5\u002f5P+oodXto3fk\u002f9qdMilwa+j\u002fwdK5Wp1b6P+o3\u002fyxEkvo\u002fHV40Zy7N+j+Q5jBtYQf7P7wYIbXYQPs\u002f\u002fh3Vw495+z\u002fAdhotgrH7P29EFJSr6Ps\u002fS2GSqwcf\u002fD9NP2c2klT8P3aHvAdHifw\u002f6XJmAyK9\u002fD9H1zUeH\u002fD8P\u002f3fSF46Iv0\u002fIm5a229T\u002fT\u002fCGBC\u002fu4P9P3zHRkUas\u002f0\u002ffuFdvIfh\u002fT\u002f1CoGFAA\u002f+P0pr8BSBO\u002f4\u002fa3ZH8gVn\u002fj+1M8K4i5H+PwT9gBcPu\u002f4\u002ftLDK0Yzj\u002fj9PUU2\u002fAQv\u002fPwQOXcxqMf8\u002f0K4x+sRW\u002fz+2XyJfDXv\u002fP0TW3yZBnv8\u002fzkmMLyuD\u002fz\u002fsy0cXJlL\u002fP\u002fg1XZIPIP8\u002fozSziOvs\u002fj\u002fO0zT3vbj+Pxnige+Kg\u002f4\u002f\u002fradl1ZN\u002fj8AYpwpJRb+PzhJTvP63f0\u002f9D3qVdyk\u002fT\u002f9DbbFzWr9P3qYrcnTL\u002f0\u002fQG0o+\u002fLz\u002fD+k\u002fX0FMLf8PwhmqKWPefw\u002fRNflqRY7\u002fD98p1jxyfv7P6gRpmuuu\u002fs\u002foKuTGMl6+z8QmqMHHzn7P22Kr1e19vo\u002fk3qCNpGz+j8RVnHgt2\u002f6P05x8p8uK\u002fo\u002feOozzfrl+T\u002fA+LDNIaD5P+oxxhOpWfk\u002f2M5EHpYS+T9Z9wR47sr4P+4dd7e3gvg\u002fFnQ0fvc5+D\u002fLf454s\u002fD3Pw3bHV3xpvc\u002fKiZQ7LZc9z\u002fmNfXvCRL3PxuGyzrwxvY\u002fQPoLqG979j+G9PQaji\u002f2P+LMVH5R4\u002fU\u002fNLETxL+W9T9\u002f97zk3kn1P9PrB9+0\u002fPQ\u002f2SJgt0ev9D+iWm13nWH0P9Pymi28E\u002fQ\u002f2AWf7KnF8z9HLAHLbHfzPyP0oOIKKfM\u002fXhU8UIra8j8AbfQy8YvyP7vI1atFPfI\u002fJYxb3Y3u8T8="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"shapes":[{"fillcolor":"#1f3a5f","layer":"below","line":{"color":"#1f3a5f"},"type":"circle","x0":0.0,"x1":2.0,"y0":0.1015166452594587,"y1":2.1015166452594585},{"fillcolor":"#c4703a","layer":"below","line":{"color":"#c4703a"},"type":"circle","x0":1.0454202587234775,"x1":3.248453549242395,"y0":0.0,"y1":2.2030332905189174}],"annotations":[{"align":"center","font":{"color":"white","size":13},"showarrow":false,"text":"2018 active\u003cbr\u003e16,383","x":0.55,"y":1.1015166452594587},{"align":"center","font":{"color":"white","size":13},"showarrow":false,"text":"Both\u003cbr\u003e9,871","x":1.4804646786178868,"y":1.1015166452594587},{"align":"center","font":{"color":"white","size":13},"showarrow":false,"text":"2019 active\u003cbr\u003e21,984","x":2.6426193943496927,"y":1.1015166452594587}],"margin":{"l":10,"r":10,"t":54,"b":10},"title":{"text":""},"width":637,"height":400,"plot_bgcolor":"white","xaxis":{"visible":false,"range":[-0.25,3.498453549242395]},"yaxis":{"visible":false,"range":[-0.25,2.4530332905189174],"scaleanchor":"x","scaleratio":1},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('ea546a51-045a-43f4-8a47-29b7d7d51217');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Area-proportional overlap of the two yearly bases</p>
+</div>
+</div><div class="column" style="width:40%;">
+<div class="note">
+<p>Only part of each year’s base carries over. The overlap is the <strong>returning</strong> core; the crescents are <strong>lapsed</strong> (left) and <strong>new/reactivated</strong> (right) customers.</p>
+<p>A large non-overlap means the headline active-customer count hides a great deal of <strong>lapse and replacement</strong> underneath.</p>
+</div>
+</div></div>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; customers active in either year</p>
+</div>
+</section></section>
+<section>
+<section id="lens-3-how-does-a-single-cohort-evolve" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Lens 3:</span> How does a single cohort evolve?</h1>
+
+</section>
+<section id="lens-3-revenue-decomposition-q1-2016-cohortcohort-revenue-decays-through-fewer-active-buyers-not-weaker-spending" class="slide level2">
+<h2><span class="eyebrow">Lens 3 · Revenue decomposition · Q1 2016 cohort</span>Cohort revenue decays through fewer active buyers — not weaker spending</h2>
+<div class="slide-sub">
+<p>% active falls steeply; spend-per-active, order frequency and order value stay broadly flat</p>
+</div>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:50%;">
+<div id="94371693" class="cell" data-execution_count="7">
+<div class="cell-output cell-output-display">
+<div style="height:200px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="f20516b2-faf2-4e40-bca5-a02d83bee7d0" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("f20516b2-faf2-4e40-bca5-a02d83bee7d0")) {                    Plotly.newPlot(                        "f20516b2-faf2-4e40-bca5-a02d83bee7d0",                        [{"hovertemplate":"%{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#1f3a5f","width":1.8},"marker":{"color":"#1f3a5f","size":6},"mode":"lines+markers","x":{"dtype":"i4","bdata":"AAAAAAEAAAACAAAAAwAAAAQAAAAFAAAABgAAAAcAAAAIAAAACQAAAAoAAAALAAAADAAAAA0AAAAOAAAADwAAAA=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D9Ob3rTm96+P4YsZCELWbw\u002f3\u002fSmN73pxD8AAAAAAAC6PyELWchCFrg\u002fyEIWspCFtD9DFrKQhSzAPy1kIQtZyLY\u002fvelNb3rTtT9ZyEIWspC1P+pNb3rTm8A\u002f05ve9KY3sz8tZCELWciyP29605ve9LI\u002fetOb3vSmvT8="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"% active by quarter"},"width":531,"height":200,"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"% active"},"tickformat":".0%"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('f20516b2-faf2-4e40-bca5-a02d83bee7d0');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div><div class="column" style="width:50%;">
+<div id="6158ccaa" class="cell" data-execution_count="8">
+<div class="cell-output cell-output-display">
+<div style="height:200px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="c5110b8b-485c-416f-9211-17ba66cb8033" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("c5110b8b-485c-416f-9211-17ba66cb8033")) {                    Plotly.newPlot(                        "c5110b8b-485c-416f-9211-17ba66cb8033",                        [{"hovertemplate":"%{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#1f3a5f","width":1.8},"marker":{"color":"#1f3a5f","size":6},"mode":"lines+markers","x":{"dtype":"i4","bdata":"AAAAAAEAAAACAAAAAwAAAAQAAAAFAAAABgAAAAcAAAAIAAAACQAAAAoAAAALAAAADAAAAA0AAAAOAAAADwAAAA=="},"y":{"dtype":"f8","bdata":"HcK0FjNNYEBdF4ImW7hiQJhn7XfhgV9ASHR6yK93ZUCk3vmAjgViQA2+1wQxEmFA7\u002fU9SZ7MXUA\u002f5eZTbspkQKoRmkfEJ2JA5lKwCv7\u002fXkAdGNGBEcdfQHOlvoSMdWNAIGsY7TfVYkCqy+0PMvRhQAHFY1LXWGFAozs2umPrYkA="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Spend per active member"},"width":531,"height":200,"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"ASPAC ($)"},"tickformat":"$,.0f"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('c5110b8b-485c-416f-9211-17ba66cb8033');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div></div>
+<div class="columns">
+<div class="column" style="width:50%;">
+<div id="e574f956" class="cell" data-execution_count="9">
+<div class="cell-output cell-output-display">
+<div style="height:200px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="271339f4-043b-4829-b900-f7005859695a" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("271339f4-043b-4829-b900-f7005859695a")) {                    Plotly.newPlot(                        "271339f4-043b-4829-b900-f7005859695a",                        [{"hovertemplate":"%{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#1f3a5f","width":1.8},"marker":{"color":"#1f3a5f","size":6},"mode":"lines+markers","x":{"dtype":"i4","bdata":"AAAAAAEAAAACAAAAAwAAAAQAAAAFAAAABgAAAAcAAAAIAAAACQAAAAoAAAALAAAADAAAAA0AAAAOAAAADwAAAA=="},"y":{"dtype":"f8","bdata":"pze96U2v8z\u002fYZ9BVI6X5PwAAAAAAAPg\u002fkq64RR3p+j9okn\u002fBWsL3P1eaNS4WSPo\u002fPbYiaDip9z+on3766af7P8uIPqA69vY\u002fkoNN3Phk9z9877333nv5P0Rz1qB42vs\u002fCVhECVhE+T+O4ziO4zj6P4ge34WD6Pk\u002fX3rppZde+j8="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Orders per active member"},"width":531,"height":200,"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"AOF"},"tickformat":".2f"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('271339f4-043b-4829-b900-f7005859695a');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div><div class="column" style="width:50%;">
+<div id="a7312922" class="cell" data-execution_count="10">
+<div class="cell-output cell-output-display">
+<div style="height:200px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="d2a363de-f02e-4339-b8b6-0052430ea168" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("d2a363de-f02e-4339-b8b6-0052430ea168")) {                    Plotly.newPlot(                        "d2a363de-f02e-4339-b8b6-0052430ea168",                        [{"hovertemplate":"%{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#1f3a5f","width":1.8},"marker":{"color":"#1f3a5f","size":6},"mode":"lines+markers","x":{"dtype":"i4","bdata":"AAAAAAEAAAACAAAAAwAAAAQAAAAFAAAABgAAAAcAAAAIAAAACQAAAAoAAAALAAAADAAAAA0AAAAOAAAADwAAAA=="},"y":{"dtype":"f8","bdata":"U\u002fPlrAqAWkDNLZ\u002fD6ltXQA9FnvpAAVVAo+2qQAuHWUCPqX4VwUVYQIbonHwRyVRA6KzPcpsmVECmX15OdQ5YQLoNZ\u002fE0TVlAcUkIAZ0zVUCS0WRVlvNTQFcy67YpW1ZARG2krPTZV0Alzfam6uhVQGhXUz8BbVVA0\u002fFUtZD1VkA="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Average order value"},"width":531,"height":200,"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"AOV ($)"},"tickformat":"$,.0f"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('d2a363de-f02e-4339-b8b6-0052430ea168');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div></div>
+</div>
+<div class="takeaway">
+<p>The customers who remain keep behaving normally; the base shrinks because fewer of them remain — the lever is repeat buying, not spend stimulation.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; Q1-2016 acquisition cohort by quarter</p>
+</div>
+</section>
+<section id="lens-3-second-purchase-q1-2016-cohortmost-repeat-buying-is-decided-early-the-second-purchase-curve-flattens-quickly" class="slide level2">
+<h2><span class="eyebrow">Lens 3 · Second purchase · Q1 2016 cohort</span>Most repeat buying is decided early — the second-purchase curve flattens quickly</h2>
+<div class="slide-sub">
+<p>Cumulative share of the cohort that has made a second purchase, by quarter</p>
+</div>
+<div class="body">
+<div id="568b6d18" class="cell" data-execution_count="11">
+<div class="cell-output cell-output-display">
+<div style="height:400px; width:1088px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="5434affe-36da-4b58-b50e-718ad6f51328" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("5434affe-36da-4b58-b50e-718ad6f51328")) {                    Plotly.newPlot(                        "5434affe-36da-4b58-b50e-718ad6f51328",                        [{"hovertemplate":"%{x}\u003cbr\u003eIncremental: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f","line":{"width":0}},"name":"Incremental","x":["Y2016 Q1","Y2016 Q2","Y2016 Q3","Y2016 Q4","Y2017 Q1","Y2017 Q2","Y2017 Q3","Y2017 Q4","Y2018 Q1","Y2018 Q2","Y2018 Q3","Y2018 Q4","Y2019 Q1","Y2019 Q2","Y2019 Q3","Y2019 Q4"],"y":{"dtype":"f8","bdata":"Tm9605vexT8YspCFLGS1P0AWspCFLKw\u002fFLKQhSxksT\u002fg9KY3vemdP1BvetOb3pQ\u002foDe96U1vij\u002fgm970pjedP8Cb3vSmN40\u002fQGQhC1nIgj9AIQtZyEKGPwCnN73pTY8\u002fgCELWchCdj+AIQtZyEJ2P4AhC1nIQnY\u002fwEIWspCFjD8="},"yaxis":"y","type":"bar"},{"hovertemplate":"%{x}\u003cbr\u003eCumulative: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"#c4703a","width":1.8},"marker":{"color":"#c4703a","size":6},"mode":"lines+markers","name":"Cumulative","x":["Y2016 Q1","Y2016 Q2","Y2016 Q3","Y2016 Q4","Y2017 Q1","Y2017 Q2","Y2017 Q3","Y2017 Q4","Y2018 Q1","Y2018 Q2","Y2018 Q3","Y2018 Q4","Y2019 Q1","Y2019 Q2","Y2019 Q3","Y2019 Q4"],"y":{"dtype":"f8","bdata":"Tm9605vexT8tZCELWUjQP\u002fWmN73pzdM\u002fetOb3vQm2D\u002fIQhaykAXaP73pTW96U9s\u002fetOb3vQm3D84velNb\u002frdPxaykIUs5N4\u002fOL3pTW963z8hC1nIQhbgP73pTW96k+A\u002fAAAAAADA4D9DFrKQhezgP4YsZCELGeE\u002fkYUsZCGL4T8="},"yaxis":"y2","type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"legend":{"orientation":"h","yanchor":"bottom","y":1.02,"xanchor":"right","x":1.0},"yaxis":{"title":{"text":"Incremental"},"tickformat":".0%","showgrid":true,"gridcolor":"#ececec","fixedrange":true,"automargin":true},"yaxis2":{"title":{"text":"Cumulative"},"tickformat":".0%","overlaying":"y","side":"right","showgrid":false,"range":[0,1],"fixedrange":true,"automargin":true},"title":{"text":"Second-Purchase Rate by Quarter (Q1 2016 Cohort)"},"autosize":false,"height":400,"bargap":0.25,"xaxis":{"type":"category","tickangle":-45,"automargin":true},"width":1088},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('5434affe-36da-4b58-b50e-718ad6f51328');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div>
+<div class="takeaway">
+<p>Across the <strong>2,944</strong> customers in the cohort, the cumulative repeat rate rises fastest in the first few quarters, then plateaus — early experience is decisive.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; Q1-2016 acquisition cohort</p>
+</div>
+</section></section>
+<section>
+<section id="lens-4-how-do-cohorts-compare-to-one-another" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Lens 4:</span> How do cohorts compare to one another?</h1>
+
+</section>
+<section id="lens-4-like-for-like-by-cohort-agealigned-by-age-cohorts-trace-nearly-the-same-path-behaviour-is-a-property-of-the-base" class="slide level2">
+<h2><span class="eyebrow">Lens 4 · Like-for-like by cohort age</span>Aligned by age, cohorts trace nearly the same path — behaviour is a property of the base</h2>
+<div class="slide-sub">
+<p>Every acquisition cohort, indexed to quarters since acquisition</p>
+</div>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:50%;">
+<div id="2af040b4" class="cell" data-execution_count="12">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="613f96ea-410b-4557-81c7-41b3a7336b4a" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("613f96ea-410b-4557-81c7-41b3a7336b4a")) {                    Plotly.newPlot(                        "613f96ea-410b-4557-81c7-41b3a7336b4a",                        [{"hovertemplate":"Y2016 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(13, 59, 102)","width":1.6},"marker":{"color":"rgb(13, 59, 102)","size":5},"mode":"lines+markers","name":"Y2016 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0ODw=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D9Ob3rTm96+P4YsZCELWbw\u002f3\u002fSmN73pxD8AAAAAAAC6PyELWchCFrg\u002fyEIWspCFtD9DFrKQhSzAPy1kIQtZyLY\u002fvelNb3rTtT9ZyEIWspC1P+pNb3rTm8A\u002f05ve9KY3sz8tZCELWciyP29605ve9LI\u002fetOb3vSmvT8="},"type":"scatter"},{"hovertemplate":"Y2016 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(19, 66, 110)","width":1.6},"marker":{"color":"rgb(19, 66, 110)","size":5},"mode":"lines+markers","name":"Y2016 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0O"},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002fvWXWH5arCPxSBv8sNYMY\u002f58jWjQuKtz8kWzcuKF68P28P1cH4c7c\u002fSMpGA+pWwD\u002fJf6Y9\u002fR+1P\u002f4z7en\u002fqLg\u002faDG7zd4otj\u002fRyH+mPf2\u002fPwuFYV0NrbE\u002f2QyjpdfztD+7w3JVyYmyP2SPKc6Rrbs\u002f"},"type":"scatter"},{"hovertemplate":"Y2016 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(25, 73, 117)","width":1.6},"marker":{"color":"rgb(25, 73, 117)","size":5},"mode":"lines+markers","name":"Y2016 Q3","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D9+mVx267nIPw+hChmJ47U\u002fhG8pAsTAuj83VYODPnm7P8HfPu8QqsA\u002f+0bOY64Ysz\u002fh5RS8nIK3P8GGZJoDnLY\u002f1ofG+tBYvz\u002fklcDfPu+wP\u002fBBWvfv\u002fLQ\u002foie0eGq1tT9WtDOl11+8Pw=="},"type":"scatter"},{"hovertemplate":"Y2016 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(32, 80, 125)","width":1.6},"marker":{"color":"rgb(32, 80, 125)","size":5},"mode":"lines+markers","name":"Y2016 Q4","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D+5e3fSA8K5P3\u002flBoWH2bY\u002fkVpOCRAHsz8orlDN0cvDP+\u002fBUjxaMrI\u002ftn\u002fHZ+fnsT8Ci3857P2wP1RX\u002fR9HaME\u002f99KtNNb+rT\u002fb29qGoSivP3AxhRVVAKw\u002fPQSlzkGovz8="},"type":"scatter"},{"hovertemplate":"Y2017 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(38, 87, 133)","width":1.6},"marker":{"color":"rgb(38, 87, 133)","size":5},"mode":"lines+markers","name":"Y2017 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoL"},"y":{"dtype":"f8","bdata":"AAAAAAAA8D+QIlzRPwG8PyZpCpR297U\u002fCgayFtI6wT9FJW56uHy2PzmgR\u002fC0ArI\u002fRbiifwI4sj8gt\u002fPBO2a+P1hcq9b2h7I\u002fMhSaKA7osT\u002fng3fMPKiwP3fypbKklrs\u002f"},"type":"scatter"},{"hovertemplate":"Y2017 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(44, 94, 140)","width":1.6},"marker":{"color":"rgb(44, 94, 140)","size":5},"mode":"lines+markers","name":"Y2017 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQo="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002faTYrOUwfAPx6iwlmEUcI\u002fzC0kHwS5tD+s+O9MKNi4P2ikt8H3jbY\u002fDr5vtGqZvz+Z7rm2XwGzP8wtJB8EubQ\u002f1pQ1ZU1Zsz+XKs3AlZe7Pw=="},"type":"scatter"},{"hovertemplate":"Y2017 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(50, 101, 148)","width":1.6},"marker":{"color":"rgb(50, 101, 148)","size":5},"mode":"lines+markers","name":"Y2017 Q3","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQ=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D9T9k51FjzHP0NTGVTACro\u002fw4PvtROFuj\u002fk0b0V9oy8P6Itvjj718A\u002fApR3SQcdsz8Dt3yU+\u002fq1P0ORwMxyIbg\u002fxAehxK5Xvj8="},"type":"scatter"},{"hovertemplate":"Y2017 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(56, 108, 156)","width":1.6},"marker":{"color":"rgb(56, 108, 156)","size":5},"mode":"lines+markers","name":"Y2017 Q4","x":{"dtype":"i1","bdata":"AAECAwQFBgcI"},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002f1pje96U27PwtZyEIWsrI\u002fetOb3vSmsT9DFrKQhSzEPyELWchCFrA\u002f3\u002fSmN73prT9kIQtZyEKuPxaykIUs5MA\u002f"},"type":"scatter"},{"hovertemplate":"Y2018 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(63, 116, 163)","width":1.6},"marker":{"color":"rgb(63, 116, 163)","size":5},"mode":"lines+markers","name":"Y2018 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgc="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002fOgiAiBcK7P1l4NqftDLg\u002fbNFhf\u002fRkwj9ovokrPkq3P4dKMDTfxLU\u002fd4W00Xpksz+ao1sM5hzAPw=="},"type":"scatter"},{"hovertemplate":"Y2018 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(69, 123, 171)","width":1.6},"marker":{"color":"rgb(69, 123, 171)","size":5},"mode":"lines+markers","name":"Y2018 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBg=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D8voMYKVeTAP+NMiJQeWcI\u002fcGIyXUCNtT\u002f6nOsZScu6PwFTzTF7t7Y\u002fPainxTzGvj8="},"type":"scatter"},{"hovertemplate":"Y2018 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(75, 130, 179)","width":1.6},"marker":{"color":"rgb(75, 130, 179)","size":5},"mode":"lines+markers","name":"Y2018 Q3","x":{"dtype":"i1","bdata":"AAECAwQF"},"y":{"dtype":"f8","bdata":"AAAAAAAA8D+IUgk61RPHP1Fu2QXAe7Y\u002fO28viVNOtz+7VbaF2fS5PwLOUtZHzr8\u002f"},"type":"scatter"},{"hovertemplate":"Y2018 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(81, 137, 186)","width":1.6},"marker":{"color":"rgb(81, 137, 186)","size":5},"mode":"lines+markers","name":"Y2018 Q4","x":{"dtype":"i1","bdata":"AAECAwQ="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D8AQT83PYO5P9fBDf+QmLA\u002fMroqWQM6rz+RbuVwRb7CPw=="},"type":"scatter"},{"hovertemplate":"Y2019 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(87, 144, 194)","width":1.6},"marker":{"color":"rgb(87, 144, 194)","size":5},"mode":"lines+markers","name":"Y2019 Q1","x":{"dtype":"i1","bdata":"AAECAw=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D9fGi3iDV+6PzMUkZ1rM7Q\u002fo5Dbr16jwD8="},"type":"scatter"},{"hovertemplate":"Y2019 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(94, 151, 202)","width":1.6},"marker":{"color":"rgb(94, 151, 202)","size":5},"mode":"lines+markers","name":"Y2019 Q2","x":{"dtype":"i1","bdata":"AAEC"},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002fCeDKUtizAP9YPqySBBcE\u002f"},"type":"scatter"},{"hovertemplate":"Y2019 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(100, 158, 209)","width":1.6},"marker":{"color":"rgb(100, 158, 209)","size":5},"mode":"lines+markers","name":"Y2019 Q3","x":{"dtype":"i1","bdata":"AAE="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D\u002fXP9y34KDEPw=="},"type":"scatter"},{"hovertemplate":"Y2019 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(106, 165, 217)","width":1.6},"marker":{"color":"rgb(106, 165, 217)","size":5},"mode":"lines+markers","name":"Y2019 Q4","x":{"dtype":"i1","bdata":"AA=="},"y":{"dtype":"f8","bdata":"AAAAAAAA8D8="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"% Active by Cohort (Aligned)"},"width":531,"height":360,"legend":{"title":{"text":"Cohort"}},"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"% Active"},"tickformat":".0%"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('613f96ea-410b-4557-81c7-41b3a7336b4a');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>% active by quarters since acquisition</p>
+</div>
+</div><div class="column" style="width:50%;">
+<div id="51459641" class="cell" data-execution_count="13">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="e3612626-4357-462f-810c-36ae7a772780" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("e3612626-4357-462f-810c-36ae7a772780")) {                    Plotly.newPlot(                        "e3612626-4357-462f-810c-36ae7a772780",                        [{"hovertemplate":"Y2016 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(13, 59, 102)","width":1.6},"marker":{"color":"rgb(13, 59, 102)","size":5},"mode":"lines+markers","name":"Y2016 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0ODw=="},"y":{"dtype":"f8","bdata":"UvPlrAqAWkDNLZ\u002fD6ltXQBBFnvpAAVVAou2qQAuHWUCPqX4VwUVYQIfonHwRyVRA6KzPcpsmVECmX15OdQ5YQLkNZ\u002fE0TVlAcEkIAZ0zVUCS0WRVlvNTQFYy67YpW1ZARG2krPTZV0Amzfam6uhVQGdXUz8BbVVA0\u002fFUtZD1VkA="},"type":"scatter"},{"hovertemplate":"Y2016 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(19, 66, 110)","width":1.6},"marker":{"color":"rgb(19, 66, 110)","size":5},"mode":"lines+markers","name":"Y2016 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0O"},"y":{"dtype":"f8","bdata":"qBaB6dCHV0Bb\u002f6go+KhVQMoAc5bNN1lAWZ9fGj4nWkCOiTpG\u002f25VQLpVoLyy3VVAYwFNkydPV0BW+ja5t0RYQHokCpipGVZAqxaTlNcHVUCYcErIMeVXQHJJe5pmOVZAFLXDrU7NVkCwUTtKQHxUQMyALEfkD1ZA"},"type":"scatter"},{"hovertemplate":"Y2016 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(25, 73, 117)","width":1.6},"marker":{"color":"rgb(25, 73, 117)","size":5},"mode":"lines+markers","name":"Y2016 Q3","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA0="},"y":{"dtype":"f8","bdata":"wjLAsnPGWEAUbvzsWMJYQJQfxDm3OFhAe3mRs5bfVEAamnbiEAVWQDecswGILFhAOdVnaZiDV0BUx3qJRDRWQFWUuyYO91RAu2BA2\u002fsbV0A0X38WfRJWQEBrwpzJt1RAtIt8cbwFVEAyu4HFvQxWQA=="},"type":"scatter"},{"hovertemplate":"Y2016 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(32, 80, 125)","width":1.6},"marker":{"color":"rgb(32, 80, 125)","size":5},"mode":"lines+markers","name":"Y2016 Q4","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoLDA=="},"y":{"dtype":"f8","bdata":"PMjJvVpuXEC4XSmzbJBZQMlcJMLnY1RA2ScHsueCVUBGqI7M\u002fhNbQHACJ3CCXVdAJY+IFVoNVEDTlyOZSxhTQO334e9vcldAisnDlSXcWEDhrXpHFDFUQEw73SUbIlRA8V3xl\u002f8FWUA="},"type":"scatter"},{"hovertemplate":"Y2017 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(38, 87, 133)","width":1.6},"marker":{"color":"rgb(38, 87, 133)","size":5},"mode":"lines+markers","name":"Y2017 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQoL"},"y":{"dtype":"f8","bdata":"c9ZkWgfVXEBBScenL5hUQIfqdqhub1VA2gyyPV1oW0AcFQrAhbdYQIQ1d1OQCVVAYLJqiQ6KU0AYl2BT6\u002fdYQEWxd+SqF1dAC4xZLKwqVECcOcSZQ3RSQBHO\u002f4ELollA"},"type":"scatter"},{"hovertemplate":"Y2017 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(44, 94, 140)","width":1.6},"marker":{"color":"rgb(44, 94, 140)","size":5},"mode":"lines+markers","name":"Y2017 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQo="},"y":{"dtype":"f8","bdata":"iLhGSPTLV0C5zP+HSK9TQJJoJ4l2E1dA4MwrdrMfWECh5Om8DmJVQJKXvVr1nFdAcsbSY0qfVUAip5LknLtXQJnUlqVAQldAp1Y4PG\u002frVkD55RwrUm1XQA=="},"type":"scatter"},{"hovertemplate":"Y2017 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(50, 101, 148)","width":1.6},"marker":{"color":"rgb(50, 101, 148)","size":5},"mode":"lines+markers","name":"Y2017 Q3","x":{"dtype":"i1","bdata":"AAECAwQFBgcICQ=="},"y":{"dtype":"f8","bdata":"xUXP9rWpWEDaBLcfSAhWQK9ji71NLFdA6JP3CsuhU0D\u002flzHLZGZUQMWIWkD4ilZANzjtaWsAWUCyN0RW\u002fxJUQC3DT313BVRAr7BRmaxhV0A="},"type":"scatter"},{"hovertemplate":"Y2017 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(56, 108, 156)","width":1.6},"marker":{"color":"rgb(56, 108, 156)","size":5},"mode":"lines+markers","name":"Y2017 Q4","x":{"dtype":"i1","bdata":"AAECAwQFBgcI"},"y":{"dtype":"f8","bdata":"cac46FL4WkACjz8c8NhXQCDvSVwhblRAS6xJEB\u002fUVEB\u002fZBEyfSVYQAARhoGxxlhALesscBoxVUCKmqHd2xRUQMNavRL+K1hA"},"type":"scatter"},{"hovertemplate":"Y2018 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(63, 116, 163)","width":1.6},"marker":{"color":"rgb(63, 116, 163)","size":5},"mode":"lines+markers","name":"Y2018 Q1","x":{"dtype":"i1","bdata":"AAECAwQFBgc="},"y":{"dtype":"f8","bdata":"TDJsXNnLWUDiyw9qWqFUQLcO1KXEDlRAr\u002fzm+p6vVkDQVhr8bHVVQEDoa6ZO4lRAIQFJ\u002fMYQU0BgmgVPY\u002fZYQA=="},"type":"scatter"},{"hovertemplate":"Y2018 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(69, 123, 171)","width":1.6},"marker":{"color":"rgb(69, 123, 171)","size":5},"mode":"lines+markers","name":"Y2018 Q2","x":{"dtype":"i1","bdata":"AAECAwQFBg=="},"y":{"dtype":"f8","bdata":"skQQVHe9VkDAHUlwrI9SQKCzRrRkbFZAmC9tVHpCVkBb12ShclxVQN7OkJi351VAG4Fble0gVkA="},"type":"scatter"},{"hovertemplate":"Y2018 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(75, 130, 179)","width":1.6},"marker":{"color":"rgb(75, 130, 179)","size":5},"mode":"lines+markers","name":"Y2018 Q3","x":{"dtype":"i1","bdata":"AAECAwQF"},"y":{"dtype":"f8","bdata":"EXz7yROCV0AKHNx\u002fuH5XQMK5esGwU1VAA5020An+U0CVoCkmF7ZUQOADGooxY1VA"},"type":"scatter"},{"hovertemplate":"Y2018 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(81, 137, 186)","width":1.6},"marker":{"color":"rgb(81, 137, 186)","size":5},"mode":"lines+markers","name":"Y2018 Q4","x":{"dtype":"i1","bdata":"AAECAwQ="},"y":{"dtype":"f8","bdata":"F72x1WMMW0Ctn8dGOUFXQDafQIvRVlZA87Q9cq0QVUBA6Fs0581ZQA=="},"type":"scatter"},{"hovertemplate":"Y2019 Q1 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(87, 144, 194)","width":1.6},"marker":{"color":"rgb(87, 144, 194)","size":5},"mode":"lines+markers","name":"Y2019 Q1","x":{"dtype":"i1","bdata":"AAECAw=="},"y":{"dtype":"f8","bdata":"iEm0XwUPWkBs6FlP0zlYQOUCVWj0v1NAX68nUUvsV0A="},"type":"scatter"},{"hovertemplate":"Y2019 Q2 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(94, 151, 202)","width":1.6},"marker":{"color":"rgb(94, 151, 202)","size":5},"mode":"lines+markers","name":"Y2019 Q2","x":{"dtype":"i1","bdata":"AAEC"},"y":{"dtype":"f8","bdata":"i4aej7TtVkB85OjD2jRTQL8A6KLO+VdA"},"type":"scatter"},{"hovertemplate":"Y2019 Q3 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(100, 158, 209)","width":1.6},"marker":{"color":"rgb(100, 158, 209)","size":5},"mode":"lines+markers","name":"Y2019 Q3","x":{"dtype":"i1","bdata":"AAE="},"y":{"dtype":"f8","bdata":"pVCLoR+0V0DslqQMLeFVQA=="},"type":"scatter"},{"hovertemplate":"Y2019 Q4 \u00b7 %{x}\u003cbr\u003e%{y}\u003cextra\u003e\u003c\u002fextra\u003e","line":{"color":"rgb(106, 165, 217)","width":1.6},"marker":{"color":"rgb(106, 165, 217)","size":5},"mode":"lines+markers","name":"Y2019 Q4","x":{"dtype":"i1","bdata":"AA=="},"y":{"dtype":"f8","bdata":"5iZu9kCtW0A="},"type":"scatter"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Average Order Value by Cohort (Aligned)"},"width":531,"height":360,"legend":{"title":{"text":"Cohort"}},"xaxis":{"title":{"text":"Quarters Since Acquisition"},"dtick":1},"yaxis":{"title":{"text":"Average Order Value"},"tickformat":"$,.0f"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('e3612626-4357-462f-810c-36ae7a772780');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Average order value by quarters since acquisition</p>
+</div>
+</div></div>
+</div>
+<div class="takeaway">
+<p>Newer cohorts are not obviously better or worse than older ones once you align by age — the decay curve is structural, so forecasts can lean on it.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; all acquisition cohorts aligned by age</p>
+</div>
+</section></section>
+<section>
+<section id="lens-5-how-healthy-is-the-customer-base-overall" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Lens 5:</span> How healthy is the customer base overall?</h1>
+
+</section>
+<section id="lens-5-annual-performancethe-base-is-growing-on-every-headline-measure-customers-spend-and-profit" class="slide level2">
+<h2><span class="eyebrow">Lens 5 · Annual performance</span>The base is growing on every headline measure — customers, spend, and profit</h2>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:33.33%;">
+<div id="73015a78" class="cell" data-execution_count="14">
+<div class="cell-output cell-output-display">
+<div style="height:300px; width:345px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="52583339-154d-480c-9710-4bc4f8a5c5a4" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("52583339-154d-480c-9710-4bc4f8a5c5a4")) {                    Plotly.newPlot(                        "52583339-154d-480c-9710-4bc4f8a5c5a4",                        [{"hovertemplate":"%{x}\u003cbr\u003eNew: %{y:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f"},"x":["2016","2017","2018","2019"],"y":{"dtype":"i2","bdata":"RTq2MT07jUc="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Acquisitions by Year"},"width":345,"height":300,"bargap":0.4,"yaxis":{"title":{"text":"New Customers"},"tickformat":",.0f"},"xaxis":{"type":"category"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('52583339-154d-480c-9710-4bc4f8a5c5a4');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>New customers</p>
+</div>
+</div><div class="column" style="width:33.33%;">
+<div id="9a5fadd3" class="cell" data-execution_count="15">
+<div class="cell-output cell-output-display">
+<div style="height:300px; width:345px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="1718c75d-caf7-4301-9ae2-6b2bb1c477d4" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("1718c75d-caf7-4301-9ae2-6b2bb1c477d4")) {                    Plotly.newPlot(                        "1718c75d-caf7-4301-9ae2-6b2bb1c477d4",                        [{"hovertemplate":"%{x}\u003cbr\u003eActive: %{y:,}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f"},"x":["2016","2017","2018","2019"],"y":{"dtype":"i2","bdata":"wVC6U45mb3w="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Active Customers by Year"},"width":345,"height":300,"bargap":0.4,"yaxis":{"title":{"text":"Active Customers"},"tickformat":",.0f"},"xaxis":{"type":"category"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('1718c75d-caf7-4301-9ae2-6b2bb1c477d4');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Active customers</p>
+</div>
+</div><div class="column" style="width:33.33%;">
+<div id="544ceada" class="cell" data-execution_count="16">
+<div class="cell-output cell-output-display">
+<div style="height:300px; width:345px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="e89d33df-2f3b-452c-a737-371766d99d59" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("e89d33df-2f3b-452c-a737-371766d99d59")) {                    Plotly.newPlot(                        "e89d33df-2f3b-452c-a737-371766d99d59",                        [{"hovertemplate":"Spend \u00b7 %{x}\u003cbr\u003e%{y:$,.0f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f"},"name":"Spend","x":["2016","2017","2018","2019"],"y":{"dtype":"f8","bdata":"kML1qFa3TEFI4Xp0amhOQQrXo5CjXlJBcD0KF+pDVkE="},"type":"bar"},{"hovertemplate":"Profit \u00b7 %{x}\u003cbr\u003e%{y:$,.0f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#c4703a"},"name":"Profit","x":["2016","2017","2018","2019"],"y":{"dtype":"f8","bdata":"NDMzMyeQPEGkcD2KzM09QZqZmVlTeUFBcT0K15taRUE="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":"Spend and Profit by Year"},"barmode":"group","width":345,"height":300,"bargap":0.35,"bargroupgap":0.08,"yaxis":{"title":{},"tickformat":"$,.0f"},"xaxis":{"type":"category"},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('e89d33df-2f3b-452c-a737-371766d99d59');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Spend &amp; profit</p>
+</div>
+</div></div>
+</div>
+<div class="takeaway">
+<p>Growth shows up first in acquisition and the active count; because per-customer behaviour is stable, more customers translates fairly directly into more spend and profit.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, 2016–2019</p>
+</div>
+</section>
+<section id="lens-5-cohort-contribution-to-profiteach-years-profit-rests-increasingly-on-older-cohorts-repeat-buying-compounds" class="slide level2">
+<h2><span class="eyebrow">Lens 5 · Cohort contribution to profit</span>Each year’s profit rests increasingly on older cohorts — repeat buying compounds</h2>
+<div class="slide-sub">
+<p>Annual profit split by acquisition-year cohort</p>
+</div>
+<div class="body">
+<div id="248b95e4" class="cell" data-execution_count="17">
+<div class="cell-output cell-output-display">
+<div style="height:400px; width:1088px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="ef9f0971-d97b-4ff8-a195-6619c56afdba" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("ef9f0971-d97b-4ff8-a195-6619c56afdba")) {                    Plotly.newPlot(                        "ef9f0971-d97b-4ff8-a195-6619c56afdba",                        [{"fill":"toself","fillcolor":"rgba(13,59,102,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[0.275,0.725,0.725,0.275],"y":[0.6783869,0.536888,0.0,0.0],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(13,59,102,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[1.275,1.725,1.725,1.275],"y":[0.536888,0.48875571999999995,0.0,0.0],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(13,59,102,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[2.275,2.725,2.725,2.275],"y":[0.48875571999999995,0.47025167,0.0,0.0],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(43,95,143,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[0.275,0.725,0.725,0.275],"y":[1.8719112,0.98855766,0.536888,0.6783869],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(43,95,143,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[1.275,1.725,1.725,1.275],"y":[0.98855766,0.858707,0.48875571999999995,0.536888],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(43,95,143,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[2.275,2.725,2.725,2.275],"y":[0.858707,0.79825905,0.47025166999999995,0.48875571999999995],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(74,134,184,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[1.275,1.725,1.725,1.275],"y":[1.95322854,1.20088879,0.8587070000000001,0.98855766],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(74,134,184,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[2.275,2.725,2.725,2.275],"y":[1.20088879,1.08240112,0.7982590500000001,0.8587070000000001],"type":"scatter"},{"fill":"toself","fillcolor":"rgba(122,169,208,0.22)","hoverinfo":"skip","line":{"width":0},"mode":"lines","showlegend":false,"x":[2.275,2.725,2.725,2.275],"y":[2.2903427,1.46967807,1.08240112,1.20088879],"type":"scatter"},{"hovertemplate":"pre 2016 \u00b7 %{x}\u003cbr\u003eProfit ($ MM): %{y:,.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#0d3b66","line":{"color":"white","width":1}},"name":"pre 2016","x":[0,1,2,3],"y":[0.6783869,0.536888,0.48875571999999995,0.47025167],"type":"bar"},{"hovertemplate":"2016 \u00b7 %{x}\u003cbr\u003eProfit ($ MM): %{y:,.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#2b5f8f","line":{"color":"white","width":1}},"name":"2016","x":[0,1,2,3],"y":[1.1935243,0.45166966,0.36995128000000005,0.32800738],"type":"bar"},{"hovertemplate":"2017 \u00b7 %{x}\u003cbr\u003eProfit ($ MM): %{y:,.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#4a86b8","line":{"color":"white","width":1}},"name":"2017","x":[0,1,2,3],"y":[null,0.96467088,0.34218179,0.28414207],"type":"bar"},{"hovertemplate":"2018 \u00b7 %{x}\u003cbr\u003eProfit ($ MM): %{y:,.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#7aa9d0","line":{"color":"white","width":1}},"name":"2018","x":[0,1,2,3],"y":[null,null,1.08945391,0.38727695],"type":"bar"},{"hovertemplate":"2019 \u00b7 %{x}\u003cbr\u003eProfit ($ MM): %{y:,.2f}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#a3c7e8","line":{"color":"white","width":1}},"name":"2019","x":[0,1,2,3],"y":[null,null,null,1.3292256100000002],"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"legend":{"title":{"text":"Cohort"},"traceorder":"reversed"},"barmode":"stack","bargap":0.45,"title":{"text":"Profit by Acquisition Cohort"},"autosize":false,"width":1088,"height":400,"annotations":[{"font":{"color":"white","size":10},"showarrow":false,"text":"36%","x":0,"y":0.33919345},{"font":{"color":"white","size":10},"showarrow":false,"text":"27%","x":1,"y":0.268444},{"font":{"color":"white","size":10},"showarrow":false,"text":"21%","x":2,"y":0.24437785999999997},{"font":{"color":"white","size":10},"showarrow":false,"text":"17%","x":3,"y":0.235125835},{"font":{"color":"white","size":10},"showarrow":false,"text":"64%","x":0,"y":1.27514905},{"font":{"color":"white","size":10},"showarrow":false,"text":"23%","x":1,"y":0.76272283},{"font":{"color":"white","size":10},"showarrow":false,"text":"16%","x":2,"y":0.67373136},{"font":{"color":"white","size":10},"showarrow":false,"text":"12%","x":3,"y":0.6342553599999999},{"font":{"color":"white","size":10},"showarrow":false,"text":"49%","x":1,"y":1.4708931},{"font":{"color":"white","size":10},"showarrow":false,"text":"15%","x":2,"y":1.0297978950000002},{"font":{"color":"white","size":10},"showarrow":false,"text":"10%","x":3,"y":0.940330085},{"font":{"color":"#22303f","size":10},"showarrow":false,"text":"48%","x":2,"y":1.745615745},{"font":{"color":"#22303f","size":10},"showarrow":false,"text":"14%","x":3,"y":1.276039595},{"font":{"color":"#22303f","size":10},"showarrow":false,"text":"47%","x":3,"y":2.1342908750000005},{"font":{"size":12},"showarrow":false,"text":"1.87","x":0,"y":1.8719112,"yshift":12},{"font":{"size":12},"showarrow":false,"text":"1.95","x":1,"y":1.95322854,"yshift":12},{"font":{"size":12},"showarrow":false,"text":"2.29","x":2,"y":2.2903427,"yshift":12},{"font":{"size":12},"showarrow":false,"text":"2.80","x":3,"y":2.7989036800000004,"yshift":12},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"79%","x":0.5,"y":0.303818725},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"91%","x":1.5,"y":0.25641093},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"96%","x":2.5,"y":0.2397518475},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"38%","x":0.5,"y":1.01893594},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"82%","x":1.5,"y":0.718227095},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"89%","x":2.5,"y":0.65399336},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"35%","x":1.5,"y":1.2503454975000001},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"83%","x":2.5,"y":0.9850639900000001},{"font":{"color":"#374151","size":9},"showarrow":false,"text":"36%","x":2.5,"y":1.51082767},{"bgcolor":"rgba(255,255,255,0.82)","bordercolor":"#c9d3df","borderpad":2,"font":{"color":"#374151","size":11},"showarrow":false,"text":"53%","x":0.5,"y":1.43023443},{"bgcolor":"rgba(255,255,255,0.82)","bordercolor":"#c9d3df","borderpad":2,"font":{"color":"#374151","size":11},"showarrow":false,"text":"61%","x":1.5,"y":1.577058665},{"bgcolor":"rgba(255,255,255,0.82)","bordercolor":"#c9d3df","borderpad":2,"font":{"color":"#374151","size":11},"showarrow":false,"text":"64%","x":2.5,"y":1.8800103850000003}],"yaxis":{"title":{"text":"Profit ($ MM)"},"rangemode":"tozero","automargin":true},"xaxis":{"tickvals":[0,1,2,3],"ticktext":["2016","2017","2018","2019"],"automargin":true}},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('ef9f0971-d97b-4ff8-a195-6619c56afdba');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+</div>
+<div class="takeaway">
+<p>A healthy base carries a thick tail of still-active older cohorts; new acquisition tops it up rather than replacing a leaking core.</p>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample; profit by acquisition-year cohort</p>
+</div>
+</section>
+<section id="implicationsfour-moves-follow-directly-from-the-audit" class="slide level2">
+<h2><span class="eyebrow">Implications</span>Four moves follow directly from the audit</h2>
+<div class="body top">
+<ul class="points">
+<li>
+<b>Treat the base as a portfolio.</b> Segment by value and manage the high-value minority explicitly — the average hides them.
+</li>
+<li>
+<b>Make repeat buying the first lever.</b> Cohort decay is driven by fewer active customers, so small repeat-buying gains compound across every cohort.
+</li>
+<li>
+<b>Win the second purchase early.</b> Repeat behaviour is largely set in the first few quarters — invest in early-life experience.
+</li>
+<li>
+<b>Acquire more of the right customers.</b> Per-customer behaviour is stable, so growth comes mainly from adding customers like the ones you keep.
+</li>
+</ul>
+<div class="takeaway">
+<p>None of these require an “average customer”. They require managing a heterogeneous base by value and by age.</p>
+</div>
+</div>
+</section></section>
+<section>
+<section id="appendix-supplementary-exhibits" class="title-slide slide level1 divider center" data-background-color="#1f3a5f">
+<h1><span class="divider-tag">Appendix:</span> Supplementary exhibits</h1>
+
+</section>
+<section id="appendix-further-distributions-2019transaction-counts-and-margins-are-skewed-too" class="slide level2">
+<h2><span class="eyebrow">Appendix · Further distributions · 2019</span>Transaction counts and margins are skewed too</h2>
+<div class="body">
+<div class="columns">
+<div class="column" style="width:50%;">
+<div id="fa7c71a2" class="cell" data-execution_count="18">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="4e151026-cf7f-42b7-afe3-0f02334a5b6f" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("4e151026-cf7f-42b7-afe3-0f02334a5b6f")) {                    Plotly.newPlot(                        "4e151026-cf7f-42b7-afe3-0f02334a5b6f",                        [{"customdata":{"dtype":"i2","bdata":"tU6yFsIJzwTLAsEBMAG9AIoAdAE=","shape":"10, 1"},"hovertemplate":"%{x}\u003cbr\u003eCustomers: %{customdata[0]:,}\u003cbr\u003eShare: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#1f3a5f","line":{"width":0}},"x":["1","2","3","4","5","6","7","8","9","10+"],"y":{"dtype":"f8","bdata":"tbkEjJ895D\u002famIxnhVjHPx\u002fysOIwE7Q\u002f3WuOmiDJoz8IcWEN8fuWPz9wH8jm3Yw\u002fp6ZxXmiLgz+JDVSrV014P7l\u002fRUiRvnE\u002fMQUmS5fqhz8="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":""},"width":531,"height":360,"bargap":0.12,"xaxis":{"title":{"text":"Annual Transactions"},"tickangle":-45,"automargin":true,"categoryorder":"array","categoryarray":["1","2","3","4","5","6","7","8","9","10+"]},"yaxis":{"title":{"text":"Customers (%)"},"tickformat":".0%","automargin":true},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('4e151026-cf7f-42b7-afe3-0f02334a5b6f');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Annual transactions per customer</p>
+</div>
+</div><div class="column" style="width:50%;">
+<div id="8c626983" class="cell" data-execution_count="19">
+<div class="cell-output cell-output-display">
+<div style="height:360px; width:531px;">            <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_SVG"></script><script>if (window.MathJax && window.MathJax.Hub && window.MathJax.Hub.Config) {window.MathJax.Hub.Config({SVG: {font: "STIX-Web"}});}</script>                <script>window.PlotlyConfig = {MathJaxConfig: 'local'};</script>
+        <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.7.0.min.js" integrity="sha256-jvTGqxNp8AGWEcvNLVuKr+8j5dGe9Yw51LQkmDH+IYA=" crossorigin="anonymous"></script>                <div id="61b26cc5-5d33-41bc-94fd-655b6bb0d655" class="plotly-graph-div" style="height:100%; width:100%;"></div>            <script>                window.PLOTLYENV=window.PLOTLYENV || {};                                if (document.getElementById("61b26cc5-5d33-41bc-94fd-655b6bb0d655")) {                    Plotly.newPlot(                        "61b26cc5-5d33-41bc-94fd-655b6bb0d655",                        [{"customdata":{"dtype":"i2","bdata":"BQFpAJEA1wAhAZwBogLoBFMJjhPQHkQcTRGJBAsBIgADAFUAAAAAAAAAAAA=","shape":"22, 1"},"hovertemplate":"%{x}\u003cbr\u003eCustomers: %{customdata[0]:,}\u003cbr\u003eShare: %{y:.1%}\u003cextra\u003e\u003c\u002fextra\u003e","marker":{"color":"#c4703a","line":{"width":0}},"x":["\u003c0","0-5","5-10","10-15","15-20","20-25","25-30","30-35","35-40","40-45","45-50","50-55","55-60","60-65","65-70","70-75","75-80","80-85","85-90","90-95","95-100","100+"],"y":{"dtype":"f8","bdata":"WwQqZPXHgD9ejkZpCQFrP2XovItJpXI\u002fhMIpBKKlez\u002f7L6bi05SCPwvLkCBcfYo\u002f6MPoluOqlT9cMt5lUTCkP98w2\u002fMiL7M\u002f5KKkB80dxD+sJMGglrLPP8FJY\u002fbbE80\u002fbEjh5TnMwT+AlgL2ZqmiP9lWslq3KoE\u002f7PAjqAN9UT9snxSifbAYPyftLJJE3GU\u002fAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="},"type":"bar"}],                        {"template":{"layout":{"colorway":["#1f3a5f","#c4703a","#4c8b6f","#6b7280","#8a6bb0","#b0563b","#c9a227"],"font":{"color":"#1f2328","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":13},"hoverlabel":{"bgcolor":"white","font":{"family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12}},"legend":{"bgcolor":"rgba(0,0,0,0)","font":{"size":11},"title":{"font":{"size":11}}},"margin":{"b":58,"l":66,"r":26,"t":66},"paper_bgcolor":"white","plot_bgcolor":"white","title":{"font":{"color":"#1f2328","size":15},"pad":{"b":8},"x":0.0,"xanchor":"left","xref":"paper"},"xaxis":{"automargin":true,"fixedrange":true,"linecolor":"#6b7280","linewidth":1,"showgrid":false,"showline":true,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false},"yaxis":{"automargin":true,"fixedrange":true,"gridcolor":"#ececec","gridwidth":1,"linecolor":"#6b7280","linewidth":1,"showgrid":true,"showline":false,"tickcolor":"#6b7280","tickfont":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"ticklen":4,"ticks":"outside","title":{"font":{"color":"#6b7280","family":"Helvetica Neue, Helvetica, Arial, sans-serif","size":12},"standoff":16},"zeroline":false}}},"title":{"text":""},"width":531,"height":360,"bargap":0.12,"xaxis":{"title":{"text":"Margin (%)"},"tickangle":-45,"automargin":true,"categoryorder":"array","categoryarray":["\u003c0","0-5","5-10","10-15","15-20","20-25","25-30","30-35","35-40","40-45","45-50","50-55","55-60","60-65","65-70","70-75","75-80","80-85","85-90","90-95","95-100","100+"],"tickmode":"array","tickvals":["\u003c0","5-10","15-20","25-30","35-40","45-50","55-60","65-70","75-80","85-90","95-100","100+"],"ticktext":["\u003c0","5-10","15-20","25-30","35-40","45-50","55-60","65-70","75-80","85-90","95-100","100+"]},"yaxis":{"title":{"text":"Customers (%)"},"tickformat":".0%","automargin":true},"autosize":false},                        {"displayModeBar": false, "scrollZoom": false, "displaylogo": false, "responsive": true}                    ).then(function(){
+                            
+var gd = document.getElementById('61b26cc5-5d33-41bc-94fd-655b6bb0d655');
+var x = new MutationObserver(function (mutations, observer) {{
+        var display = window.getComputedStyle(gd).display;
+        if (!display || display === 'none') {{
+            console.log([gd, 'removed!']);
+            Plotly.purge(gd);
+            observer.disconnect();
+        }}
+}});
+
+// Listen for the removal of the full notebook cells
+var notebookContainer = gd.closest('#notebook-container');
+if (notebookContainer) {{
+    x.observe(notebookContainer, {childList: true});
+}}
+
+// Listen for the clearing of the current output cell
+var outputEl = gd.closest('.output');
+if (outputEl) {{
+    x.observe(outputEl, {childList: true});
+}}
+
+                        })                };            </script>        </div>
+</div>
+</div>
+<div class="exhibit-cap">
+<p>Average margin per customer</p>
+</div>
+</div></div>
+</div>
+<div class="footer">
+<p>Madrigal transaction sample, active customers, 2019</p>
+</div>
+</section>
+<section id="appendix-methoda-definitions-note-keep-the-two-average-transaction-numbers-apart" class="slide level2">
+<h2><span class="eyebrow">Appendix · Method</span>A definitions note: keep the two “average transaction” numbers apart</h2>
+<div class="slide-sub">
+<p>“Average spend per transaction” is two different numbers</p>
+</div>
+<div class="body top">
+<div class="note">
+<ul class="points" style="margin-top:8px">
+<li>
+<b>AOV — ratio of totals.</b> Total spend ÷ total transactions. A <b>transaction-weighted</b> average, so frequent buyers dominate it.
+</li>
+<li>
+<b>Mean of per-customer averages.</b> Average each customer’s own spend-per-transaction, then average across customers — every customer counts equally, so one-and-done-in-2019 buyers pull it up.
+</li>
+</ul>
+<p>The two are equal only if every customer transacts the same number of times, which never happens. The gap’s direction is informative: here the weighted figure sits below the unweighted one, so heavier buyers have <strong>smaller</strong> baskets than light buyers.</p>
+<p><span style="color:#6b7280">Convention used throughout: “AOV” always means the transaction-weighted ratio of totals.</span></p>
+</div>
+</div>
+<div class="footer">
+<p>See Lens 1 — Distribution of average spend per transaction</p>
+</div>
+</section>
+<section id="appendix-methoda-wording-note-repeat-buying-rate-and-of-cohort-active-not-retention" class="slide level2">
+<h2><span class="eyebrow">Appendix · Method</span>A wording note: “repeat-buying rate” and “% of cohort active”, not “retention”</h2>
+<div class="body top">
+<div class="note">
+<ul class="points">
+<li>
+<b>Why not “retention” here.</b> Madrigal is <b>noncontractual</b> — a customer who skips a period has not necessarily left. “Retention” properly describes contractual renewal / survival, where a cancellation is actually observed.
+</li>
+<li>
+<b>% of cohort active.</b> The share of a cohort that buys in a period — <b>unconditional</b>, and it includes one-time buyers.
+</li>
+<li>
+<b>Repeat-buying rate.</b> The <b>conditional</b> quantity — the share of customers active in one period who buy again in the next.
+</li>
+<li>
+<b>Carryover.</b> For value: a cohort’s profit in one year relative to the year before (what the cohort-flow chart annotates).
+</li>
+</ul>
+<p>Likewise the two “one-and-done” figures are different: <strong>one-and-done in 2019</strong> (exactly one transaction that year, Lens 1) is not the share of a cohort that <strong>never makes a second purchase</strong> (Lens 3).</p>
+</div>
+</div>
+<div class="footer">
+<p>After Fader, Hardie &amp; Ross, <em>The Customer-Base Audit</em> (2022), Ch. 9 — “Be Wary of the ‘R’ Word”</p>
+</div>
+
+</section></section>
+    </div>
+  <div class="quarto-auto-generated-content" style="display: none;">
+<div class="footer footer-default">
+
+</div>
+</div></div>
+
+  <script>window.backupDefine = window.define; window.define = undefined;</script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/dist/reveal.js"></script>
+  <!-- reveal.js plugins -->
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/pdf-export/pdfexport.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/reveal-menu/menu.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/reveal-menu/quarto-menu.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/quarto-support/support.js"></script>
+  
+
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/notes/notes.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/search/search.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/zoom/zoom.js"></script>
+  <script src="customer-base-audit-slides_files/libs/revealjs/plugin/math/math.js"></script>
+  <script>window.define = window.backupDefine; window.backupDefine = undefined;</script>
+
+  <script>
+
+      // Full list of configuration options available at:
+      // https://revealjs.com/config/
+      Reveal.initialize({
+'controlsAuto': false,
+'previewLinksAuto': false,
+'pdfSeparateFragments': false,
+'autoAnimateEasing': "ease",
+'autoAnimateDuration': 1,
+'autoAnimateUnmatched': true,
+'jumpToSlide': true,
+'pdfMaxPagesPerSlide': 1,
+'menu': {"side":"left","useTextContentForMissingTitles":true,"markers":false,"loadIcons":false,"custom":[{"title":"Tools","icon":"<i class=\"fas fa-gear\"></i>","content":"<ul class=\"slide-menu-items\">\n<li class=\"slide-tool-item active\" data-item=\"0\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.fullscreen(event)\"><kbd>f</kbd> Fullscreen</a></li>\n<li class=\"slide-tool-item\" data-item=\"1\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.speakerMode(event)\"><kbd>s</kbd> Speaker View</a></li>\n<li class=\"slide-tool-item\" data-item=\"2\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.overview(event)\"><kbd>o</kbd> Slide Overview</a></li>\n<li class=\"slide-tool-item\" data-item=\"3\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.togglePdfExport(event)\"><kbd>e</kbd> PDF Export Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"4\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.toggleScrollView(event)\"><kbd>r</kbd> Scroll View Mode</a></li>\n<li class=\"slide-tool-item\" data-item=\"5\"><a href=\"#\" onclick=\"RevealMenuToolHandlers.keyboardHelp(event)\"><kbd>?</kbd> Keyboard Help</a></li>\n</ul>"}],"openButton":true},
+'smaller': false,
+ 
+        // Display controls in the bottom right corner
+        controls: true,
+
+        // Help the user learn the controls by providing hints, for example by
+        // bouncing the down arrow when they first encounter a vertical slide
+        controlsTutorial: false,
+
+        // Determines where controls appear, "edges" or "bottom-right"
+        controlsLayout: 'edges',
+
+        // Visibility rule for backwards navigation arrows; "faded", "hidden"
+        // or "visible"
+        controlsBackArrows: 'faded',
+
+        // Display a presentation progress bar
+        progress: true,
+
+        // Display the page number of the current slide
+        slideNumber: false,
+
+        // 'all', 'print', or 'speaker'
+        showSlideNumber: 'all',
+
+        // Add the current slide number to the URL hash so that reloading the
+        // page/copying the URL will return you to the same slide
+        hash: true,
+
+        // Start with 1 for the hash rather than 0
+        hashOneBasedIndex: false,
+
+        // Flags if we should monitor the hash and change slides accordingly
+        respondToHashChanges: true,
+
+        // Push each slide change to the browser history
+        history: true,
+
+        // Enable keyboard shortcuts for navigation
+        keyboard: true,
+
+        // Enable the slide overview mode
+        overview: true,
+
+        // Disables the default reveal.js slide layout (scaling and centering)
+        // so that you can use custom CSS layout
+        disableLayout: false,
+
+        // Vertical centering of slides
+        center: false,
+
+        // Enables touch navigation on devices with touch input
+        touch: true,
+
+        // Loop the presentation
+        loop: false,
+
+        // Change the presentation direction to be RTL
+        rtl: false,
+
+        // see https://revealjs.com/vertical-slides/#navigation-mode
+        navigationMode: 'linear',
+
+        // Randomizes the order of slides each time the presentation loads
+        shuffle: false,
+
+        // Turns fragments on and off globally
+        fragments: true,
+
+        // Flags whether to include the current fragment in the URL,
+        // so that reloading brings you to the same fragment position
+        fragmentInURL: false,
+
+        // Flags if the presentation is running in an embedded mode,
+        // i.e. contained within a limited portion of the screen
+        embedded: false,
+
+        // Flags if we should show a help overlay when the questionmark
+        // key is pressed
+        help: true,
+
+        // Flags if it should be possible to pause the presentation (blackout)
+        pause: true,
+
+        // Flags if speaker notes should be visible to all viewers
+        showNotes: false,
+
+        // Global override for autoplaying embedded media (null/true/false)
+        autoPlayMedia: null,
+
+        // Global override for preloading lazy-loaded iframes (null/true/false)
+        preloadIframes: null,
+
+        // Number of milliseconds between automatically proceeding to the
+        // next slide, disabled when set to 0, this value can be overwritten
+        // by using a data-autoslide attribute on your slides
+        autoSlide: 0,
+
+        // Stop auto-sliding after user input
+        autoSlideStoppable: true,
+
+        // Use this method for navigation when auto-sliding
+        autoSlideMethod: null,
+
+        // Specify the average time in seconds that you think you will spend
+        // presenting each slide. This is used to show a pacing timer in the
+        // speaker view
+        defaultTiming: null,
+
+        // Enable slide navigation via mouse wheel
+        mouseWheel: false,
+
+        // The display mode that will be used to show slides
+        display: 'flex',
+
+        // Hide cursor if inactive
+        hideInactiveCursor: true,
+
+        // Time before the cursor is hidden (in ms)
+        hideCursorTime: 5000,
+
+        // Opens links in an iframe preview overlay
+        previewLinks: false,
+
+        // Transition style (none/fade/slide/convex/concave/zoom)
+        transition: 'none',
+
+        // Transition speed (default/fast/slow)
+        transitionSpeed: 'default',
+
+        // Transition style for full page slide backgrounds
+        // (none/fade/slide/convex/concave/zoom)
+        backgroundTransition: 'none',
+
+        // Number of slides away from the current that are visible
+        viewDistance: 3,
+
+        // Number of slides away from the current that are visible on mobile
+        // devices. It is advisable to set this to a lower number than
+        // viewDistance in order to save resources.
+        mobileViewDistance: 2,
+
+        // The "normal" size of the presentation, aspect ratio will be preserved
+        // when the presentation is scaled to fit different resolutions. Can be
+        // specified using percentage units.
+        width: 1180,
+
+        height: 664,
+
+        // Factor of the display size that should remain empty around the content
+        margin: 0,
+
+        math: {
+          mathjax: 'https://cdn.jsdelivr.net/npm/mathjax@2.7.9/MathJax.js',
+          config: 'TeX-AMS_HTML-full',
+          tex2jax: {
+            inlineMath: [['\\(','\\)']],
+            displayMath: [['\\[','\\]']],
+            balanceBraces: true,
+            processEscapes: false,
+            processRefs: true,
+            processEnvironments: true,
+            preview: 'TeX',
+            skipTags: ['script','noscript','style','textarea','pre','code'],
+            ignoreClass: 'tex2jax_ignore',
+            processClass: 'tex2jax_process'
+          },
+        },
+
+        // reveal.js plugins
+        plugins: [QuartoLineHighlight, PdfExport, RevealMenu, QuartoSupport,
+
+          RevealMath,
+          RevealNotes,
+          RevealSearch,
+          RevealZoom
+        ]
+      });
+    </script>
+    <script>
+      // Stamp a page number onto every slide, once, in document order.
+      //
+      // This cannot be a CSS counter. Reveal only keeps slides within `viewDistance`
+      // (3) in the DOM flow — everything else is `display: none`, and an element that
+      // generates no box does not increment a CSS counter. The count therefore
+      // changed as you navigated, which is why divider slides showed the number of
+      // the slide before them.
+      //
+      // A data attribute is immune to that, and it also survives PDF export, where
+      // reveal re-parents every slide into a `.pdf-page` wrapper.
+      //
+      // Numbering starts at 2: the cover is not counted, matching the marimo deck.
+      (function () {
+        function number() {
+          var n = 1;
+          document
+            .querySelectorAll(".reveal .slides section.slide")
+            .forEach(function (slide) {
+              slide.setAttribute("data-page", ++n);
+            });
+        }
+        if (document.readyState === "loading") {
+          document.addEventListener("DOMContentLoaded", number);
+        } else {
+          number();
+        }
+      })();
+    </script>
+    <script id="quarto-html-after-body" type="application/javascript">
+      window.document.addEventListener("DOMContentLoaded", function (event) {
+        const tabsets =  window.document.querySelectorAll(".panel-tabset-tabby")
+        tabsets.forEach(function(tabset) {
+          const tabby = new Tabby('#' + tabset.id);
+        });
+        const isCodeAnnotation = (el) => {
+          for (const clz of el.classList) {
+            if (clz.startsWith('code-annotation-')) {                     
+              return true;
+            }
+          }
+          return false;
+        }
+        const onCopySuccess = function(e) {
+          // button target
+          const button = e.trigger;
+          // don't keep focus
+          button.blur();
+          // flash "checked"
+          button.classList.add('code-copy-button-checked');
+          var currentTitle = button.getAttribute("title");
+          button.setAttribute("title", "Copied!");
+          let tooltip;
+          if (window.bootstrap) {
+            button.setAttribute("data-bs-toggle", "tooltip");
+            button.setAttribute("data-bs-placement", "left");
+            button.setAttribute("data-bs-title", "Copied!");
+            tooltip = new bootstrap.Tooltip(button, 
+              { trigger: "manual", 
+                customClass: "code-copy-button-tooltip",
+                offset: [0, -8]});
+            tooltip.show();    
+          }
+          setTimeout(function() {
+            if (tooltip) {
+              tooltip.hide();
+              button.removeAttribute("data-bs-title");
+              button.removeAttribute("data-bs-toggle");
+              button.removeAttribute("data-bs-placement");
+            }
+            button.setAttribute("title", currentTitle);
+            button.classList.remove('code-copy-button-checked');
+          }, 1000);
+          // clear code selection
+          e.clearSelection();
+        }
+        const getTextToCopy = function(trigger) {
+          const outerScaffold = trigger.parentElement.cloneNode(true);
+          const codeEl = outerScaffold.querySelector('code');
+          for (const childEl of codeEl.children) {
+            if (isCodeAnnotation(childEl)) {
+              childEl.remove();
+            }
+          }
+          return codeEl.innerText;
+        }
+        const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+          text: getTextToCopy
+        });
+        clipboard.on('success', onCopySuccess);
+        if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+          const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+            text: getTextToCopy,
+            container: window.document.getElementById('quarto-embedded-source-code-modal')
+          });
+          clipboardModal.on('success', onCopySuccess);
+        }
+          var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+          var mailtoRegex = new RegExp(/^mailto:/);
+            var filterRegex = new RegExp('/' + window.location.host + '/');
+          var isInternal = (href) => {
+              return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+          }
+          // Inspect non-navigation links and adorn them if external
+         var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+          for (var i=0; i<links.length; i++) {
+            const link = links[i];
+            if (!isInternal(link.href)) {
+              // undo the damage that might have been done by quarto-nav.js in the case of
+              // links that we want to consider external
+              if (link.dataset.originalHref !== undefined) {
+                link.href = link.dataset.originalHref;
+              }
+            }
+          }
+        function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+          const config = {
+            allowHTML: true,
+            maxWidth: 500,
+            delay: 100,
+            arrow: false,
+            appendTo: function(el) {
+                return el.closest('section.slide') || el.parentElement;
+            },
+            interactive: true,
+            interactiveBorder: 10,
+            theme: 'light-border',
+            placement: 'bottom-start',
+          };
+          if (contentFn) {
+            config.content = contentFn;
+          }
+          if (onTriggerFn) {
+            config.onTrigger = onTriggerFn;
+          }
+          if (onUntriggerFn) {
+            config.onUntrigger = onUntriggerFn;
+          }
+            config['offset'] = [0,0];
+            config['maxWidth'] = 700;
+          window.tippy(el, config); 
+        }
+        const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+        for (var i=0; i<noterefs.length; i++) {
+          const ref = noterefs[i];
+          tippyHover(ref, function() {
+            // use id or data attribute instead here
+            let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+            try { href = new URL(href).hash; } catch {}
+            const id = href.replace(/^#\/?/, "");
+            const note = window.document.getElementById(id);
+            if (note) {
+              return note.innerHTML;
+            } else {
+              return "";
+            }
+          });
+        }
+        const findCites = (el) => {
+          const parentEl = el.parentElement;
+          if (parentEl) {
+            const cites = parentEl.dataset.cites;
+            if (cites) {
+              return {
+                el,
+                cites: cites.split(' ')
+              };
+            } else {
+              return findCites(el.parentElement)
+            }
+          } else {
+            return undefined;
+          }
+        };
+        var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+        for (var i=0; i<bibliorefs.length; i++) {
+          const ref = bibliorefs[i];
+          const citeInfo = findCites(ref);
+          if (citeInfo) {
+            tippyHover(citeInfo.el, function() {
+              var popup = window.document.createElement('div');
+              citeInfo.cites.forEach(function(cite) {
+                var citeDiv = window.document.createElement('div');
+                citeDiv.classList.add('hanging-indent');
+                citeDiv.classList.add('csl-entry');
+                var biblioDiv = window.document.getElementById('ref-' + cite);
+                if (biblioDiv) {
+                  citeDiv.innerHTML = biblioDiv.innerHTML;
+                }
+                popup.appendChild(citeDiv);
+              });
+              return popup.innerHTML;
+            });
+          }
+        }
+      });
+      </script>
+    
+
+</body></html>

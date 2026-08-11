@@ -1,8 +1,16 @@
 /*-- scss:defaults --*/
 // ===========================================================================
-// Consulting-deck reveal.js theme for the Customer-Base Audit slides.
-// Emulates a top-tier strategy-deck look (navy action titles, ochre accent,
-// clean 16:9 exhibits, source footnotes). Not affiliated with any firm.
+// Consulting-deck reveal.js theme:
+//
+// The canvas is 1180x664 (set in the .qmd) so every size here is an absolute
+// px lifted from that stylesheet, and the plotly figures (absolute px fonts, 
+// from the notebook's `cba` template) keep the same size relative to the slide text.
+//
+// Each slide is a vertical flex column; `.body` takes `flex: 1` so exhibits
+// centre in the leftover height and the takeaway/footer sit on the bottom edge.
+// `display: flex` is NOT set here — reveal writes `display` inline on every
+// loaded slide, so it must come from the `display: flex` reveal option in the
+// .qmd. Everything below assumes it is on.
 // ===========================================================================
 
 $navy: #1f3a5f;
@@ -11,10 +19,15 @@ $accent: #c4703a;
 $ink: #1f2328;
 $muted: #6b7280;
 $rule: #e6e8eb;
+$hairline: #f1f3f5;
+$panel: #f3f6fa;
+$on-dark: #93a6bc;
+$on-dark-accent: #d68a5a;
+$on-dark-text: #cdd7e3;
 
 $font-family-sans-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
-$presentation-font-size-root: 20px;
-$presentation-line-height: 1.4;
+$presentation-font-size-root: 14px;
+$presentation-line-height: 1.5;
 
 $body-color: $ink;
 $body-bg: #ffffff;
@@ -25,238 +38,641 @@ $selection-bg: rgba(31, 58, 95, 0.2);
 $presentation-heading-font: "Helvetica Neue", Helvetica, Arial, sans-serif;
 $presentation-heading-color: $navy;
 $presentation-heading-font-weight: 700;
-$presentation-heading-line-height: 1.18;
-$presentation-h1-font-size: 2.4em;
-$presentation-h2-font-size: 1.5em;
-$presentation-h3-font-size: 1.0em;
+$presentation-heading-line-height: 1.2;
+$presentation-h1-font-size: 33px;
+$presentation-h2-font-size: 23px;
+$presentation-h3-font-size: 15px;
 $presentation-title-slide-text-align: left;
 
 /*-- scss:rules --*/
 
+// slide padding — the deck's outer margin
+$pad-x: 46px;
+$pad-top: 32px;
+$pad-bottom: 14px;
+
+// MUST match `height:` in the .qmd. Only used by the PDF fix at the foot of
+// this file; the on-screen deck takes its height from reveal.
+$slide-h: 664px;
+
+// header rhythm — raise these to open the space above the navy rule
+$eyebrow-gap: 10px; // eyebrow -> title
+$sub-gap: 8px; // title -> subtitle
+$rule-space-above: 16px;
+$rule-space-below: 18px;
+
 .reveal {
   font-weight: 400;
-  letter-spacing: -0.005em;
+  // marimo renders with grayscale antialiasing; without these the same font
+  // stack picks up subpixel rendering and reads noticeably heavier
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 .reveal .slides,
 .reveal .slides section {
   text-align: left;
 }
 
-// ---- action title (##) with a short navy rule underneath -----------------
-.reveal h2 {
-  text-transform: none;
-  margin-bottom: 0.15em;
+// ---------------------------------------------------------------------------
+// SLIDE BOX — the flex column every slide is built from
+// ---------------------------------------------------------------------------
+.reveal .slides > section,
+.reveal .slides > section > section {
+  flex-direction: column;
+  box-sizing: border-box;
+  height: 100%;
+  padding: $pad-top $pad-x $pad-bottom;
 }
-.reveal h2::after {
-  content: "";
-  display: block;
-  width: 58px;
-  height: 3px;
-  background: $navy;
-  margin: 0.32em 0 0.5em;
+// reveal's wrapper around a level-1 heading and the slides under it: a
+// positioning shell whose children are absolutely positioned
+.reveal .slides > section.stack {
+  padding: 0;
 }
-// on divider slides we don't want the h2 rule
-.reveal section.divider h2::after { display: none; }
 
-// ---- eyebrow / kicker above the title ------------------------------------
+// Stacking order within a slide. Explicit so `.takeaway.top` can be lifted
+// above the body without disturbing anything else.
+.reveal section.slide > h2 {
+  order: 10;
+}
+.reveal section.slide > .slide-sub {
+  order: 20;
+}
+.reveal section.slide > .takeaway.top {
+  order: 30;
+  margin: 0 0 14px;
+}
+.reveal section.slide > .body {
+  order: 40;
+}
+.reveal section.slide > .takeaway {
+  order: 50;
+}
+.reveal section.slide > .footer {
+  order: 60;
+}
+
+// ---------------------------------------------------------------------------
+// HEADER — eyebrow -> action title -> subtitle -> navy rule
+// ---------------------------------------------------------------------------
 .reveal .eyebrow {
-  font-size: 0.46em;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: $muted;
-  font-weight: 700;
-  margin-bottom: 0.15em;
-}
-
-// ---- takeaway strip -------------------------------------------------------
-.reveal .takeaway {
-  margin-top: 0.6em;
-  padding: 0.45em 0.7em;
-  background: #f3f6fa;
-  border-left: 3px solid $accent;
-  font-size: 0.6em;
-  color: $ink;
-  line-height: 1.4;
-}
-.reveal .takeaway b { color: $navy; }
-
-// ---- source footnote (bottom-left); page number is reveal's slide-number --
-// (.source retired — per-slide credits now use Quarto's `.footer` div)
-
-// ---- bullet lists ---------------------------------------------------------
-.reveal .points { list-style: none; margin: 0.1em 0 0; padding: 0; }
-.reveal .points li {
-  position: relative;
-  padding: 0.5em 0 0.5em 1.7em;
-  border-bottom: 1px solid #f1f3f5;
-  font-size: 0.78em;
-  line-height: 1.5;
-}
-// marker is em-based so it tracks the text, and the gutter is wide enough that
-// it can never collide with the label
-.reveal .points li::before {
-  content: "";
-  position: absolute;
-  left: 0.15em;
-  top: 0.95em;
-  width: 0.44em;
-  height: 0.44em;
-  background: $accent;
-  border-radius: 1px;
-}
-// IMPORTANT: `.note` already shrinks its contents — without this the two
-// font-sizes multiply (0.62 x 0.7 = 0.43em) and the appendix text becomes
-// unreadable with the bullet marker jammed into the label.
-.reveal .note .points li { font-size: 1em; }
-.reveal .points b { color: $navy; }
-
-// numbered agenda
-.reveal .agenda { list-style: none; margin: 0.2em 0 0; padding: 0; }
-.reveal .agenda li {
-  display: flex;
-  gap: 0.7em;
-  align-items: baseline;
-  padding: 0.5em 0;
-  border-bottom: 1px solid #eef1f4;
-  font-size: 0.82em;
-}
-.reveal .agenda .n { color: $accent; font-weight: 700; min-width: 1.1em; }
-.reveal .agenda .q { color: $muted; font-size: 0.72em; margin-left: auto; text-align: right; }
-
-// ---- divider / section slides --------------------------------------------
-// NOTE: the divider background comes solely from `data-background-color` on the
-// slide (reveal paints that on its background layer). Do NOT also set a
-// background here — the section box would paint a second, slightly different
-// navy behind the text only.
-.reveal section.divider { background: transparent; }
-.reveal section.divider h1,
-.reveal section.divider h2,
-.reveal section.divider h3,
-.reveal .divider h1,
-.reveal .divider h2,
-.reveal .divider h3 { color: #ffffff; }
-.reveal section.divider .eyebrow,
-.reveal .divider .eyebrow { color: #d68a5a; }
-
-// ---- title slide ----------------------------------------------------------
-#title-slide .title { color: #ffffff; font-size: 1.9em; font-weight: 700; }
-#title-slide .subtitle { color: #cdd7e3; font-weight: 400; }
-#title-slide .quarto-title-authors,
-#title-slide .date,
-#title-slide .author { color: #93a6bc; font-size: 0.6em; }
-
-// ---- exhibit captions + column tidy --------------------------------------
-.reveal .exhibit-cap {
-  font-size: 0.42em;
-  color: $muted;
-  font-style: italic;
-  text-align: center;
-  margin-top: 0.1em;
-}
-.reveal .columns { align-items: center; }
-
-// tighten tables so they fit a 16:9 slide
-.reveal table { font-size: 0.5em; margin: 0.2em 0; }
-.reveal table th { color: #ffffff; background: $navy; font-weight: 700; border: none; }
-.reveal table td, .reveal table th { padding: 0.28em 0.6em; }
-.reveal .slides section .cell-output-display { margin: 0 auto; }
-
-// slide-number bottom-right, subtle
-.reveal .slide-number { background: transparent; color: $muted; font-weight: 700; }
-
-// ===========================================================================
-// Parity with the marimo deck (customer-base-audit-slides.py).
-// Element order is eyebrow → title → subtitle → rule → body → takeaway → footer.
-// The eyebrow is emitted INSIDE the heading as a block-level span, so no
-// flexbox/order overrides are needed (reveal's own layout rules win those, and
-// making sections flex containers broke navigation + the agenda layout).
-// ===========================================================================
-.reveal h2 .eyebrow,
-.reveal h1 .divider-num {
   display: block;
+  font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
-  margin-bottom: 0.35em;
-}
-.reveal h2 .eyebrow {
-  font-size: 0.42em;
   letter-spacing: 0.16em;
+  text-transform: uppercase;
   color: $muted;
+  margin-bottom: $eyebrow-gap;
 }
-.reveal h1 .divider-num {
-  font-size: 0.3em;
-  letter-spacing: 0.22em;
-  color: #d68a5a;
+.reveal h2 {
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 700;
+  color: $navy;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-transform: none;
+}
+.reveal .slide-sub {
+  font-size: 13px;
+  line-height: 1.35;
+  color: $muted;
+  margin: $sub-gap 0 0;
+}
+.reveal .slide-sub p {
+  margin: 0;
 }
 
-// subtitle under the action title (marimo .mck-sub)
-.reveal .slide-sub {
-  font-size: 0.52em;
-  color: $muted;
-  margin: -0.1em 0 0;
-}
-// the navy rule sits AFTER the subtitle when one is present
-.reveal section:has(.slide-sub) h2::after { display: none; }
+// The rule closes the header, so it hangs off whichever element ends it.
+.reveal h2::after,
 .reveal .slide-sub::after {
   content: "";
   display: block;
-  width: 58px;
+  width: 56px;
   height: 3px;
   background: $navy;
-  margin: 0.5em 0 0.6em;
+  margin: $rule-space-above 0 $rule-space-below;
+}
+.reveal section:has(.slide-sub) h2::after,
+.reveal section.divider h2::after {
+  display: none;
 }
 
-// pseudo-heading inside note blocks (replaces #### which created sub-slides)
+// ---------------------------------------------------------------------------
+// BODY — absorbs all leftover height; exhibits centre inside it
+// ---------------------------------------------------------------------------
+// Vertical placement is switchable per slide from the markdown:
+//   ::: {.body}          centred (default)
+//   ::: {.body .top}     pinned under the header
+//   ::: {.body .bottom}  pinned above the takeaway/footer
+//   ::: {.body .between} spread, first item at the top
+.reveal section.slide > .body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $ink;
+}
+.reveal section.slide > .body.top {
+  justify-content: flex-start;
+}
+.reveal section.slide > .body.bottom {
+  justify-content: flex-end;
+}
+.reveal section.slide > .body.between {
+  justify-content: space-between;
+}
+.reveal .slides section.slide > .body > .columns {
+  margin: 0;
+  align-items: center;
+}
+// bold in body copy reads as the title colour
+.reveal section.slide > .body b,
+.reveal section.slide > .body strong {
+  color: $navy;
+}
+
+// ---------------------------------------------------------------------------
+// COLUMNS
+// ---------------------------------------------------------------------------
+// Quarto ships `div.columns { display: initial }` + `div.column { display:
+// inline-block }` at top level to restore pandoc's pre-8237 behaviour, and it
+// loads after pandoc's `display: flex`. Left alone, the gutter becomes a
+// whitespace text node, two `width:50%` columns overflow the row and the second
+// one wraps. `.reveal .columns` is (0,2,0) against Quarto's (0,1,1).
+//
+// The 26px gutter is what the .qmd's column pixel widths are derived from.
+.reveal .columns {
+  display: flex;
+  gap: 26px;
+  align-items: center;
+}
+.reveal .columns > .column {
+  flex: 0 1 auto; // inline `width:<pct>` is the basis; shrink to absorb the gap
+  min-width: 0;
+}
+// Any number of `.column` divs is allowed; their `width:<pct>` values are flex
+// bases, so they should sum to ~100% and the gutters are absorbed by
+// proportional shrink (see `col_px()` in the .qmd for the pixel widths).
+//
+// Columns are centred against each other by default, so each is only as tall as
+// its own content and has no slack to align within. `.columns .fill` stretches
+// them to the full row height, which is what makes `.column .top/.bottom/
+// .between` meaningful — e.g. for a takeaway pinned to the foot of one column.
+//
+// Opt-in rather than the default so existing multi-column slides do not shift.
+// The row itself is only as tall as its tallest column, so `.bottom` aligns to
+// that — a note at the foot of a narrow column sits level with the base of the
+// tall chart beside it.
+.reveal .columns.fill {
+  align-items: stretch;
+}
+.reveal .columns.fill > .column {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.reveal .columns.fill > .column.top {
+  justify-content: flex-start;
+}
+.reveal .columns.fill > .column.bottom {
+  justify-content: flex-end;
+}
+.reveal .columns.fill > .column.between {
+  justify-content: space-between;
+}
+.reveal .columns > .column > :not(ul, ol),
+.reveal .columns > .column:first-child > :not(ul, ol),
+.reveal .columns > .column:last-child > :not(ul, ol) {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+// ---------------------------------------------------------------------------
+// EXHIBITS
+// ---------------------------------------------------------------------------
+.reveal .cell-output-display {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+}
+// great-tables carries its own typography (style_table in the notebook) — do
+// not set a font size here or the deck and the notebook diverge
+.reveal table {
+  margin: 0 auto;
+}
+.reveal .exhibit-cap {
+  font-size: 11px;
+  color: $muted;
+  font-style: italic;
+  text-align: center;
+  margin-top: 2px;
+}
+
+// ---------------------------------------------------------------------------
+// TAKEAWAY, FOOTER, PAGE NUMBER
+// ---------------------------------------------------------------------------
+// As a direct child of the slide, `.takeaway` sits above the footer; add `.top`
+// to move it directly under the navy rule instead (see the order rules above).
+//
+// The styling is class-only, so the block also works NESTED — inside `.body` it
+// hugs the body content instead of the slide's bottom edge, and inside a
+// `.column` it belongs to that column alone. Nested, its position is simply
+// where you write it; the surrounding flex container does the alignment, and no
+// modifier class is needed.
+//
+// Sibling form comments on the whole slide, nested form on one exhibit.
+.reveal .takeaway {
+  margin: 12px 0 0;
+  padding: 10px 15px;
+  background: $panel;
+  border-left: 3px solid $accent;
+  font-size: 13px;
+  line-height: 1.45;
+  color: $ink;
+}
+.reveal .takeaway b,
+.reveal .takeaway strong {
+  color: $navy;
+}
+.reveal .takeaway p {
+  margin: 0;
+}
+// nested: the body's own `gap` (or the column's flow) supplies the spacing
+.reveal .body > .takeaway,
+.reveal .column > .takeaway:first-child {
+  margin-top: 0;
+}
+
+// Quarto's quarto-support/footer.css loads after this theme and carries
+// `.reveal .slide .footer { display: none }` plus a fixed, centred bar. This
+// selector is (0,3,1) against its (0,3,0), which takes the in-slide footer back.
+.reveal section.slide > .footer {
+  display: block;
+  position: static;
+  width: auto;
+  z-index: auto;
+  margin: 10px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid $rule;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-style: italic;
+  color: $muted;
+  text-align: left;
+  // keep the credit clear of the page number in the same band; a long source
+  // line wraps to a second row rather than running underneath it
+  padding-right: 40px;
+  // a hand-written empty `::: {.footer}` would otherwise collapse to an 8px
+  // band and sit the rule ~15px low; one line box matches every other slide
+  min-height: 1.4em;
+}
+.reveal section.slide > .footer p {
+  margin: 0;
+}
+
+// Slides with no `.footer` still get the hairline, so the bottom edge is
+// consistent across the deck. `::before` becomes a flex item in the slide's
+// column and takes the footer's own slot; the nbsp gives it exactly a one-line
+// footer's height, so the rule lands at the same y either way with no magic
+// offset. Dividers are excluded — they are full-bleed and carry no footer band.
+//
+// Deliberately NOT an absolutely-positioned line: keeping the band in flow is
+// what lets a two-line footer grow upward (shrinking the body) instead of
+// overrunning a rule fixed to the slide.
+.reveal section.slide:not(.divider):not(:has(> .footer))::before {
+  content: "\00a0";
+  order: 60;
+  display: block;
+  margin: 10px 0 0;
+  padding-top: 7px;
+  border-top: 1px solid $rule;
+  font-size: 10.5px;
+  line-height: 1.4;
+}
+// Quarto emits an (empty) `.footer-default` even with no document-level
+// `footer:`, which switches its JS on: on every slide change it clones the
+// in-slide footer to `.reveal` as a second, centred, 18px copy. Both live here.
+.reveal > .footer {
+  display: none !important;
+}
+
+// Page number. `data-page` is stamped by slides-pagenum.html — a CSS counter
+// cannot do this, see the note in that file.
+.reveal section.slide::after {
+  content: attr(data-page);
+  position: absolute;
+  right: $pad-x;
+  bottom: $pad-bottom;
+  font-size: 10.5px;
+  line-height: 1.4;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: $muted;
+}
+
+// ---------------------------------------------------------------------------
+// LISTS
+// ---------------------------------------------------------------------------
+.reveal .points {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.reveal .points li {
+  position: relative;
+  margin: 0;
+  padding: 8px 0 8px 26px;
+  border-bottom: 1px solid $hairline;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.reveal .points li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 15px;
+  width: 9px;
+  height: 9px;
+  background: $accent;
+  border-radius: 1px;
+}
+.reveal .points b,
+.reveal .points strong {
+  color: $navy;
+}
+.reveal .points p {
+  margin: 0;
+}
+
+.reveal .agenda {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0 0;
+  width: 100%;
+}
+.reveal .agenda li {
+  display: flex;
+  gap: 18px;
+  align-items: baseline;
+  margin: 0;
+  padding: 12px 2px;
+  border-bottom: 1px solid #eef1f4;
+  font-size: 16px;
+  color: $ink;
+}
+.reveal .agenda .n {
+  color: $accent;
+  font-weight: 700;
+  min-width: 30px;
+}
+.reveal .agenda .q {
+  color: $muted;
+  font-size: 13.5px;
+  margin-left: auto;
+  text-align: right;
+  max-width: 46%;
+}
+
+// ---------------------------------------------------------------------------
+// PROSE PANELS
+// ---------------------------------------------------------------------------
+.reveal .note {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: $ink;
+}
+.reveal .note b,
+.reveal .note strong {
+  color: $navy;
+}
+.reveal .note p {
+  margin: 0 0 0.9em;
+}
+.reveal .note > :last-child {
+  margin-bottom: 0;
+}
 .reveal .note-h {
   display: block;
   color: $navy;
   font-weight: 700;
-  font-size: 1.08em;
+  font-size: 15px;
   margin: 0 0 0.4em;
 }
-.reveal .note { font-size: 0.8em; line-height: 1.6; }
-.reveal .note b { color: $navy; }
-.reveal .note .note { font-size: 1em; }
 
-// ---- slide footer: source bottom-left + hairline, page number bottom-right --
-// Quarto's own per-slide footer relies on its JS (which does not run for print
-// / PDF export), so the credit line is positioned here in pure CSS instead.
-// Sections are given full height so `bottom:` anchors to the slide edge rather
-// than to the end of the content box.
-.reveal .slides > section,
-.reveal .slides > section > section {
-  height: 100%;
-  box-sizing: border-box;
+// ---------------------------------------------------------------------------
+// INLINE TEXT UTILITIES
+// ---------------------------------------------------------------------------
+// Applied from the markdown as `[text]{.accent}`, combinable: `[text]{.accent
+// .caps}`. For one-off values use `[text]{style="color:#6b7280"}`.
+.reveal .navy {
+  color: $navy;
 }
-.reveal .footer {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 10px;
-  margin: 0;
-  padding-top: 7px;
-  border-top: 1px solid $rule;
-  font-style: italic;
+.reveal .accent {
+  color: $accent;
+}
+.reveal .muted {
   color: $muted;
-  font-size: 0.4em;
-  text-align: left;
 }
-.reveal .footer p { margin: 0; }
-
-// dark slides (cover + dividers): hairline and text pick up the marimo tones
-.reveal section.divider .footer,
-#title-slide .footer {
-  border-top-color: rgba(255, 255, 255, 0.18);
-  color: #93a6bc;
+.reveal .on-dark {
+  color: $on-dark;
 }
-.reveal section.divider .slide-number,
-.reveal section.divider ~ .slide-number { color: #93a6bc; }
+.reveal .bold {
+  font-weight: 700;
+}
+.reveal .italic {
+  font-style: italic;
+}
+.reveal .caps {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.reveal .small {
+  font-size: 0.85em;
+}
+.reveal .large {
+  font-size: 1.15em;
+}
+.reveal .nowrap {
+  white-space: nowrap;
+}
 
-// (bullet spacing lives with the .points rules above — no duplicate override)
+// ---------------------------------------------------------------------------
+// DIVIDER SLIDES
+// ---------------------------------------------------------------------------
+// The navy comes solely from `data-background-color` on the slide (reveal
+// paints that on its background layer). Do NOT also set a background here — the
+// section box would paint a second, slightly different navy behind the text.
+//
+// Two markers are available inside the h1:
+//   [Lens 1]{.divider-num}   block, above the title
+//   [Lens 1:]{.divider-tag}  inline, on the title's own line  <- in use
+.reveal .slides section.divider {
+  background: transparent;
+  justify-content: center;
+  height: 100%;
+  top: 0 !important;
+}
+.reveal section.divider h1 {
+  color: #ffffff;
+  font-size: 33px;
+  font-weight: 700;
+  line-height: 1.15;
+  max-width: 82%;
+  margin: 0;
+}
+.reveal section.divider .divider-num {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: $on-dark-accent;
+  margin: 0 0 14px;
+}
+.reveal section.divider .divider-tag {
+  color: $on-dark-accent;
+}
+.reveal section.divider::after {
+  color: $on-dark;
+}
 
-// agenda must run edge to edge
-.reveal .agenda { width: 100%; }
-.reveal .agenda li { width: 100%; }
+// ---------------------------------------------------------------------------
+// COVER
+// ---------------------------------------------------------------------------
+// The kicker and meta line are read off `title-slide-attributes` in the .qmd.
+// Author and date come from _quarto.yml; set `author: ""` / `date: ""` in the
+// deck's own front matter to drop them.
+#title-slide {
+  justify-content: center;
+  height: 100%;
+  top: 0 !important;
+}
+#title-slide::before {
+  content: attr(data-kicker);
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: $on-dark-accent;
+  margin-bottom: 18px;
+}
+#title-slide::after {
+  content: attr(data-meta);
+  position: absolute;
+  left: $pad-x;
+  bottom: 22px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: $on-dark;
+}
+#title-slide .title {
+  color: #ffffff;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.06;
+  max-width: 84%;
+  margin: 0 0 14px;
+}
+#title-slide .subtitle {
+  color: $on-dark-text;
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.45;
+  max-width: 66%;
+  margin: 0;
+}
+// `.quarto-title-authors` is the wrapper, `.quarto-title-author` one entry
+// inside it. With `author: ""` Quarto still emits the empty wrapper, so it is
+// collapsed here rather than leaving 22px of dead space.
+#title-slide .quarto-title-authors {
+  color: $on-dark;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  margin-top: 22px;
+  padding: 0;
+  justify-content: flex-start;
+}
+#title-slide .quarto-title-authors:not(:has(.quarto-title-author)) {
+  display: none;
+}
+#title-slide .quarto-title-author {
+  padding: 0;
+}
+#title-slide .date {
+  color: $on-dark;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  margin: 2px 0 0;
+}
 
-// exhibit columns
-.reveal .columns { align-items: flex-start; }
+// ---------------------------------------------------------------------------
+// PDF EXPORT (`?print-pdf`, or `E` in the deck)
+// ---------------------------------------------------------------------------
+// Reveal's print stylesheet forces `display: block !important; padding: 0
+// !important` on every slide, and re-parents each one into a `.pdf-page`
+// wrapper — so the `.slides > section` selectors above stop matching entirely
+// and these must use the descendant form.
+//
+// `.pdf-page` has an explicit height, so `height: 100%` restores the slide box
+// without hard-coding 664px; `top: 0` undoes the inline centring reveal writes.
+// Scoped to `section.slide` because the pager skips `.stack` wrappers and
+// leaves them behind empty — a bare `section` rule inflates them into blank
+// pages. `:is()` covers both class names reveal sets; (0,4,2) beats its (0,3,2).
+html:is(.reveal-print, .print-pdf) {
+  .reveal .slides section.slide,
+  .reveal .slides section.quarto-title-block {
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    top: 0 !important;
+    height: 100% !important;
+    padding: $pad-top $pad-x $pad-bottom !important;
+  }
+  .reveal section.slide::after {
+    visibility: visible;
+  }
+
+  // The 1px white line under the cover and dividers in PDF export.
+  //
+  // Reveal sizes each page wrapper `(height + pdfPageHeightOffset) * pages`, and
+  // that offset defaults to -1 — so a 663px `.pdf-page` sits on a 664px sheet
+  // (`@page { size: 1180px 664px }`) and one row of bare paper shows underneath.
+  // Invisible on white slides; a white line under a full-bleed navy one. The
+  // `.slide-background` is `height: 100%` of the wrapper, so it cannot cover it.
+  //
+  // Quarto accepts `pdf-page-height-offset` in its schema but never forwards it
+  // to the reveal config (checked: the key is absent for 0, 1 and -1 alike), so
+  // this is settled in CSS instead — `!important` to beat reveal's inline style.
+  //
+  // Assumes one page per slide; with `pdf-max-pages-per-slide` above 1 the
+  // wrapper is a multiple of the sheet and this would clamp it. Reveal chose -1
+  // to avoid rounding a hair onto a blank page — if one ever appears, drop this.
+  .reveal .slides .pdf-page {
+    height: $slide-h !important;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// REVEAL CHROME
+// ---------------------------------------------------------------------------
+// The progress bar is the only full-width element pinned to `bottom: 0`, and
+// reveal gives its TRACK a `rgba(0,0,0,.2)` fill — a 3px band across the bottom
+// of every slide. Invisible enough on white slides, but an obvious line on the
+// solid-colour cover and dividers (and on the cover it is 100% unfilled track).
+// Dropping the track leaves just the ochre fill. Set `progress: false` in the
+// .qmd to remove the bar entirely.
+.reveal .progress {
+  color: $accent;
+  height: 3px;
+  background: transparent;
+}
+.reveal .controls {
+  color: $navy;
+}

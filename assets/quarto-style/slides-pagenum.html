@@ -1,0 +1,29 @@
+<script>
+  // Stamp a page number onto every slide, once, in document order.
+  //
+  // This cannot be a CSS counter. Reveal only keeps slides within `viewDistance`
+  // (3) in the DOM flow — everything else is `display: none`, and an element that
+  // generates no box does not increment a CSS counter. The count therefore
+  // changed as you navigated, which is why divider slides showed the number of
+  // the slide before them.
+  //
+  // A data attribute is immune to that, and it also survives PDF export, where
+  // reveal re-parents every slide into a `.pdf-page` wrapper.
+  //
+  // Numbering starts at 2: the cover is not counted, matching the marimo deck.
+  (function () {
+    function number() {
+      var n = 1;
+      document
+        .querySelectorAll(".reveal .slides section.slide")
+        .forEach(function (slide) {
+          slide.setAttribute("data-page", ++n);
+        });
+    }
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", number);
+    } else {
+      number();
+    }
+  })();
+</script>

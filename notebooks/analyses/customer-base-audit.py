@@ -48,7 +48,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _():
     import numpy as np
     import pandas as pd
@@ -68,7 +68,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(GT, pd, style_table):
     def customer_descriptives(df, metric):
         s = df[metric]
@@ -141,7 +141,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(np, pd):
     def create_bins_labels(bin_width, max_cutoff, min_cutoff=None):
         if min_cutoff is None:
@@ -182,7 +182,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(GT, np, style_table):
     DECILE_FIELDS = [
         "Decile",
@@ -256,7 +256,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(go, pio):
     # Consultant / academic palette: navy primary, ochre secondary.
     INK, MUTED, GRID = "#1f2328", "#6b7280", "#ececec"
@@ -361,7 +361,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     # Unify the notebook's text/dashboard font with the charts and tables via
     # marimo's font CSS variables.
@@ -374,8 +374,8 @@ def _(mo):
     return
 
 
-@app.cell
-def _(ACCENT, FONT, INK, MUTED, loc, style):
+@app.cell(hide_code=True)
+def _(ACCENT, FONT, GT, INK, MUTED, loc, style):
     def style_table(gt, font_size="12px", row_padding="4px"):
         # One consultant look for every great-tables table: navy header with
         # white labels, the chart font, light row striping, hairline borders.
@@ -394,9 +394,60 @@ def _(ACCENT, FONT, INK, MUTED, loc, style):
             heading_border_bottom_color=MUTED,
             row_striping_include_table_body=True,
             row_striping_background_color="#f3f6fa",
+            table_body_hlines_style="none",
             table_border_top_style="none",
             table_border_bottom_color=MUTED,
             table_border_bottom_width="1px",
+        )
+
+    def accent_stub(gt):
+        return gt.tab_style(
+            style=[
+                style.fill(color=ACCENT),
+                style.text(color="white", weight="bold"),
+            ],
+            locations=loc.stub(),
+        ).tab_options(stub_border_style="none")
+
+    def crosstab_table(
+        tbl,
+        title,
+        subtitle=None,
+        spanner=None,
+        stubhead=None,
+        lead_cols=(),
+        percent=True,
+        decimals=1,
+        font_size="12px",
+        row_padding="4px",
+    ):
+        # `lead_cols` stand outside the periods, so the spanner skips them.
+        # A two-level index means the outer level groups the rows.
+        t = tbl.reset_index()
+        group, stub = (
+            (None, t.columns[0])
+            if tbl.index.nlevels == 1
+            else (t.columns[0], t.columns[1])
+        )
+        vals = [c for c in t.columns if c not in (group, stub)]
+        out = (
+            GT(t, rowname_col=stub, groupname_col=group)
+            .tab_header(title=title, subtitle=subtitle)
+            .tab_stubhead(label=stubhead or stub)
+            .sub_missing(missing_text="")
+            .cols_align(align="right", columns=vals)
+        )
+        out = (
+            out.fmt_percent(columns=vals, decimals=decimals)
+            if percent
+            else out.fmt_number(columns=vals, decimals=decimals)
+        )
+        if spanner:
+            out = out.tab_spanner(
+                label=spanner, columns=[c for c in vals if c not in lead_cols]
+            )
+        return out.pipe(accent_stub).pipe(
+            style_table, font_size=font_size, row_padding=row_padding
         )
 
     def bold_totals(gt, stub, names=("Total", "All", "Overall")):
@@ -407,7 +458,7 @@ def _(ACCENT, FONT, INK, MUTED, loc, style):
             locations=loc.body(rows=lambda d: d[stub].astype(str).isin(names)),
         )
 
-    return bold_totals, style_table
+    return accent_stub, bold_totals, crosstab_table, style_table
 
 
 @app.cell(hide_code=True)
@@ -418,7 +469,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(mo):
     def pretty_cohort(label):
         # Render an internal cohort key as a reader-facing label:
@@ -447,7 +498,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(ACCENT, ACCENT2, H, W, go):
     # ==================================================== Plotly chart helpers
     def _range_col(dist):
@@ -501,6 +552,7 @@ def _(ACCENT, ACCENT2, H, W, go):
         )
         fig.update_xaxes(
             title=x_title,
+            type="category",
             tickangle=-45,
             automargin=True,
             categoryorder="array",
@@ -555,6 +607,7 @@ def _(ACCENT, ACCENT2, H, W, go):
         )
         fig.update_xaxes(
             title=x_title,
+            type="category",
             tickangle=-45,
             automargin=True,
             categoryorder="array",
@@ -699,12 +752,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Read the long-format data file. Each row is one customer in one quarter.
-    2. Multiply the spend and the profit by 100. Keep them as whole cents.
-    3. Read the year and the quarter from the `YearQuarter` text.
+    1. Read `data/madrigal/cust_data_long.csv`, customer long form data. One row is one customer in one quarter.
+    2. Multiply `Spend` and `Profit` by 100, round, and hold them as `int64` cents.
+    3. Read `Year` and `Quarter` out of the `YearQuarter` text with the pattern `y(\d{4})_q(\d)`.
 
-    **Purpose:** Make one clean table of all quarterly records.
-    **Goal:** Give every lens the same base data.
+    **Purpose:** Give every lens one base table.
+
+    **Result:** One row for each customer-quarter with a purchase, plus `Year` and `Quarter`.
+
+    **Watch:** A quarter with no purchase has no row. Money stays in cents until a display step divides by 100.
     """)
     return
 
@@ -735,13 +791,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Set the current year and the prior year for the audit.
-    2. Set the key of the focus cohort.
-    3. Make the reader labels for the focus cohort.
-    4. Count the customers in the focus cohort.
+    1. Set the current year, the prior year, and the key of the focus cohort.
+    2. Make two label forms for that cohort: `Y2016 Q1` for legends, `Q1 2016` for prose.
+    3. Count the distinct customers in the cohort.
 
-    **Purpose:** Keep the years and the cohort in one place.
-    **Goal:** Let one change re-label the whole notebook.
+    **Purpose:** Hold every year and cohort the audit names in one cell.
+
+    **Result:** Five constants. Titles and subtitles read them, so one edit re-labels the notebook.
     """)
     return
 
@@ -890,13 +946,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the rows for one year. Group them by customer.
-    2. Add the transactions, the spend, and the profit for each customer.
-    3. Add the average spend per transaction and the margin.
-    4. Add all customers together to get the year totals.
+    1. `annual_customer_totals`: keep the rows of one year, group by `CustomerID`, and add `NumTrans`, `Spend`, and `Profit`. Divide the cents back to dollars.
+    2. `add_customer_ratios`: add spend per transaction (`Spend / NumTrans`) and margin (`Profit / Spend`, as a percent).
 
-    **Purpose:** Make one row for each active customer, with the year totals.
-    **Goal:** Fix the reference numbers for the rest of Lens 1.
+    **Purpose:** Reduce the year to one row for each customer.
+
+    **Result:** One row for each customer active in the year, with five per-customer quantities.
+
+    **Watch:** Margin is undefined where spend is 0. Keep it missing. Do not fill it with 0.
     """)
     return
 
@@ -1156,12 +1213,13 @@ def _(YEAR_CURR, create_percentile_table, trans_stats):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Make the bins 1 to 10. Put all larger counts in a `10+` bin.
-    2. Count the customers in each bin.
-    3. Change the counts to a share of all customers.
+    1. Set the bin edges 1 to 10, then infinity. Each bin is half-open: `[i, i+1)`.
+    2. Count the customers in each bin. All counts of 10 or more go in the `10+` bin.
+    3. Divide each count by the total to get a share.
 
     **Purpose:** Show how the transaction counts spread across customers.
-    **Goal:** Give the bar chart its data.
+
+    **Result:** One row for each bin, with the count and the share.
     """)
     return
 
@@ -1318,12 +1376,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Put each customer in a transaction-count bin.
-    2. Group the customers by bin.
-    3. For each bin, find the mean, the median, the range, and the 5th and 95th percentiles of the spend per transaction.
+    1. Put each customer in the same transaction-count bin as the chart above.
+    2. Group by the bin.
+    3. For each bin, find the mean, the standard deviation, the minimum, the 5th percentile, the median, the 95th percentile, and the maximum of the spend per transaction.
 
-    **Purpose:** Show how the spend per transaction changes with the transaction count.
-    **Goal:** Give the summary table its numbers.
+    **Purpose:** Test whether the basket grows with the purchase frequency.
+
+    **Result:** One row for each transaction level, with seven statistics.
     """)
     return
 
@@ -1504,13 +1563,16 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Rank the customers by profit, from high to low.
-    2. Cut the ranked customers into 10 equal groups (deciles).
+    1. Rank the customers by profit, high to low. Ties keep their row order.
+    2. Cut the ranks into 10 groups of equal size. Group 1 is the most profitable tenth.
     3. For each decile, add the customers, the transactions, the spend, and the profit.
-    4. Find the share and the average for each decile.
+    4. Divide to get the four shares, the two averages, AOF, AOV, and margin.
 
     **Purpose:** Show how much each tenth of the customers contributes.
-    **Goal:** Give the decile table its numbers.
+
+    **Result:** 10 rows, one for each decile, with the nine profit-identity columns.
+
+    **Watch:** Each group holds a tenth of the *customers*. The report below cuts on cumulative profit instead, so its groups hold a tenth of the *profit*.
     """)
     return
 
@@ -1582,9 +1644,9 @@ def _(mo):
     Lens 2 compares 2018 with 2019 and traces the change in firm performance to
     changes in customer behaviour. The working dataset has one row for each
     customer active in **either** year (an outer join of the two annual
-    aggregates, with zeros filled in). It covers 48,238 customers. A `Status`
-    field marks each customer as active in both years, in 2018 only (lapsed), or
-    in 2019 only (new or reactivated).
+    aggregates; the year a customer is absent stays missing, not zero). It
+    covers 48,238 customers. A `Status` field marks each customer as active in
+    both years, in 2018 only (lapsed), or in 2019 only (new or reactivated).
     """)
     return
 
@@ -1600,12 +1662,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Join the prior-year table and the current-year table by customer.
-    2. Keep every customer that is active in either year. Fill the gaps with zero.
-    3. Mark each customer as active in both years, in the prior year only, or in the current year only.
+    1. Merge the prior-year table and the current-year table on `CustomerID` with an outer join. Add the suffixes `_2018` and `_2019`.
+    2. Read the merge indicator and set `Status`: active both years, prior year only, or current year only.
 
-    **Purpose:** Make one table that pairs each customer across the two years.
-    **Goal:** Support every Lens 2 comparison.
+    **Purpose:** Pair each customer across the two years.
+
+    **Result:** One row for each customer active in either year (48,238).
+
+    **Watch:** The year a customer is absent stays **missing, not zero**. Sums use `min_count=1`, so a group with no data prints blank instead of $0.
     """)
     return
 
@@ -1655,12 +1719,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Add the prior-year columns and the current-year columns.
-    2. Add the active-customer count for each year.
-    3. Find the percent change from the prior year to the current year.
+    1. For each year, take the columns with that year's suffix. Add the transactions, the spend, and the profit; average the spend per transaction and the margin.
+    2. Count the distinct active customers in each year.
+    3. Find the change: (current − prior) / prior.
 
-    **Purpose:** Show the firm-level change between the two years.
-    **Goal:** Give the headline summary table its numbers.
+    **Purpose:** Show the firm-level move between the two years.
+
+    **Result:** Six rows and three columns: prior year, current year, and the percent change.
+
+    **Watch:** The two averages skip the missing values, so each is over the customers active in that year, not over all 48,238.
     """)
     return
 
@@ -1792,12 +1859,15 @@ def _(
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Make the same bins for both years.
-    2. Count the customers in each bin, for each year.
-    3. Change the counts to a share of all customers.
+    1. Build the same bin edges for both years.
+    2. Count the customers in each bin, one count for each year.
+    3. Divide each count by that year's customer total.
 
-    **Purpose:** Compare the two years on one axis.
-    **Goal:** Give the overlaid bar chart its data.
+    **Purpose:** Compare the shape of the two years on one axis.
+
+    **Result:** Two frames with the same bins. The chart draws them side by side.
+
+    **Watch:** Plot shares, not counts. The two years hold different numbers of customers.
     """)
     return
 
@@ -1909,12 +1979,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Count the customers in each status group.
-    2. Add the "both years" group to the "prior year only" group to get the prior-year active count.
-    3. Add the "both years" group to the "current year only" group to get the current-year active count.
+    1. Count the rows in each of the three status groups.
+    2. Add "both years" to "prior year only" to get the prior-year active count.
+    3. Add "both years" to "current year only" to get the current-year active count.
 
     **Purpose:** Measure how much the two yearly customer sets overlap.
-    **Goal:** Feed the overlap table and the Venn diagram.
+
+    **Result:** Five rows: three groups and the two year totals. They set the three areas of the Venn diagram.
     """)
     return
 
@@ -2089,12 +2160,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Group the customers by status.
-    2. Add the prior-year profit and the current-year profit for each group.
-    3. Add a total row for all groups.
+    1. Group the paired table by `Status`.
+    2. Add the prior-year profit and the current-year profit in each group.
+    3. Append a Total row.
 
     **Purpose:** Show where the profit sits across the three groups.
-    **Goal:** Feed the profit table and the profit bridge.
+
+    **Result:** Four rows and two columns.
+
+    **Watch:** `min_count=1` keeps the impossible cells blank. A lapsed customer has no current-year profit, which is not the same as $0.
     """)
     return
 
@@ -2247,13 +2321,15 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Reshape the paired table to one row for each customer, metric, and year.
-    2. Group by status, metric, and year. Add the values.
-    3. Count the active customers in each status and year.
-    4. Build the profit factors: customers, orders, order value, and margin.
+    1. Melt the six metric-year columns to long form: customer, status, metric, year, value.
+    2. Group by status, metric, and year, and add the values.
+    3. Count the active customers as the rows where the transaction value is present.
+    4. Divide to get AOF (trans / customers), AOV (spend / trans), and margin (profit / spend).
+    5. Turn the metrics into rows and the years into columns.
 
-    **Purpose:** Break the profit change into its causes for each group.
-    **Goal:** Feed the performance-decomposition table.
+    **Purpose:** Apply the profit identity to each group in each year.
+
+    **Result:** One block for each status: seven metric rows and two year columns.
     """)
     return
 
@@ -2360,6 +2436,7 @@ def _(
     GT,
     YEAR_CURR,
     YEAR_PRIOR,
+    accent_stub,
     cust_2018_2019,
     cust_data_2018,
     cust_data_2019,
@@ -2415,7 +2492,8 @@ def _(
             title="Profit Decile Change",
             subtitle=f"{YEAR_PRIOR} to {YEAR_CURR}",
         )
-        .tab_spanner(label="2019 decile", columns=_dcols)
+        .tab_stubhead(label=f"{YEAR_PRIOR} decile")
+        .tab_spanner(label=f"{YEAR_CURR} decile", columns=_dcols)
         .fmt_number(columns=_ccols, decimals=0, use_seps=True)
         .fmt_percent(columns=_ccols, rows=_is_pct, decimals=1)
         .fmt_percent(columns="% 2018", decimals=1)
@@ -2434,6 +2512,7 @@ def _(
             style=style.text(weight="bold"),
             locations=loc.body(columns=["Total"]),
         )
+        .pipe(accent_stub)
         .pipe(style_table, font_size="11px", row_padding="3px")
     )
     return
@@ -2480,13 +2559,16 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the customers active in both years, with spend above zero.
-    2. For each customer, flag whether the profit, the transactions, the spend per order, and the margin went up.
-    3. Group the customers by the four flags.
-    4. Add the customers and the profit in each group.
+    1. Keep the customers active in both years with spend above zero. This drops the one customer whose current-year margin is undefined (9,871 → 9,870).
+    2. Flag four moves: profit up, spend per order up, margin up (each "up" means "not lower"), and transactions up, same, or down.
+    3. Group by the four flags. Count the customers and add the profit of both years.
+    4. Append the subtotal, the lapsed row, the new row, and the total.
 
     **Purpose:** Sort the returning customers by how their behaviour moved.
-    **Goal:** Feed the up-down table.
+
+    **Result:** The 14 groups that occur in this sample, then four tail rows.
+
+    **Watch:** Do not hard-code 16 groups; the two absent ones are possible. Transactions need three states, because a third of the returning base buys the same number of times in both years.
     """)
     return
 
@@ -2635,13 +2717,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Group them by year and quarter.
-    2. Add the active customers, the transactions, the spend, and the profit.
-    3. Divide by the cohort size to get the percent active.
-    4. Build the per-active factors: orders, order value, and spend per active customer.
+    1. Keep the focus-cohort rows and group them by year and quarter.
+    2. Count the rows for the active customers (one row is one customer-quarter), and add the transactions, the spend, and the profit.
+    3. Take the cohort size from the acquisition quarter, and divide to get the percent active.
+    4. Divide to get AOF, AOV, and ASPAC (spend per active member). Number the quarters 0 to 15.
 
-    **Purpose:** Follow the cohort quarter by quarter, and split its revenue into factors.
-    **Goal:** Feed the revenue-decomposition line charts.
+    **Purpose:** Follow the cohort quarter by quarter and split its revenue into factors.
+
+    **Result:** 16 rows, one for each quarter, with the four factors of the revenue identity.
     """)
     return
 
@@ -2797,13 +2880,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Count the transactions by customer and year.
-    2. Mark each customer active or not in each year.
-    3. Group the customers by their yearly active pattern.
-    4. Count the customers in each pattern and find the share.
+    1. Pivot the cohort to a customer-by-year table of transaction counts. Fill the empty cells with 0.
+    2. Set the flag with a different rule in the acquisition year: more than one transaction there, more than zero after. So the first flag means a repeat beyond the acquisition purchase.
+    3. Group the customers by their four-flag pattern. Count them and divide by the cohort size.
+    4. Sort the patterns and append a Total.
 
     **Purpose:** Show the common year-by-year buying patterns.
-    **Goal:** Feed the repeat-buying table.
+
+    **Result:** Up to 16 rows, one for each pattern of Y and N.
     """)
     return
 
@@ -2888,13 +2972,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Count the transactions by customer and quarter.
-    2. Mark a customer once they buy a second time, and keep the mark after.
-    3. For each quarter, find the share of the cohort that has bought again.
-    4. Find the added share in each quarter.
+    1. Pivot the cohort to a customer-by-quarter table of transaction counts.
+    2. Set the same threshold as the annual table: more than one transaction in the acquisition quarter, more than zero after.
+    3. Take the running maximum along each row. The flag latches on at the second purchase and stays on.
+    4. The column mean is the cumulative share. The first difference is the added share of the quarter.
 
     **Purpose:** Measure how fast the cohort makes a second purchase.
-    **Goal:** Feed the second-purchase chart.
+
+    **Result:** 16 rows: the count, the cumulative share, and the incremental share.
     """)
     return
 
@@ -3033,12 +3118,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Mark each customer active or not in each quarter.
-    2. Count the customers active in a quarter and again in the next quarter.
-    3. Divide by the customers active in the quarter to get the repeat rate.
+    1. Pivot the cohort to a customer-by-quarter table and mark each cell active or not.
+    2. Combine the table with itself, shifted one quarter to the left, to find the customers active in a quarter and again in the next.
+    3. Divide that count by the customers active in the first of the two quarters.
 
-    **Purpose:** Measure the quarter-to-quarter repeat-buying rate.
-    **Goal:** Feed the repeat-rate line chart.
+    **Purpose:** Measure the conditional quarter-to-quarter repeat rate.
+
+    **Result:** 15 rows. The last quarter has no successor, so it is dropped.
     """)
     return
 
@@ -3120,12 +3206,13 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Group them by customer.
-    2. Add the transactions, the spend, and the profit to date for each customer.
-    3. Count the customers in each value bin.
+    1. Keep the focus-cohort rows and group them by customer.
+    2. Add the transactions, and add the spend and the profit over the four years, in dollars.
+    3. Bin the profit in steps of $25, with a bin below 0 and censoring at $1,000. Divide the counts by the cohort size.
 
     **Purpose:** Measure each customer's value to date.
-    **Goal:** Give the value-to-date chart its data.
+
+    **Result:** One row for each of the 2,944 cohort members, and the binned frame the chart draws.
     """)
     return
 
@@ -3166,13 +3253,16 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Rank the cohort customers by value to date. Cut them into 10 deciles.
-    2. Group the customers by decile.
+    1. Sort the cohort by value to date, high to low, and take the running total in whole cents.
+    2. Cut at each tenth of the cohort total, so each decile holds about 10% of the value.
     3. For each decile, add the customers, the transactions, the spend, and the profit.
-    4. Find the share and the average for each decile.
+    4. Divide to get the four shares, the two averages, AOF, AOV, and margin.
 
-    **Purpose:** Show how the cohort value concentrates in the top deciles.
-    **Goal:** Feed the value-to-date decile table.
+    **Purpose:** Show which factor makes the top customers valuable.
+
+    **Result:** 10 rows and 10 columns.
+
+    **Watch:** The cut is on value, so decile 1 holds far fewer than 10% of the customers. Every loss-making customer lands in decile 10.
     """)
     return
 
@@ -3236,19 +3326,20 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Mark each cohort customer active or not in each year.
-    2. Group the customers by their value-to-date decile.
-    3. Count the active customers in each decile and year.
-    4. Divide by the decile size to get the percent active. Add a total row.
+    1. Pivot the cohort to a customer-by-year table and mark each cell active or not.
+    2. Join the value-to-date decile of each customer.
+    3. Count the active customers in each decile and year, and count the size of each decile. Append a Total row.
+    4. Divide the counts by the decile size. Add the decile's share of the cohort, and leave it blank on the Total row.
 
-    **Purpose:** Show how the top-value customers stay active over time.
-    **Goal:** Feed the annual-active table.
+    **Purpose:** Show whether the top-value customers stay active.
+
+    **Result:** 11 rows: the decile size and the percent active in each of the four years.
     """)
     return
 
 
 @app.cell
-def _(FOCUS_COHORT_QTR, GT, bold_totals, cust_data, style_table, vtd_decile):
+def _(FOCUS_COHORT_QTR, bold_totals, crosstab_table, cust_data, vtd_decile):
     _a = (
         cust_data.query("Cohort == 'y2016_q1'")
         .pivot_table(
@@ -3277,20 +3368,18 @@ def _(FOCUS_COHORT_QTR, GT, bold_totals, cust_data, style_table, vtd_decile):
                 .mask(_counts.index == "Total")
             }
         )
-        .reset_index(names="Decile")
+        .rename_axis("Decile")
+        # "% Cohort" is the size of the decile, not a yearly rate: keep it next
+        # to the decile label, before the "% active" year columns.
+        .loc[:, ["% Cohort", *_yr]]
     )
-    (
-        GT(_tbl, rowname_col="Decile")
-        .tab_header(
-            title="Annual % Active by VTD Decile",
-            subtitle=f"{FOCUS_COHORT_QTR} cohort",
-        )
-        .tab_spanner(label="% active", columns=_yr)
-        .fmt_percent(columns=["% Cohort"] + _yr, decimals=1)
-        .sub_missing(missing_text="")
-        .pipe(bold_totals, "Decile")
-        .pipe(style_table)
-    )
+    crosstab_table(
+        _tbl,
+        title="Annual % Active by VTD Decile",
+        subtitle=f"{FOCUS_COHORT_QTR} cohort",
+        spanner="% active",
+        lead_cols=["% Cohort"],
+    ).pipe(bold_totals, "Decile")
     return
 
 
@@ -3332,18 +3421,22 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Keep the focus-cohort rows. Group them by customer.
-    2. Find the recency, the frequency, and the average profit for each customer.
-    3. Put each customer in a band for recency, for frequency, and for money.
+    1. Keep the focus-cohort rows and number the quarters 1 to 16.
+    2. For each customer, find the recency (the last active quarter), the frequency (all transactions), and the money (profit per transaction, in dollars).
+    3. Band each of the three, as ordered categories: R as Q1 / Q2-Q8 / Q9-Q15 / Q16, F as 1 / 2-4 / 5-10 / 11+, M as ≤$25 / $25-50 / $50-75 / $75+.
+    4. Cross-tabulate: recency and money down the rows, frequency across the columns. Keep the unused bands, and blank the zeros.
 
-    **Purpose:** Score each cohort customer on recency, frequency, and money.
-    **Goal:** Feed the RFM summary table.
+    **Purpose:** Score each cohort member on recency, frequency, and money.
+
+    **Result:** 16 rows and 4 columns.
+
+    **Watch:** 12 of the 64 cells are impossible, not empty. A customer with one transaction made it in the acquisition quarter, so frequency 1 forces recency Q1.
     """)
     return
 
 
 @app.cell
-def _(FOCUS_COHORT_QTR, GT, cust_data, np, pd, style_table):
+def _(FOCUS_COHORT_QTR, crosstab_table, cust_data, np, pd):
     _r = (
         cust_data.query("Cohort == 'y2016_q1'")
         .assign(Period=lambda d: (d["Year"] - 2016) * 4 + d["Quarter"])
@@ -3399,17 +3492,16 @@ def _(FOCUS_COHORT_QTR, GT, cust_data, np, pd, style_table):
     _tbl = (
         pd.crosstab([_r["R"], _r["M"]], _r["F"], dropna=False)
         .replace(0, pd.NA)
-        .reset_index()
-        .rename(columns={"R": "Recency", "M": "Avg profit/trans"})
+        .rename_axis(index=["Recency", "Avg profit/trans"])
     )
-    (
-        GT(_tbl, groupname_col="Recency", rowname_col="Avg profit/trans")
-        .tab_header(title="RFM Summary", subtitle=f"{FOCUS_COHORT_QTR} cohort")
-        .tab_spanner(label="Frequency", columns=_fo)
-        .fmt_number(columns=_fo, decimals=0)
-        .sub_missing(missing_text="")
-        .cols_align(align="right", columns=_fo)
-        .pipe(style_table, row_padding="3px")
+    crosstab_table(
+        _tbl,
+        title="RFM Summary",
+        subtitle=f"{FOCUS_COHORT_QTR} cohort",
+        spanner="Frequency",
+        percent=False,
+        decimals=0,
+        row_padding="3px",
     )
     return
 
@@ -3446,13 +3538,16 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Group every customer by cohort and quarter.
-    2. Add the customers, the transactions, the spend, and the profit.
-    3. Build the factors: orders, order value, and margin.
-    4. Divide by each cohort's start size to get the percent active.
+    1. Group every customer by acquisition cohort and quarter.
+    2. Count the distinct customers, add the transactions, and add the spend and the profit in dollars.
+    3. Divide to get AOF, AOV, and margin.
+    4. Read each cohort's size off the diagonal, where the cohort key is the quarter key, and divide to get the percent active.
 
-    **Purpose:** Build the full quarterly record for every cohort.
-    **Goal:** Feed all the Lens 4 cohort charts.
+    **Purpose:** Build the quarterly record of all 17 cohorts.
+
+    **Result:** A cohort-by-quarter grid with four totals and four derived factors.
+
+    **Watch:** The pre-2016 cohort has no diagonal cell, so its percent active is missing. That is by design; its size is unknown.
     """)
     return
 
@@ -3836,95 +3931,81 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(ACCENT, ACCENT2, go):
-    def acquisitions_bar_chart(df, width=520, height=340):
-        d = df.reset_index()
-        d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
-        fig = go.Figure(
-            go.Bar(
-                x=d["Year"].astype(str),
-                y=d["NumActive"],
-                marker_color=ACCENT,
-                hovertemplate="%{x}<br>New: %{y:,}<extra></extra>",
-            )
-        )
-        fig.update_layout(
-            template="cba",
+    ANNUAL_VIEWS = {
+        "acquisitions": dict(
+            metrics={"NumActive": "New customers"},
+            diagonal=True,
             title="Acquisitions by Year",
-            width=width,
-            height=height,
-            bargap=0.4,
-        )
-        fig.update_yaxes(title="New Customers", tickformat=",.0f")
-        fig.update_xaxes(type="category")
-        return fig
-
-    def active_customers_bar_chart(df, width=520, height=340):
-        d = df.groupby("Year", observed=True)["NumActive"].sum().reset_index()
-        fig = go.Figure(
-            go.Bar(
-                x=d["Year"].astype(str),
-                y=d["NumActive"],
-                marker_color=ACCENT,
-                hovertemplate="%{x}<br>Active: %{y:,}<extra></extra>",
-            )
-        )
-        fig.update_layout(
-            template="cba",
+            y_title="New Customers",
+            tickformat=",.0f",
+            value_fmt=",.0f",
+        ),
+        "active": dict(
+            metrics={"NumActive": "Active customers"},
+            diagonal=False,
             title="Active Customers by Year",
-            width=width,
-            height=height,
-            bargap=0.4,
-        )
-        fig.update_yaxes(title="Active Customers", tickformat=",.0f")
-        fig.update_xaxes(type="category")
-        return fig
+            y_title="Active Customers",
+            tickformat=",.0f",
+            value_fmt=",.0f",
+        ),
+        "spend_profit": dict(
+            metrics={"TotalSpend": "Spend", "TotalProfit": "Profit"},
+            diagonal=False,
+            title="Spend and Profit by Year",
+            y_title=None,
+            tickformat="$,.0f",
+            value_fmt="$,.0f",
+        ),
+    }
 
-    def spend_profit_bar_chart(df, width=560, height=360):
-        d = (
-            df.reset_index()
-            .melt(
-                id_vars=["CohortYear", "Year"],
-                value_vars=["TotalSpend", "TotalProfit"],
-                var_name="Metric",
-                value_name="Value",
-            )
-            .groupby(["Year", "Metric"], observed=True, as_index=False)["Value"]
+    def annual_summary_data(df, view):
+        spec = ANNUAL_VIEWS[view]
+        d = df.reset_index()
+        if spec["diagonal"]:
+            d = d[d["CohortYear"].astype(str) == d["Year"].astype(str)]
+        values = (
+            d.groupby("Year", observed=True)[list(spec["metrics"])]
             .sum()
+            .rename(columns=spec["metrics"])
         )
-        d["Year"] = d["Year"].astype(str)
+        values.index = values.index.astype(str)
+        return {
+            "values": values,
+            "title": spec["title"],
+            "y_title": spec["y_title"],
+            "tickformat": spec["tickformat"],
+            "value_fmt": spec["value_fmt"],
+        }
+
+    def annual_summary_chart(data, colors=(ACCENT, ACCENT2), width=520, height=340):
+        values = data["values"]
+        one_series = values.shape[1] == 1
         fig = go.Figure()
-        for metric, col, name in [
-            ("TotalSpend", ACCENT, "Spend"),
-            ("TotalProfit", ACCENT2, "Profit"),
-        ]:
-            dm = d[d["Metric"] == metric]
+        for name, color in zip(values.columns, colors):
             fig.add_bar(
-                x=dm["Year"],
-                y=dm["Value"],
+                x=values.index,
+                y=values[name],
                 name=name,
-                marker_color=col,
-                hovertemplate=f"{name} · %{{x}}<br>%{{y:$,.0f}}<extra></extra>",
+                marker_color=color,
+                hovertemplate=f"{name} · %{{x}}<br>%{{y:{data['value_fmt']}}}<extra></extra>",
             )
         fig.update_layout(
             template="cba",
-            title="Spend and Profit by Year",
-            barmode="group",
+            title=data["title"],
             width=width,
             height=height,
-            bargap=0.35,
+            barmode="group",
+            bargap=0.4 if one_series else 0.35,
             bargroupgap=0.08,
+            showlegend=not one_series,
         )
-        fig.update_yaxes(title=None, tickformat="$,.0f")
+        fig.update_yaxes(title=data["y_title"], tickformat=data["tickformat"])
         fig.update_xaxes(type="category")
         return fig
 
-    return (
-        acquisitions_bar_chart,
-        active_customers_bar_chart,
-        spend_profit_bar_chart,
-    )
+    return annual_summary_chart, annual_summary_data
 
 
 @app.cell(hide_code=True)
@@ -3935,18 +4016,11 @@ def _(mo):
     return
 
 
-@app.cell
-def _(SEQ, go, pd, pretty_cohort):
+@app.cell(hide_code=True)
+def _(pd):
     ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
 
-    def _hex_rgba(hexc, a):
-        h = hexc.lstrip("#")
-        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
-        return f"rgba({r},{g},{b},{a})"
-
     def cohort_flow_data(df, metric, scale=1.0, order=tuple(ANNUAL_ORDER)):
-        # Prepare every number the flow chart draws, so it can be reviewed as
-        # plain tables before plotting. Returns a dict of frames keyed by role.
         order = list(order)
         P = df[metric].unstack("Year").reindex(order).div(scale)
         P.columns = P.columns.astype(str)
@@ -3960,7 +4034,7 @@ def _(SEQ, go, pd, pretty_cohort):
             {gaps[i]: P[years[i + 1]] / P[years[i]] for i in range(len(gaps))},
             index=order,
         )
-        # Base carryover (TCBA Ch. 7): of a year's whole base, the share still
+        # Base carryover: of a year's whole base, the share still
         # delivered next year (the newest cohort of the next year is excluded).
         base = {}
         for i, g in enumerate(gaps):
@@ -3982,6 +4056,16 @@ def _(SEQ, go, pd, pretty_cohort):
             "gaps": gaps,
         }
 
+    return (cohort_flow_data,)
+
+
+@app.cell(hide_code=True)
+def _(SEQ, go, pd, pretty_cohort):
+    def _hex_rgba(hexc, a):
+        h = hexc.lstrip("#")
+        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+        return f"rgba({r},{g},{b},{a})"
+
     def cohort_flow_chart(
         data,
         y_title="",
@@ -3990,7 +4074,6 @@ def _(SEQ, go, pd, pretty_cohort):
         width=820,
         height=520,
     ):
-        # Pure renderer: every number comes from `data` (see cohort_flow_data).
         P, years, gaps = data["values"], data["years"], data["gaps"]
         totals, share, bottoms = (
             data["totals"],
@@ -4005,7 +4088,7 @@ def _(SEQ, go, pd, pretty_cohort):
         colors = dict(zip(order, SEQ[: len(order)]))
         text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
         xpos = list(range(len(years)))
-        hw = (1 - 0.45) / 2  # half bar width in x-units (bargap=0.45)
+        hw = (1 - 0.45) / 2
         fig = go.Figure()
         # Ribbons first, so the bars render on top of them.
         if flows:
@@ -4110,13 +4193,228 @@ def _(SEQ, go, pd, pretty_cohort):
         fig.update_xaxes(tickvals=xpos, ticktext=years, automargin=True)
         return fig
 
-    return cohort_flow_chart, cohort_flow_data
+    return (cohort_flow_chart,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Time to second purchase
+    """)
+    return
+
+
+@app.cell
+def _(SEQ, go, pd):
+    def second_purchase_annual_data(df):
+        # One row for each customer and year, with the acquisition year kept on
+        # the row. Customers acquired before the window have no acquisition year
+        # inside it, so they leave here: their cohort size is unknown.
+        annual = (
+            df.assign(
+                CohortYear=lambda d: d["Cohort"].str.extract(
+                    r"y(\d{4})_q\d", expand=False
+                )
+            )
+            .dropna(subset=["CohortYear"])
+            .astype({"CohortYear": "int32"})
+            .groupby(["CustomerID", "CohortYear", "Year"], as_index=False)["NumTrans"]
+            .sum()
+        )
+        # The first transaction of the acquisition year is the acquisition
+        # itself, not a repeat purchase. Take it out of the count. One rule then
+        # covers the whole grid: any transaction left over is a second-or-later
+        # purchase. The running maximum latches the flag on at the second
+        # purchase and keeps it on, so the column sums are cumulative.
+        flags = (
+            annual.assign(
+                Repeat=lambda d: d["NumTrans"].sub(d["Year"].eq(d["CohortYear"]))
+            )
+            .pivot_table(
+                index=["CustomerID", "CohortYear"],
+                columns="Year",
+                values="Repeat",
+                aggfunc="sum",
+                fill_value=0,
+            )
+            .rename(columns=str)
+            .gt(0)
+            .cummax(axis=1)
+        )
+
+        grp = flags.groupby("CohortYear")
+        counts = grp.sum().rename_axis("Cohort")
+        sizes = grp.size().rename("Cohort size").rename_axis("Cohort")
+        # A cohort has no cell before its acquisition year. Keep those cells
+        # missing. A zero would read as "nobody has come back yet", and the
+        # chart would draw it.
+        exists = pd.DataFrame(
+            {y: counts.index <= int(y) for y in counts.columns},
+            index=counts.index,
+        )
+
+        # The share of each cohort that has come back, down the calendar years.
+        by_year = counts.div(sizes, axis=0).where(exists)
+
+        # The same shares re-labelled by the age of the cohort: push each row
+        # left, so column 1 is every cohort's own first year. Only this
+        # alignment compares like with like.
+        first = min(int(c) for c in by_year.columns)
+        by_age = by_year.apply(lambda row: row.shift(first - int(row.name)), axis=1)
+        by_age.columns = [f"Year {i}" for i in range(1, by_age.shape[1] + 1)]
+
+        return {
+            "flags": flags,
+            "counts": counts.where(exists),
+            "sizes": sizes,
+            "cum_pct_by_year": by_year,
+            "cum_pct_by_age": by_age,
+        }
+
+    def second_purchase_annual_chart(
+        tbl,
+        title="Time to Second Purchase by Annual Cohort",
+        x_title="Year",
+        width=740,
+        height=380,
+    ):
+        # `tbl` is a finished cohort-by-period matrix of cumulative shares.
+        # Missing cells break the line, so each cohort starts in its own year.
+        fig = go.Figure()
+        for (cohort, row), color in zip(tbl.iterrows(), SEQ):
+            fig.add_scatter(
+                x=list(tbl.columns),
+                y=row.to_numpy(),
+                name=f"{cohort} cohort",
+                mode="lines+markers",
+                line=dict(width=1.8, color=color),
+                marker=dict(size=6, color=color),
+                connectgaps=False,
+                hovertemplate=(
+                    f"{cohort} cohort · %{{x}}<br>%{{y:.1%}}<extra></extra>"
+                ),
+            )
+        fig.update_layout(
+            template="cba",
+            title=title,
+            width=width,
+            height=height,
+            # A legend above the plot sits inside the top margin, where the
+            # title also lives. Deepen that margin so the two do not touch.
+            margin=dict(t=104),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.04,
+                xanchor="right",
+                x=1.0,
+            ),
+        )
+        fig.update_xaxes(title=x_title, type="category")
+        fig.update_yaxes(
+            title="Cumulative % of Cohort",
+            tickformat=".0%",
+            rangemode="tozero",
+        )
+        return fig
+
+    return second_purchase_annual_chart, second_purchase_annual_data
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
     ## Annual performance
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The three bar charts below give the firm-level headline for each year. They
+    use one function, `annual_summary_chart`, with one of three prepared views.
+
+    - **Acquisitions.** The customers acquired in the year. This is the diagonal
+      of the cohort grid, where the acquisition year is the calendar year.
+    - **Active customers.** All customers who buy in the year, new and old
+      together. This is the column total of the grid.
+    - **Spend and profit.** The two money totals for the year, side by side.
+
+    Read the three together. Acquisition sets how many customers enter. The
+    active count adds the customers who stay from earlier years. Spend and profit
+    follow the active count, because one customer's behaviour changes little from
+    year to year (Lens 2).
+
+    These bars show **that** the firm grows. They do not show **where** the
+    growth comes from. The cohort flow charts below answer that.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Take the acquisition year out of the cohort key. Customers acquired before the window go in a `pre_2016` group.
+    2. Make the cohort year an ordered category, so the stack order is fixed from oldest to newest.
+    3. Group by cohort year and calendar year. Count the distinct customers, add the transactions, and add the spend and the profit in dollars.
+
+    **Purpose:** Roll the quarterly cohorts up to five yearly cohorts.
+
+    **Result:** 14 rows. The grid is triangular: a cohort has no row before its acquisition year.
+    """)
+    return
+
+
+@app.cell
+def _(cust_data, pd):
+    _order = ["pre_2016", "2016", "2017", "2018", "2019"]
+    _annual = cust_data.assign(
+        CohortYear=lambda d: pd.Categorical(
+            d["Cohort"].str.extract(r"y(\d{4})_q\d", expand=False).fillna("pre_2016"),
+            categories=_order,
+            ordered=True,
+        )
+    )
+    annual_cohort_combined = _annual.groupby(["CohortYear", "Year"], observed=True).agg(
+        NumActive=("CustomerID", "nunique"),
+        TotalTrans=("NumTrans", "sum"),
+        TotalSpend=("Spend", lambda s: s.sum() / 100),
+        TotalProfit=("Profit", lambda s: s.sum() / 100),
+    )
+    return (annual_cohort_combined,)
+
+
+@app.cell
+def _(annual_cohort_combined, annual_summary_data):
+    bars_acquisitions = annual_summary_data(annual_cohort_combined, "acquisitions")
+    bars_active = annual_summary_data(annual_cohort_combined, "active")
+    bars_spend_profit = annual_summary_data(annual_cohort_combined, "spend_profit")
+    return bars_acquisitions, bars_active, bars_spend_profit
+
+
+@app.cell
+def _(annual_summary_chart, bars_acquisitions):
+    annual_summary_chart(bars_acquisitions)
+    return
+
+
+@app.cell
+def _(annual_summary_chart, bars_active):
+    annual_summary_chart(bars_active)
+    return
+
+
+@app.cell
+def _(annual_summary_chart, bars_spend_profit):
+    annual_summary_chart(bars_spend_profit, width=560, height=360)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Prepared flow data
     """)
     return
 
@@ -4153,70 +4451,45 @@ def _(mo):
 
 
 @app.cell(hide_code=True)
-def _(how):
-    how(r"""
-    1. Give each customer an acquisition year. Put earlier customers in a `pre_2016` group.
-    2. Group the customers by acquisition year and calendar year.
-    3. Add the active customers, the transactions, the spend, and the profit.
-
-    **Purpose:** Roll the quarterly cohorts up to yearly cohorts.
-    **Goal:** Feed the Lens 5 flow charts and ratios.
-    """)
-    return
-
-
-@app.cell
-def _(cust_data, pd):
-    _order = ["pre_2016", "2016", "2017", "2018", "2019"]
-    _annual = cust_data.assign(
-        CohortYear=lambda d: pd.Categorical(
-            d["Cohort"].str.extract(r"y(\d{4})_q\d", expand=False).fillna("pre_2016"),
-            categories=_order,
-            ordered=True,
-        )
-    )
-    annual_cohort_combined = _annual.groupby(["CohortYear", "Year"], observed=True).agg(
-        NumActive=("CustomerID", "nunique"),
-        TotalTrans=("NumTrans", "sum"),
-        TotalSpend=("Spend", lambda s: s.sum() / 100),
-        TotalProfit=("Profit", lambda s: s.sum() / 100),
-    )
-    return (annual_cohort_combined,)
-
-
-@app.cell
-def _(acquisitions_bar_chart, annual_cohort_combined):
-    acquisitions_bar_chart(annual_cohort_combined)
-    return
-
-
-@app.cell
-def _(active_customers_bar_chart, annual_cohort_combined):
-    active_customers_bar_chart(annual_cohort_combined)
-    return
-
-
-@app.cell
-def _(annual_cohort_combined, spend_profit_bar_chart):
-    spend_profit_bar_chart(annual_cohort_combined)
-    return
-
-
-@app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Prepared flow data
-    """)
-    return
+    Write $P_{c,y}$ for the value that cohort $c$ gives in calendar year $y$,
+    divided by the scale (thousands for customers, millions for money). Cells
+    before a cohort exists are missing, not zero. Each table below is one part of
+    the chart:
 
+    | Table | Formula | What the chart does with it |
+    |---|---|---|
+    | `values` | $P_{c,y}$ | the height of each band |
+    | `totals` | $T_y=\sum_c P_{c,y}$ | the label above each bar |
+    | `share` | $P_{c,y}/T_y$ | the label inside each band |
+    | `bottoms` | $B_{c,y}=\sum_{c'\le c}P_{c',y}-P_{c,y}$ | where each band starts |
+    | `cohort_carryover` | $P_{c,y+1}/P_{c,y}$ | the label on each ribbon |
+    | `base_carryover` | $(T_{y+1}-P_{y+1,\,y+1})/T_y$ | the boxed label between two bars |
 
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    The numbers for the three flow charts are computed first, as tables, so you
-    can review them before plotting. `cohort_flow_data` returns the values, the
-    per-year totals, the share of each year, the per-cohort year-to-year
-    carryover, and the base carryover. The plot function only draws them.
+    **`bottoms` — where each band starts.** Plotly stacks the bars, but the
+    labels and the ribbons need the coordinates of each band. Add the values down
+    the cohort order to get the top edge of each band. Subtract the band's own
+    value to get its foot. The chart then puts the share label at
+    $B_{c,y}+P_{c,y}/2$, the middle of the band, and draws each ribbon between
+    the feet and the tops of two bands.
+
+    **Cohort carryover — how much one cohort gives again.** Divide a cohort's
+    value in one year by its value in the year before. 100% means the cohort
+    gives the same value in both years. 40% means it gives two fifths as much.
+    This is a ratio of value, not a count of persons: a customer who does not buy
+    in one year can buy in the next.
+
+    **Base carryover — how much the whole base gives again.** Take the total for
+    the next year, remove the cohort acquired in that year (the newest band), and
+    divide by the total for this year. It answers one question: of the value the
+    base gives this year, how much do the same cohorts give again next year? It
+    leaves out the new customers, so it measures the old base alone.
+
+    Read the two carryovers against the totals. If the totals grow while base
+    carryover stays near half, the firm buys its growth with acquisition. The
+    first year is the exception: the pre-2016 cohort has no earlier year in the
+    window, so no ribbon enters it.
     """)
     return
 
@@ -4224,12 +4497,17 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Take the yearly cohort table.
-    2. For each metric, lay the years across and the cohorts down.
-    3. Scale the numbers to thousands or to millions.
+    1. For one metric, put the calendar years across the columns and the cohorts down the rows, in the fixed order. Divide by the scale: thousands for customers, millions for money.
+    2. Add each column to get the year totals. Divide each cell by its column total to get the share.
+    3. Add the values down each column and subtract the cell itself. This gives the foot of each band.
+    4. Divide each cohort's next year by its own current year to get the cohort carryover.
+    5. Take the next year's total, remove the cohort acquired in that year, and divide by this year's total. This gives the base carryover.
 
-    **Purpose:** Shape the flow data as plain tables before the chart.
-    **Goal:** Feed the cohort flow charts.
+    **Purpose:** Compute every number the flow chart draws, as tables you can read first.
+
+    **Result:** Six tables, plus the year labels and the year-pair labels.
+
+    **Watch:** Cells before a cohort exists stay missing. A zero would be drawn.
     """)
     return
 
@@ -4240,13 +4518,6 @@ def _(annual_cohort_combined, cohort_flow_data):
     flow_profit = cohort_flow_data(annual_cohort_combined, "TotalProfit", scale=1e6)
     flow_spend = cohort_flow_data(annual_cohort_combined, "TotalSpend", scale=1e6)
     return flow_active, flow_profit, flow_spend
-
-
-@app.cell
-def _(flow_profit):
-    # Review: each cohort's year-to-year carryover of profit (%).
-    (flow_profit["cohort_carryover"] * 100).round(0)
-    return
 
 
 @app.cell
@@ -4266,6 +4537,169 @@ def _(cohort_flow_chart, flow_profit):
 @app.cell
 def _(cohort_flow_chart, flow_spend):
     cohort_flow_chart(flow_spend, y_title="Spend ($ MM)", total_fmt="{:.2f}")
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ## Annual Cohort Dynamics
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The charts above measure the **value** each cohort gives each year. This
+    section measures the **behaviour** behind that value: how many members of a
+    cohort ever come back, and how long they take. Lens 3 asked this of one
+    quarterly cohort. Here the same question runs across all four annual
+    cohorts, so the answer can be compared from cohort to cohort.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Time to second purchase, by annual cohort
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Cumulative % of each annual cohort that has made a second-ever purchase by end of each year.
+
+    Logic per customer × year cell:
+    - 0 if the year precedes the cohort year
+    - if year == cohort year: `1 if trans > 1 else 0` (repeat beyond the acquisition purchase)
+    - if year > cohort year: `max(previous_flag, 1 if trans > 0 else 0)`
+
+    Sum by cohort year, divide by cohort size. **Exclude the `pre 2016` cohort** — its size is unknown and its "acquisition year" is outside the window.
+
+    Result is a triangular table (each cohort's series starts in its acquisition year).
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Start from the customer-by-year grid of transaction counts. Build one flag
+    for each customer and each year: 0 means the customer has not yet made a
+    second purchase, 1 means the customer has made one, in this year or in an
+    earlier year. Three rules give the flag, one for each side of the
+    acquisition year:
+
+    | Year | Flag |
+    |---|---|
+    | before the cohort year | 0 — the customer does not exist yet |
+    | the cohort year | 1 if transactions > 1 (the first transaction is the acquisition) |
+    | after the cohort year | 1 if transactions > 0, or if the flag was already on |
+
+    The last rule **latches**: once a customer has a second purchase, the flag
+    stays on for every later year. So the column sums are **cumulative**, and
+    dividing them by the cohort size gives the cumulative share of the cohort
+    that has come back.
+
+    The code needs only one of these three rules. Take the acquisition
+    transaction out of the year it falls in, and every year then asks the same
+    question: is there a purchase left over? A year before the cohort holds no
+    transactions, so it answers no on its own.
+
+    Exclude the `pre 2016` cohort. Its size is unknown and its acquisition year
+    is outside the window, so there is no denominator to divide by.
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Add the transactions of each customer in each year. Keep the acquisition year on the row.
+    2. Take one transaction out of the acquisition year. That transaction is the acquisition itself, so what is left is the repeat purchases.
+    3. Pivot to one row for each customer and one column for each year. A cell with more than zero repeat purchases sets the flag.
+    4. Take the running maximum along each row. The flag latches on at the second purchase and stays on.
+    5. Add the flags down each cohort. Count the members of each cohort.
+    6. Divide the sums by the cohort size to get the cumulative share. Then make a second copy with the rows pushed to the left, so column 1 is every cohort's own first year.
+
+    **Purpose:** Measure how many of each cohort come back, and how fast.
+
+    **Result:** Five tables to audit: the customer-level `flags`, the `counts` of flagged customers, the cohort `sizes`, and the shares `cum_pct_by_year` and `cum_pct_by_age`.
+
+    **Watch:** Step 2 does the work of a threshold. Without it, the acquisition year needs **more than one** transaction and every later year needs more than zero, which is two rules instead of one. Cells before a cohort exists stay missing, not zero.
+    """)
+    return
+
+
+@app.cell
+def _(cust_data, second_purchase_annual_data):
+    # `sp_annual` holds the audit trail: the customer-level flags, the counts,
+    # the cohort sizes, and the shares (read in two ways: by calendar year and
+    # by age of the cohort).
+    sp_annual = second_purchase_annual_data(cust_data)
+    return (sp_annual,)
+
+
+@app.cell
+def _(crosstab_table, sp_annual):
+    crosstab_table(
+        sp_annual["cum_pct_by_year"],
+        title="Time to Second Purchase by Annual Cohort",
+        subtitle="Cumulative % of cohort with a second-ever purchase",
+        spanner="By end of",
+        stubhead="Cohort",
+    )
+    return
+
+
+@app.cell
+def _(crosstab_table, sp_annual):
+    crosstab_table(
+        sp_annual["cum_pct_by_age"],
+        title="Time to Second Purchase by Annual Cohort",
+        subtitle="Cumulative % of cohort, counted from each cohort's own first year",
+        spanner="Years since acquisition",
+        stubhead="Cohort",
+    )
+    return
+
+
+@app.cell
+def _(second_purchase_annual_chart, sp_annual):
+    second_purchase_annual_chart(
+        sp_annual["cum_pct_by_age"], x_title="Years Since Acquisition"
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The first table reads by calendar year: each cohort starts on its own
+    diagonal. The second pushes every row to the left, so the columns hold the
+    first, second, third and fourth year of each cohort's own life. Only the
+    second alignment compares like with like, and it is the one the chart draws.
+
+    The four cohorts behave alike. About 26% to 29% of each cohort makes a
+    second purchase inside its acquisition year, and each curve then rises by
+    about 14 points in the following year and by less after that. The 2016
+    cohort, the only one observed for four years, reaches 52% by the end of
+    2019: **about half of every cohort never buys twice**, and the half that
+    does buy twice mostly does so early.
+
+    This is the annual view of the Lens 3 result. There the Q1 2016 cohort
+    reached 55% by the end of 2019; here the whole 2016 cohort reaches 52%,
+    because its later quarters have less time to come back.
+
+    Read the curves against the cohort flow charts above. A cohort's value
+    falls by about half in its second year not because the firm loses
+    customers it had, but because most members of the cohort never became
+    repeat buyers in the first place.
+    """)
     return
 
 
@@ -4320,25 +4754,6 @@ def _(mo):
     - The pre-2016 cohort delivered \\$678,387 in 2016 and \\$536,888 in 2017 → **79%** retention.
 
     **The story:** new cohorts decay fast (38% in year two); old, self-selected surviving cohorts are far stickier (79%). Growth in total profit is being bought with acquisition, while the profit contributed by each existing cohort falls roughly by half annually. Repeat the same annotation for the active-customer stack.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Time to second purchase, by annual cohort
-
-    Cumulative % of each annual cohort that has made a second-ever purchase by end of each year.
-
-    Logic per customer × year cell:
-    - 0 if the year precedes the cohort year
-    - if year == cohort year: `1 if trans > 1 else 0` (repeat beyond the acquisition purchase)
-    - if year > cohort year: `max(previous_flag, 1 if trans > 0 else 0)`
-
-    Sum by cohort year, divide by cohort size. **Exclude the `pre 2016` cohort** — its size is unknown and its "acquisition year" is outside the window.
-
-    Result is a triangular table (each cohort's series starts in its acquisition year).
     """)
     return
 

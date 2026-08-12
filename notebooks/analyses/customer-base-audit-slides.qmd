@@ -588,7 +588,7 @@ Madrigal transaction sample; all acquisition cohorts aligned by age
 ::: {.column width="33.33%"}
 ```{python}
 # | echo: false
-fit(acquisitions_bar_chart(annual_cohort_combined), width=COL_THIRD, height=300)
+fit(annual_summary_chart(bars_acquisitions), width=COL_THIRD, height=300)
 ```
 ::: {.exhibit-cap}
 New customers
@@ -597,7 +597,7 @@ New customers
 ::: {.column width="33.33%"}
 ```{python}
 # | echo: false
-fit(active_customers_bar_chart(annual_cohort_combined), width=COL_THIRD, height=300)
+fit(annual_summary_chart(bars_active), width=COL_THIRD, height=300)
 ```
 ::: {.exhibit-cap}
 Active customers
@@ -606,7 +606,7 @@ Active customers
 ::: {.column width="33.33%"}
 ```{python}
 # | echo: false
-fit(spend_profit_bar_chart(annual_cohort_combined), width=COL_THIRD, height=300)
+fit(annual_summary_chart(bars_spend_profit), width=COL_THIRD, height=300)
 ```
 ::: {.exhibit-cap}
 Spend & profit

@@ -84,7 +84,9 @@ def _(GT, pd, style_table):
             "percentiles": s.quantile([i / 100 for i in range(5, 100, 5)]),
         }
 
-    def stat_badges(stats, label, money=True, pct=False, title=None, subtitle=None):
+    def stat_badges(
+        stats, label, money=True, pct=False, title=None, subtitle=None
+    ):
         if money:
             fmt = lambda v: f"${v:,.2f}"
         elif pct:
@@ -114,18 +116,26 @@ def _(GT, pd, style_table):
             gt = gt.tab_header(title=title, subtitle=subtitle)
         return gt.pipe(style_table)
 
-    def create_percentile_table(stats, column, title, subtitle=None, fmt=None):
+    def create_percentile_table(
+        stats, column, title, subtitle=None, fmt=None
+    ):
         t = (
             stats["percentiles"]
             .reset_index()
             .rename(columns={"index": "Percentile", column: "Value"})
         )
-        t["Percentile"] = (t["Percentile"] * 100).astype(int).astype(str) + "%"
-        gt = GT(t).tab_header(title=title, subtitle=subtitle).pipe(style_table)
+        t["Percentile"] = (t["Percentile"] * 100).astype(int).astype(
+            str
+        ) + "%"
+        gt = (
+            GT(t).tab_header(title=title, subtitle=subtitle).pipe(style_table)
+        )
         if fmt == "currency":
             gt = gt.fmt_currency(columns="Value", decimals=2)
         elif fmt == "pct":
-            gt = gt.fmt_percent(columns="Value", decimals=2, scale_values=False)
+            gt = gt.fmt_percent(
+                columns="Value", decimals=2, scale_values=False
+            )
         elif fmt == "float":
             gt = gt.fmt_number(columns="Value", decimals=2)
         return gt
@@ -155,7 +165,10 @@ def _(np, pd):
         )
         labels = (
             lower_labels
-            + [f"{i}-{i + bin_width}" for i in range(min_cutoff, max_cutoff, bin_width)]
+            + [
+                f"{i}-{i + bin_width}"
+                for i in range(min_cutoff, max_cutoff, bin_width)
+            ]
             + [f"{max_cutoff}+"]
         )
         return {"bins": bins, "labels": labels}
@@ -220,7 +233,9 @@ def _(GT, np, style_table):
             )
             .assign(
                 PctCust=lambda x: x["Customers"] / x["Customers"].sum(),
-                PctTrans=lambda x: x["Transactions"] / x["Transactions"].sum(),
+                PctTrans=lambda x: (
+                    x["Transactions"] / x["Transactions"].sum()
+                ),
                 PctSpend=lambda x: x["Spend"] / x["Spend"].sum(),
                 PctProfit=lambda x: x["Profit"] / x["Profit"].sum(),
                 AvgSpendCust=lambda x: x["Spend"] / x["Customers"],
@@ -231,7 +246,9 @@ def _(GT, np, style_table):
             )
             .drop(columns=["Customers", "Transactions", "Spend", "Profit"])
         )
-        fields = [f if f != "% Profit" else profit_pct_name for f in DECILE_FIELDS]
+        fields = [
+            f if f != "% Profit" else profit_pct_name for f in DECILE_FIELDS
+        ]
         rep.columns = fields
         return rep, fields
 
@@ -239,7 +256,9 @@ def _(GT, np, style_table):
         return (
             GT(rep)
             .tab_header(title=title)
-            .fmt_percent(columns=fields[1:5] + [fields[-1]], decimals=pct_decimals)
+            .fmt_percent(
+                columns=fields[1:5] + [fields[-1]], decimals=pct_decimals
+            )
             .fmt_currency(columns=fields[5:7] + [fields[8]])
             .fmt_number(columns=fields[7])
             .pipe(style_table)
@@ -455,7 +474,9 @@ def _(ACCENT, FONT, GT, INK, MUTED, loc, style):
         # left), so totals read apart from the detail rows. Consulting-table norm.
         return gt.tab_style(
             style=style.text(weight="bold"),
-            locations=loc.body(rows=lambda d: d[stub].astype(str).isin(names)),
+            locations=loc.body(
+                rows=lambda d: d[stub].astype(str).isin(names)
+            ),
         )
 
     return accent_stub, bold_totals, crosstab_table, style_table
@@ -485,7 +506,9 @@ def _(mo):
     def how(body):
         # Collapsible "How this is done" block: an info callout in ASD-STE100
         # Simplified Technical English, placed above a calculation/summary cell.
-        return mo.accordion({"How this is done": mo.callout(mo.md(body), kind="info")})
+        return mo.accordion(
+            {"How this is done": mo.callout(mo.md(body), kind="info")}
+        )
 
     return how, pretty_cohort
 
@@ -520,7 +543,11 @@ def _(ACCENT, ACCENT2, H, W, go):
     def _titleblk(text, subtitle=None):
         # Consulting-style exhibit title: a descriptive Title-Case main line, with
         # an optional "so-what"/context subtitle underneath.
-        return dict(text=text, subtitle=dict(text=subtitle)) if subtitle else text
+        return (
+            dict(text=text, subtitle=dict(text=subtitle))
+            if subtitle
+            else text
+        )
 
     def bar_distribution(
         dist,
@@ -559,7 +586,9 @@ def _(ACCENT, ACCENT2, H, W, go):
             categoryarray=order,
             **_thin_ticks(order),
         )
-        fig.update_yaxes(title="Customers (%)", tickformat=".0%", automargin=True)
+        fig.update_yaxes(
+            title="Customers (%)", tickformat=".0%", automargin=True
+        )
         return fig
 
     def overlay_bar_distribution(
@@ -614,7 +643,9 @@ def _(ACCENT, ACCENT2, H, W, go):
             categoryarray=order,
             **_thin_ticks(order),
         )
-        fig.update_yaxes(title="Customers (%)", tickformat=".0%", automargin=True)
+        fig.update_yaxes(
+            title="Customers (%)", tickformat=".0%", automargin=True
+        )
         return fig
 
     def line_chart(
@@ -809,12 +840,16 @@ def _(cust_data, pretty_cohort):
     YEAR_PRIOR = 2018  # the comparison year for Lens 2
     FOCUS_COHORT = "y2016_q1"  # the acquisition cohort followed in Lens 3
 
-    FOCUS_COHORT_LABEL = pretty_cohort(FOCUS_COHORT)  # "Y2016 Q1" (legend/label form)
+    FOCUS_COHORT_LABEL = pretty_cohort(
+        FOCUS_COHORT
+    )  # "Y2016 Q1" (legend/label form)
     FOCUS_COHORT_QTR = (
         f"Q{FOCUS_COHORT[-1]} {FOCUS_COHORT[1:5]}"  # "Q1 2016" (prose form)
     )
     FOCUS_COHORT_N = int(
-        cust_data.loc[cust_data["Cohort"] == FOCUS_COHORT, "CustomerID"].nunique()
+        cust_data.loc[
+            cust_data["Cohort"] == FOCUS_COHORT, "CustomerID"
+        ].nunique()
     )
     return FOCUS_COHORT_N, FOCUS_COHORT_QTR, YEAR_CURR, YEAR_PRIOR
 
@@ -971,7 +1006,9 @@ def _(np):
             )
             .assign(
                 Spend=lambda x: (x["Spend"] / 100).astype("float32").round(2),
-                Profit=lambda x: (x["Profit"] / 100).astype("float32").round(2),
+                Profit=lambda x: (
+                    (x["Profit"] / 100).astype("float32").round(2)
+                ),
             )
         )
 
@@ -997,8 +1034,12 @@ def _(
     pd,
     style_table,
 ):
-    cust_data_2019 = add_customer_ratios(annual_customer_totals(cust_data, 2019))
-    cust_data_2018 = add_customer_ratios(annual_customer_totals(cust_data, 2018))
+    cust_data_2019 = add_customer_ratios(
+        annual_customer_totals(cust_data, 2019)
+    )
+    cust_data_2018 = add_customer_ratios(
+        annual_customer_totals(cust_data, 2018)
+    )
 
     _summary = pd.DataFrame(
         {
@@ -1039,7 +1080,9 @@ def _(cust_data_2019, customer_descriptives):
     spend_stats = customer_descriptives(cust_data_2019, "Spend")
     profit_stats = customer_descriptives(cust_data_2019, "Profit")
     trans_stats = customer_descriptives(cust_data_2019, "NumTrans")
-    avg_spend_stats = customer_descriptives(cust_data_2019, "AvgSpendPerTrans")
+    avg_spend_stats = customer_descriptives(
+        cust_data_2019, "AvgSpendPerTrans"
+    )
     avg_margin_stats = customer_descriptives(
         cust_data_2019.query("Spend > 0"), "Margin"
     )
@@ -1080,7 +1123,9 @@ def _(mo):
 
 @app.cell
 def _(YEAR_CURR, spend_stats, stat_badges):
-    stat_badges(spend_stats, "Spend", title=f"Spend per Customer ({YEAR_CURR})")
+    stat_badges(
+        spend_stats, "Spend", title=f"Spend per Customer ({YEAR_CURR})"
+    )
     return
 
 
@@ -1105,7 +1150,9 @@ def _(
     cust_data_2019,
 ):
     bar_distribution(
-        create_distribution(cust_data_2019, "Spend", **create_bins_labels(25, 1000)),
+        create_distribution(
+            cust_data_2019, "Spend", **create_bins_labels(25, 1000)
+        ),
         title=f"Annual Customer Spend Distribution ({YEAR_CURR})",
         x_title="Annual Spend ($)",
     )
@@ -1134,7 +1181,9 @@ def _(mo):
 
 @app.cell
 def _(YEAR_CURR, profit_stats, stat_badges):
-    stat_badges(profit_stats, "Profit", title=f"Profit per Customer ({YEAR_CURR})")
+    stat_badges(
+        profit_stats, "Profit", title=f"Profit per Customer ({YEAR_CURR})"
+    )
     return
 
 
@@ -1159,7 +1208,9 @@ def _(
     cust_data_2019,
 ):
     bar_distribution(
-        create_distribution(cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)),
+        create_distribution(
+            cust_data_2019, "Profit", **create_bins_labels(25, 500, 0)
+        ),
         title=f"Annual Customer Profit Distribution ({YEAR_CURR})",
         x_title="Annual Profit ($)",
     )
@@ -1229,7 +1280,9 @@ def _(YEAR_CURR, bar_distribution, create_distribution, cust_data_2019, np):
     _bins = list(range(1, 11)) + [np.inf]
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     bar_distribution(
-        create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
+        create_distribution(
+            cust_data_2019, "NumTrans", bins=_bins, labels=_labels
+        ),
         title=f"Annual Transaction-Count Distribution ({YEAR_CURR})",
         x_title="Annual Transactions",
     )
@@ -1396,7 +1449,9 @@ def _(GT, cust_data_2019, np, pd, style_table):
             d["NumTrans"], bins=_bins, labels=_labels, right=False
         )
     )
-    aspt_by_level = _binned.groupby("TransBin", as_index=False, observed=True).agg(
+    aspt_by_level = _binned.groupby(
+        "TransBin", as_index=False, observed=True
+    ).agg(
         Mean=("AvgSpendPerTrans", "mean"),
         Std=("AvgSpendPerTrans", "std"),
         Min=("AvgSpendPerTrans", "min"),
@@ -1407,7 +1462,9 @@ def _(GT, cust_data_2019, np, pd, style_table):
     )
     (
         GT(aspt_by_level.rename(columns={"TransBin": "Transactions"}))
-        .tab_header(title="Average Spend per Transaction, by Transaction Level")
+        .tab_header(
+            title="Average Spend per Transaction, by Transaction Level"
+        )
         .fmt_currency(columns=list(aspt_by_level.columns[1:]), decimals=2)
         .pipe(style_table)
     )
@@ -1755,9 +1812,15 @@ def _(
         suffix = f"_{year}"
         sub = df.filter(like=suffix)
         funcs = {c: _func_cols[c.removesuffix(suffix)] for c in sub.columns}
-        return sub.agg(funcs).rename(lambda c: c.removesuffix(suffix)).rename(str(year))
+        return (
+            sub.agg(funcs)
+            .rename(lambda c: c.removesuffix(suffix))
+            .rename(str(year))
+        )
 
-    _yoy = pd.concat([_summarize(cust_2018_2019, y) for y in (2018, 2019)], axis=1)
+    _yoy = pd.concat(
+        [_summarize(cust_2018_2019, y) for y in (2018, 2019)], axis=1
+    )
     _yoy["Δ"] = (_yoy["2019"] - _yoy["2018"]) / _yoy["2018"]
     _a18 = cust_data_2018["CustomerID"].nunique()
     _a19 = cust_data_2019["CustomerID"].nunique()
@@ -1886,8 +1949,12 @@ def _(
     _labels = [str(i) for i in range(1, 10)] + ["10+"]
     overlay_bar_distribution(
         [
-            create_distribution(cust_data_2018, "NumTrans", bins=_bins, labels=_labels),
-            create_distribution(cust_data_2019, "NumTrans", bins=_bins, labels=_labels),
+            create_distribution(
+                cust_data_2018, "NumTrans", bins=_bins, labels=_labels
+            ),
+            create_distribution(
+                cust_data_2019, "NumTrans", bins=_bins, labels=_labels
+            ),
         ],
         labels=("2018", "2019"),
         title=f"Transaction-Count Distribution ({YEAR_PRIOR} vs {YEAR_CURR})",
@@ -1992,12 +2059,15 @@ def _(how):
 
 @app.cell
 def _(GT, cust_2018_2019, style_table):
-    overlap = cust_2018_2019.groupby("Status").agg(Customers=("CustomerID", "count"))
+    overlap = cust_2018_2019.groupby("Status").agg(
+        Customers=("CustomerID", "count")
+    )
     overlap.loc["Active 2018"] = (
         overlap.loc["2018 Only (Lapsed)"] + overlap.loc["Active Both Years"]
     )
     overlap.loc["Active 2019"] = (
-        overlap.loc["2019 Only (New/Reactivated)"] + overlap.loc["Active Both Years"]
+        overlap.loc["2019 Only (New/Reactivated)"]
+        + overlap.loc["Active Both Years"]
     )
     (
         GT(overlap.reset_index(names="Group"))
@@ -2018,7 +2088,9 @@ def _(mo):
 
 @app.cell(hide_code=True)
 def _(ACCENT, ACCENT2, brentq, go, np):
-    def venn_two(n_a, n_b, n_both, label_a, label_b, title, width=560, height=460):
+    def venn_two(
+        n_a, n_b, n_both, label_a, label_b, title, width=560, height=460
+    ):
         R = 1.0
         r = np.sqrt(n_b / n_a)
         a_target = np.pi * (n_both / n_a)
@@ -2028,8 +2100,12 @@ def _(ACCENT, ACCENT2, brentq, go, np):
                 return 0.0
             if d <= abs(R - r):
                 return np.pi * min(R, r) ** 2
-            p1 = R**2 * np.arccos(np.clip((d**2 + R**2 - r**2) / (2 * d * R), -1, 1))
-            p2 = r**2 * np.arccos(np.clip((d**2 + r**2 - R**2) / (2 * d * r), -1, 1))
+            p1 = R**2 * np.arccos(
+                np.clip((d**2 + R**2 - r**2) / (2 * d * R), -1, 1)
+            )
+            p2 = r**2 * np.arccos(
+                np.clip((d**2 + r**2 - R**2) / (2 * d * r), -1, 1)
+            )
             p3 = 0.5 * np.sqrt(
                 max(
                     (-d + r + R) * (d - r + R) * (d + r - R) * (d + r + R),
@@ -2038,7 +2114,9 @@ def _(ACCENT, ACCENT2, brentq, go, np):
             )
             return p1 + p2 - p3
 
-        d = brentq(lambda x: lens_area(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9)
+        d = brentq(
+            lambda x: lens_area(x) - a_target, abs(R - r) + 1e-9, R + r - 1e-9
+        )
         cy = max(R, r)
         cx1, cx2 = R, R + d
         xlens = R + (d**2 + R**2 - r**2) / (2 * d)
@@ -2072,7 +2150,9 @@ def _(ACCENT, ACCENT2, brentq, go, np):
         _lens = np.vstack([_c1, _c2])
         _ctr = _lens.mean(axis=0)
         _lens = _lens[
-            np.argsort(np.arctan2(_lens[:, 1] - _ctr[1], _lens[:, 0] - _ctr[0]))
+            np.argsort(
+                np.arctan2(_lens[:, 1] - _ctr[1], _lens[:, 0] - _ctr[0])
+            )
         ]
         _rgb = tuple(int(ACCENT[k : k + 2], 16) for k in (1, 3, 5))
         fig.add_scatter(
@@ -2216,16 +2296,34 @@ def _(ACCENT, ACCENT2, INK, MUTED, YEAR_CURR, go):
         # carried-over base, navy for the 2018 flow, ochre for the 2019 flow.
         # All three are dark enough for white in-bar labels.
         _both = dict(marker_color="#64748b")
-        _b18 = dict(marker_color=ACCENT, marker_line=dict(color="white", width=1))
-        _b19 = dict(marker_color=ACCENT2, marker_line=dict(color="white", width=1))
+        _b18 = dict(
+            marker_color=ACCENT, marker_line=dict(color="white", width=1)
+        )
+        _b19 = dict(
+            marker_color=ACCENT2, marker_line=dict(color="white", width=1)
+        )
         w = 0.62
-        fig.add_bar(x=[0], y=[both18], base=0, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18)
-        fig.add_bar(x=[1], y=[only18], base=both18, width=w, showlegend=False, **_b18)
-        fig.add_bar(x=[2], y=[abs(delta)], base=lo, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[3], y=[only19], base=both19, width=w, showlegend=False, **_b19)
-        fig.add_bar(x=[4], y=[both19], base=0, width=w, showlegend=False, **_both)
-        fig.add_bar(x=[4], y=[only19], base=both19, width=w, showlegend=False, **_b19)
+        fig.add_bar(
+            x=[0], y=[both18], base=0, width=w, showlegend=False, **_both
+        )
+        fig.add_bar(
+            x=[0], y=[only18], base=both18, width=w, showlegend=False, **_b18
+        )
+        fig.add_bar(
+            x=[1], y=[only18], base=both18, width=w, showlegend=False, **_b18
+        )
+        fig.add_bar(
+            x=[2], y=[abs(delta)], base=lo, width=w, showlegend=False, **_both
+        )
+        fig.add_bar(
+            x=[3], y=[only19], base=both19, width=w, showlegend=False, **_b19
+        )
+        fig.add_bar(
+            x=[4], y=[both19], base=0, width=w, showlegend=False, **_both
+        )
+        fig.add_bar(
+            x=[4], y=[only19], base=both19, width=w, showlegend=False, **_b19
+        )
 
         def hline(x0, x1, y):
             fig.add_shape(
@@ -2475,7 +2573,9 @@ def _(
     _tbl["% 2018"] = _tbl["Total"] / cust_data_2018["CustomerID"].count()
     _tbl.loc[["2019 Only", "Total"], "% 2018"] = np.nan
 
-    _tbl.loc["% 2019"] = _tbl.loc["Total"] / cust_data_2019["CustomerID"].count()
+    _tbl.loc["% 2019"] = (
+        _tbl.loc["Total"] / cust_data_2019["CustomerID"].count()
+    )
     _tbl.loc["% 2019", ["2018 Only", "Total", "% 2018"]] = np.nan
 
     _tbl = _tbl.reset_index(names="2018 decile")
@@ -2500,7 +2600,9 @@ def _(
         .sub_missing(missing_text="")
         .data_color(
             columns=_dcols,
-            rows=lambda d: ~d["2018 decile"].isin(["2019 Only", "Total", "% 2019"]),
+            rows=lambda d: (
+                ~d["2018 decile"].isin(["2019 Only", "Total", "% 2019"])
+            ),
             palette=["#ffffff", "#c6dbef", "#4292c6", "#08306b"],
             na_color="white",
         )
@@ -2588,7 +2690,8 @@ def _(GT, YEAR_CURR, YEAR_PRIOR, cust_2018_2019, np, pd, style_table):
                 >= d["Spend_2018"] / d["NumTrans_2018"]
             ),
             margin_up=lambda d: (
-                d["Profit_2019"] / d["Spend_2019"] >= d["Profit_2018"] / d["Spend_2018"]
+                d["Profit_2019"] / d["Spend_2019"]
+                >= d["Profit_2018"] / d["Spend_2018"]
             ),
         )
     )
@@ -2611,7 +2714,9 @@ def _(GT, YEAR_CURR, YEAR_PRIOR, cust_2018_2019, np, pd, style_table):
         aspt_up=lambda d: d["aspt_up"].map(_bmap),
         margin_up=lambda d: d["margin_up"].map(_bmap),
     )
-    _body = pd.concat([_lbl, _grp[["NumCust", "P2018", "P2019", "Change"]]], axis=1)
+    _body = pd.concat(
+        [_lbl, _grp[["NumCust", "P2018", "P2019", "Change"]]], axis=1
+    )
     _body.columns = [
         "Profit",
         "# Trans",
@@ -2679,9 +2784,13 @@ def _(GT, YEAR_CURR, YEAR_PRIOR, cust_2018_2019, np, pd, style_table):
         )
         .tab_spanner(label="Profit", columns=["2018", "2019", "Change"])
         .fmt_number(columns="# Customers", decimals=0, use_seps=True)
-        .fmt_currency(columns=["2018", "2019", "Change"], currency="USD", decimals=0)
+        .fmt_currency(
+            columns=["2018", "2019", "Change"], currency="USD", decimals=0
+        )
         .sub_missing(missing_text="")
-        .cols_align(align="center", columns=["Profit", "# Trans", "ASPT", "Avg Marg"])
+        .cols_align(
+            align="center", columns=["Profit", "# Trans", "ASPT", "Avg Marg"]
+        )
         .pipe(style_table, font_size="11px", row_padding="3px")
     )
     return
@@ -3008,7 +3117,9 @@ def _(cust_data, pd):
         }
     )
     second_purchase["inc_pct"] = (
-        second_purchase["cum_pct"].diff().fillna(second_purchase["cum_pct"].iloc[0])
+        second_purchase["cum_pct"]
+        .diff()
+        .fillna(second_purchase["cum_pct"].iloc[0])
     )
     return (second_purchase,)
 
@@ -3235,7 +3346,9 @@ def _(
         )
     )
     bar_distribution(
-        create_distribution(vtd_df, "TotalProfit", **create_bins_labels(25, 1000, 0)),
+        create_distribution(
+            vtd_df, "TotalProfit", **create_bins_labels(25, 1000, 0)
+        ),
         title=f"Value-to-Date Distribution ({FOCUS_COHORT_QTR} Cohort)",
         x_title="Value to Date ($)",
     )
@@ -3571,7 +3684,10 @@ def _(cust_data):
     _idx = cohort_df.index
     _csize = (
         cohort_df["TotalCust"]
-        .loc[_idx.get_level_values("Cohort") == _idx.get_level_values("YearQuarter")]
+        .loc[
+            _idx.get_level_values("Cohort")
+            == _idx.get_level_values("YearQuarter")
+        ]
         .droplevel("YearQuarter")
     )
     cohort_df = cohort_df.assign(
@@ -3649,12 +3765,18 @@ def _(go, pretty_cohort):
         if cohorts is not None:
             d = d[d["Cohort"].isin(cohorts)]
         d = d.sort_values(["Cohort", "YearQuarter"]).copy()
-        base_year = d["YearQuarter"].str.extract(pattern)[0].astype("float").min()
+        base_year = (
+            d["YearQuarter"].str.extract(pattern)[0].astype("float").min()
+        )
         d["Age"] = _q_index(d["YearQuarter"], base_year, pattern) - _q_index(
             d["Cohort"], base_year, pattern
         )
         if index:
-            d[metric] = d[metric] / d.groupby("Cohort")[metric].transform("first") * 100
+            d[metric] = (
+                d[metric]
+                / d.groupby("Cohort")[metric].transform("first")
+                * 100
+            )
         order = [
             c
             for c in ["pre y2016", *sorted(d["YearQuarter"].unique())]
@@ -3683,7 +3805,9 @@ def _(go, pretty_cohort):
                 )
                 if b
             ]
-            title = f"{_mlabel} by Cohort" + (f" ({', '.join(_bits)})" if _bits else "")
+            title = f"{_mlabel} by Cohort" + (
+                f" ({', '.join(_bits)})" if _bits else ""
+            )
         fig = go.Figure()
         for c in order:
             dc = d[d["Cohort"] == c]
@@ -3739,7 +3863,9 @@ def _(cohort_df, cohort_lines):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "TotalProfit", cohorts=["y2016_q3", "y2016_q4"], index=True)
+    cohort_lines(
+        cohort_df, "TotalProfit", cohorts=["y2016_q3", "y2016_q4"], index=True
+    )
     return
 
 
@@ -3756,13 +3882,17 @@ def _(cohort_df, cohort_lines):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "AOF", cohorts=["y2016_q3", "y2016_q4"], tickformat=",.1f")
+    cohort_lines(
+        cohort_df, "AOF", cohorts=["y2016_q3", "y2016_q4"], tickformat=",.1f"
+    )
     return
 
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "AOV", cohorts=["y2016_q3", "y2016_q4"], tickformat="$,.0f")
+    cohort_lines(
+        cohort_df, "AOV", cohorts=["y2016_q3", "y2016_q4"], tickformat="$,.0f"
+    )
     return
 
 
@@ -3855,7 +3985,9 @@ def _(mo):
 
 @app.cell
 def _(cohort_df, cohort_lines):
-    cohort_lines(cohort_df, "TotalProfit", align=True, index=True, tickformat="$,.0f")
+    cohort_lines(
+        cohort_df, "TotalProfit", align=True, index=True, tickformat="$,.0f"
+    )
     return
 
 
@@ -3979,7 +4111,9 @@ def _(ACCENT, ACCENT2, go):
             "value_fmt": spec["value_fmt"],
         }
 
-    def annual_summary_chart(data, colors=(ACCENT, ACCENT2), width=520, height=340):
+    def annual_summary_chart(
+        data, colors=(ACCENT, ACCENT2), width=520, height=340
+    ):
         values = data["values"]
         one_series = values.shape[1] == 1
         fig = go.Figure()
@@ -4028,10 +4162,15 @@ def _(pd):
         totals = P.sum(axis=0)
         share = P.div(totals, axis=1)
         bottoms = P.cumsum(axis=0) - P
-        gaps = [f"{years[i]}\u2192{years[i + 1]}" for i in range(len(years) - 1)]
+        gaps = [
+            f"{years[i]}\u2192{years[i + 1]}" for i in range(len(years) - 1)
+        ]
         # Per-cohort carryover: a cohort's value next year / its value this year.
         cohort_carryover = pd.DataFrame(
-            {gaps[i]: P[years[i + 1]] / P[years[i]] for i in range(len(gaps))},
+            {
+                gaps[i]: P[years[i + 1]] / P[years[i]]
+                for i in range(len(gaps))
+            },
             index=order,
         )
         # Base carryover: of a year's whole base, the share still
@@ -4042,7 +4181,9 @@ def _(pd):
             new_next = P.loc[y1, y1] if y1 in P.index else 0.0
             new_next = 0.0 if pd.isna(new_next) else new_next
             base[g] = (
-                (totals[y1] - new_next) / totals[y0] if totals[y0] else float("nan")
+                (totals[y1] - new_next) / totals[y0]
+                if totals[y0]
+                else float("nan")
             )
         base_carryover = pd.Series(base, name="base_carryover")
         return {
@@ -4086,7 +4227,9 @@ def _(SEQ, go, pd, pretty_cohort):
         )
         order = list(P.index)
         colors = dict(zip(order, SEQ[: len(order)]))
-        text_color = {c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)}
+        text_color = {
+            c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)
+        }
         xpos = list(range(len(years)))
         hw = (1 - 0.45) / 2
         fig = go.Figure()
@@ -4117,7 +4260,9 @@ def _(SEQ, go, pd, pretty_cohort):
                 name=pretty_cohort(c),
                 x=xpos,
                 y=y_vals,
-                marker=dict(color=colors[c], line=dict(color="white", width=1)),
+                marker=dict(
+                    color=colors[c], line=dict(color="white", width=1)
+                ),
                 hovertemplate=f"{pretty_cohort(c)} \u00b7 %{{x}}<br>{y_title}: %{{y:,.2f}}<extra></extra>",
             )
         fig.update_layout(
@@ -4218,7 +4363,9 @@ def _(SEQ, go, pd):
             )
             .dropna(subset=["CohortYear"])
             .astype({"CohortYear": "int32"})
-            .groupby(["CustomerID", "CohortYear", "Year"], as_index=False)["NumTrans"]
+            .groupby(["CustomerID", "CohortYear", "Year"], as_index=False)[
+                "NumTrans"
+            ]
             .sum()
         )
         # The first transaction of the acquisition year is the acquisition
@@ -4228,7 +4375,9 @@ def _(SEQ, go, pd):
         # purchase and keeps it on, so the column sums are cumulative.
         flags = (
             annual.assign(
-                Repeat=lambda d: d["NumTrans"].sub(d["Year"].eq(d["CohortYear"]))
+                Repeat=lambda d: d["NumTrans"].sub(
+                    d["Year"].eq(d["CohortYear"])
+                )
             )
             .pivot_table(
                 index=["CustomerID", "CohortYear"],
@@ -4260,7 +4409,9 @@ def _(SEQ, go, pd):
         # left, so column 1 is every cohort's own first year. Only this
         # alignment compares like with like.
         first = min(int(c) for c in by_year.columns)
-        by_age = by_year.apply(lambda row: row.shift(first - int(row.name)), axis=1)
+        by_age = by_year.apply(
+            lambda row: row.shift(first - int(row.name)), axis=1
+        )
         by_age.columns = [f"Year {i}" for i in range(1, by_age.shape[1] + 1)]
 
         return {
@@ -4371,12 +4522,16 @@ def _(cust_data, pd):
     _order = ["pre_2016", "2016", "2017", "2018", "2019"]
     _annual = cust_data.assign(
         CohortYear=lambda d: pd.Categorical(
-            d["Cohort"].str.extract(r"y(\d{4})_q\d", expand=False).fillna("pre_2016"),
+            d["Cohort"]
+            .str.extract(r"y(\d{4})_q\d", expand=False)
+            .fillna("pre_2016"),
             categories=_order,
             ordered=True,
         )
     )
-    annual_cohort_combined = _annual.groupby(["CohortYear", "Year"], observed=True).agg(
+    annual_cohort_combined = _annual.groupby(
+        ["CohortYear", "Year"], observed=True
+    ).agg(
         NumActive=("CustomerID", "nunique"),
         TotalTrans=("NumTrans", "sum"),
         TotalSpend=("Spend", lambda s: s.sum() / 100),
@@ -4387,9 +4542,13 @@ def _(cust_data, pd):
 
 @app.cell
 def _(annual_cohort_combined, annual_summary_data):
-    bars_acquisitions = annual_summary_data(annual_cohort_combined, "acquisitions")
+    bars_acquisitions = annual_summary_data(
+        annual_cohort_combined, "acquisitions"
+    )
     bars_active = annual_summary_data(annual_cohort_combined, "active")
-    bars_spend_profit = annual_summary_data(annual_cohort_combined, "spend_profit")
+    bars_spend_profit = annual_summary_data(
+        annual_cohort_combined, "spend_profit"
+    )
     return bars_acquisitions, bars_active, bars_spend_profit
 
 
@@ -4514,9 +4673,15 @@ def _(how):
 
 @app.cell
 def _(annual_cohort_combined, cohort_flow_data):
-    flow_active = cohort_flow_data(annual_cohort_combined, "NumActive", scale=1e3)
-    flow_profit = cohort_flow_data(annual_cohort_combined, "TotalProfit", scale=1e6)
-    flow_spend = cohort_flow_data(annual_cohort_combined, "TotalSpend", scale=1e6)
+    flow_active = cohort_flow_data(
+        annual_cohort_combined, "NumActive", scale=1e3
+    )
+    flow_profit = cohort_flow_data(
+        annual_cohort_combined, "TotalProfit", scale=1e6
+    )
+    flow_spend = cohort_flow_data(
+        annual_cohort_combined, "TotalSpend", scale=1e6
+    )
     return flow_active, flow_profit, flow_spend
 
 
@@ -4530,7 +4695,9 @@ def _(cohort_flow_chart, flow_active):
 
 @app.cell
 def _(cohort_flow_chart, flow_profit):
-    cohort_flow_chart(flow_profit, y_title="Profit ($ MM)", total_fmt="{:.3f}")
+    cohort_flow_chart(
+        flow_profit, y_title="Profit ($ MM)", total_fmt="{:.3f}"
+    )
     return
 
 
@@ -4743,15 +4910,15 @@ def _(mo):
     For the profit-by-cohort stack, annotate two different ratios — they answer different questions.
 
     **(a) Share of a year's profit from that year's new customers.**
-    2016: \\$1,193,524 / \\$1,871,911 = **64%** → 36% of 2016 profit came from customers acquired earlier.
+    2016: \$1,193,524 / \$1,871,911 = **64%** → 36% of 2016 profit came from customers acquired earlier.
 
     **(b) Year-on-year retention of profit from existing cohorts.**
-    Profit in 2017 from all cohorts acquired *before* 2017 = \\$1,953,229 – \\$964,671 = \\$988,558.
-    That's **53%** of what those same cohorts delivered in 2016 (\\$1,871,911).
+    Profit in 2017 from all cohorts acquired *before* 2017 = \$1,953,229 – \$964,671 = \$988,558.
+    That's **53%** of what those same cohorts delivered in 2016 (\$1,871,911).
 
     And per-cohort:
-    - The 2016 cohort delivered \\$1,193,524 in 2016 and \\$451,670 in 2017 → **38%** retention of profit.
-    - The pre-2016 cohort delivered \\$678,387 in 2016 and \\$536,888 in 2017 → **79%** retention.
+    - The 2016 cohort delivered \$1,193,524 in 2016 and \$451,670 in 2017 → **38%** retention of profit.
+    - The pre-2016 cohort delivered \$678,387 in 2016 and \$536,888 in 2017 → **79%** retention.
 
     **The story:** new cohorts decay fast (38% in year two); old, self-selected surviving cohorts are far stickier (79%). Growth in total profit is being bought with acquisition, while the profit contributed by each existing cohort falls roughly by half annually. Repeat the same annotation for the active-customer stack.
     """)

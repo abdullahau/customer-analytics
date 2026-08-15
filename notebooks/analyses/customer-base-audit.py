@@ -4344,61 +4344,72 @@ def _(SEQ, go, pd, pretty_cohort):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Time to second purchase
+    ### Annual cohort dynamics
     """)
     return
 
 
 @app.cell
-def _(SEQ, go, pd):
-    def second_purchase_annual_data(df):
-        # One row for each customer and year, with the acquisition year kept on
-        # the row. Customers acquired before the window have no acquisition year
-        # inside it, so they leave here: their cohort size is unknown.
+def _(ACCENT2, SEQ, go, pd, pretty_cohort):
+    PRE_COHORT = "pre_2016"
+
+    def annual_cohort_dynamics_data(df):
+        # One row for each customer and year, with the annual cohort kept on the
+        # row. Customers acquired before the window carry the `pre_2016` label.
+        # They cannot appear in the second-purchase tables, whose denominator is
+        # the cohort size, but they do belong in the repeat-buying rates, whose
+        # denominator is the customers active in a year.
         annual = (
             df.assign(
-                CohortYear=lambda d: d["Cohort"].str.extract(
-                    r"y(\d{4})_q\d", expand=False
+                Cohort=lambda d: (
+                    d["Cohort"]
+                    .str.extract(r"y(\d{4})_q\d", expand=False)
+                    .fillna(PRE_COHORT)
                 )
             )
-            .dropna(subset=["CohortYear"])
-            .astype({"CohortYear": "int32"})
-            .groupby(["CustomerID", "CohortYear", "Year"], as_index=False)[
+            .groupby(["CustomerID", "Cohort", "Year"], as_index=False)[
                 "NumTrans"
             ]
             .sum()
         )
+        # One row for each customer, one column for each year. A zero cell means
+        # the customer made no purchase in that year.
+        trans = annual.pivot_table(
+            index=["CustomerID", "Cohort"],
+            columns="Year",
+            values="NumTrans",
+            aggfunc="sum",
+            fill_value=0,
+        ).rename(columns=str)
+        years = list(trans.columns)
+        cohorts = trans.index.get_level_values("Cohort")
+        # Oldest first, with the pre-window group at the top.
+        order = [PRE_COHORT] + sorted(set(cohorts) - {PRE_COHORT})
+        order = [c for c in order if c in set(cohorts)]
+
+        # --- Time to second purchase -------------------------------------
         # The first transaction of the acquisition year is the acquisition
         # itself, not a repeat purchase. Take it out of the count. One rule then
         # covers the whole grid: any transaction left over is a second-or-later
         # purchase. The running maximum latches the flag on at the second
         # purchase and keeps it on, so the column sums are cumulative.
+        acquired = pd.DataFrame(
+            {y: cohorts == y for y in years}, index=trans.index
+        )
         flags = (
-            annual.assign(
-                Repeat=lambda d: d["NumTrans"].sub(
-                    d["Year"].eq(d["CohortYear"])
-                )
-            )
-            .pivot_table(
-                index=["CustomerID", "CohortYear"],
-                columns="Year",
-                values="Repeat",
-                aggfunc="sum",
-                fill_value=0,
-            )
-            .rename(columns=str)
+            trans.sub(acquired.astype("int8"))[cohorts != PRE_COHORT]
             .gt(0)
             .cummax(axis=1)
         )
 
-        grp = flags.groupby("CohortYear")
-        counts = grp.sum().rename_axis("Cohort")
-        sizes = grp.size().rename("Cohort size").rename_axis("Cohort")
+        grp = flags.groupby("Cohort")
+        counts = grp.sum()
+        sizes = grp.size().rename("Cohort size")
         # A cohort has no cell before its acquisition year. Keep those cells
         # missing. A zero would read as "nobody has come back yet", and the
         # chart would draw it.
         exists = pd.DataFrame(
-            {y: counts.index <= int(y) for y in counts.columns},
+            {y: counts.index.astype(int) <= int(y) for y in counts.columns},
             index=counts.index,
         )
 
@@ -4414,35 +4425,85 @@ def _(SEQ, go, pd):
         )
         by_age.columns = [f"Year {i}" for i in range(1, by_age.shape[1] + 1)]
 
+        # --- Annual repeat-buying rates ----------------------------------
+        # Of the cohort members active in year x, the share also active in year
+        # x+1. The rate is conditional on being active in the first year of the
+        # pair, so a cohort's own acquisition year is its first denominator.
+        active = trans.gt(0)
+        pairs = {
+            f"{years[i]}/{years[i + 1][-2:]}": (years[i], years[i + 1])
+            for i in range(len(years) - 1)
+        }
+        both = pd.DataFrame(
+            {lab: active[y0] & active[y1] for lab, (y0, y1) in pairs.items()},
+            index=active.index,
+        )
+        at_risk = pd.DataFrame(
+            {lab: active[y0] for lab, (y0, _) in pairs.items()},
+            index=active.index,
+        )
+        rbr_counts = both.groupby("Cohort").sum().reindex(order)
+        rbr_base = at_risk.groupby("Cohort").sum().reindex(order)
+        # A cohort that does not exist yet has nobody to condition on. Keep the
+        # cell missing rather than 0/0.
+        rbr = (rbr_counts / rbr_base).where(rbr_base > 0)
+        # The firm-level rate: every customer, not split by cohort. It is a
+        # weighted average of the rows, not the mean of them.
+        rbr.loc["Overall"] = both.sum() / at_risk.sum()
+        # The newest cohort has no year before the last pair, so its row is
+        # empty. Reading it needs one more year of data.
+        rbr = rbr.dropna(how="all")
+
         return {
             "flags": flags,
             "counts": counts.where(exists),
             "sizes": sizes,
             "cum_pct_by_year": by_year,
             "cum_pct_by_age": by_age,
+            "active": active.groupby("Cohort").sum().reindex(order),
+            "rbr_counts": rbr_counts,
+            "rbr_base": rbr_base,
+            "rbr": rbr,
         }
 
-    def second_purchase_annual_chart(
+    def cohort_dynamics_chart(
         tbl,
         title="Time to Second Purchase by Annual Cohort",
         x_title="Year",
+        y_title="Cumulative % of Cohort",
+        name_fmt="{} cohort",
+        emphasize=("Overall",),
         width=740,
         height=380,
     ):
-        # `tbl` is a finished cohort-by-period matrix of cumulative shares.
-        # Missing cells break the line, so each cohort starts in its own year.
+        # `tbl` is a finished cohort-by-period matrix of shares. Missing cells
+        # break the line, so each cohort starts in its own period. Rows named in
+        # `emphasize` are firm-level benchmarks, not cohorts: they are drawn in
+        # the accent colour and stay out of the cohort colour ramp.
         fig = go.Figure()
-        for (cohort, row), color in zip(tbl.iterrows(), SEQ):
+        colors = iter(SEQ)
+        for cohort, row in tbl.iterrows():
+            marked = cohort in emphasize
+            color = ACCENT2 if marked else next(colors)
+            name = (
+                str(cohort)
+                if marked
+                else name_fmt.format(pretty_cohort(cohort))
+            )
             fig.add_scatter(
                 x=list(tbl.columns),
                 y=row.to_numpy(),
-                name=f"{cohort} cohort",
+                name=name,
                 mode="lines+markers",
-                line=dict(width=1.8, color=color),
+                line=dict(
+                    width=2.2 if marked else 1.8,
+                    color=color,
+                    dash="dash" if marked else "solid",
+                ),
                 marker=dict(size=6, color=color),
                 connectgaps=False,
                 hovertemplate=(
-                    f"{cohort} cohort · %{{x}}<br>%{{y:.1%}}<extra></extra>"
+                    f"{name} · %{{x}}<br>%{{y:.1%}}<extra></extra>"
                 ),
             )
         fig.update_layout(
@@ -4463,13 +4524,13 @@ def _(SEQ, go, pd):
         )
         fig.update_xaxes(title=x_title, type="category")
         fig.update_yaxes(
-            title="Cumulative % of Cohort",
+            title=y_title,
             tickformat=".0%",
             rangemode="tozero",
         )
         return fig
 
-    return second_purchase_annual_chart, second_purchase_annual_data
+    return annual_cohort_dynamics_data, cohort_dynamics_chart
 
 
 @app.cell(hide_code=True)
@@ -4693,6 +4754,29 @@ def _(cohort_flow_chart, flow_active):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For the profit-by-cohort stack, the two annotations answer different questions.
+
+    **(a) Share of a year's profit from that year's new customers.** In 2016,
+    \$1,193,524 of \$1,871,911 (64%) came from the 2016 cohort, so 36% came from
+    customers acquired earlier.
+
+    **(b) Year-on-year carryover of profit from existing cohorts.** Profit in 2017
+    from cohorts acquired before 2017 was \$988,558, which is 53% of what the same
+    cohorts delivered in 2016. Per cohort: the 2016 cohort delivered \$1,193,524 in
+    2016 and \$451,670 in 2017 (38% carryover); the pre-2016 cohort delivered
+    \$678,387 then \$536,888 (79% carryover).
+
+    The pattern generalizes. **New cohorts decay fast; old, self-selected
+    survivors are far stickier.** Each existing cohort's profit falls by roughly
+    half per year, and total growth is bought with acquisition. Survivorship, not
+    superiority, explains why older cohorts look loyal.
+    """)
+    return
+
+
 @app.cell
 def _(cohort_flow_chart, flow_profit):
     cohort_flow_chart(
@@ -4710,7 +4794,7 @@ def _(cohort_flow_chart, flow_spend):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Annual Cohort Dynamics
+    ## Annual cohort dynamics
     """)
     return
 
@@ -4786,35 +4870,38 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(how):
     how(r"""
-    1. Add the transactions of each customer in each year. Keep the acquisition year on the row.
-    2. Take one transaction out of the acquisition year. That transaction is the acquisition itself, so what is left is the repeat purchases.
-    3. Pivot to one row for each customer and one column for each year. A cell with more than zero repeat purchases sets the flag.
+    1. Add the transactions of each customer in each year. Keep the acquisition year on the row. Customers acquired before the window get the `pre` label.
+    2. Pivot to one row for each customer and one column for each year. Each cell holds the transactions of that customer in that year.
+    3. For the second purchase, take one transaction out of the acquisition year. That transaction is the acquisition itself, so what is left is the repeat purchases. A cell with more than zero repeat purchases sets the flag.
     4. Take the running maximum along each row. The flag latches on at the second purchase and stays on.
     5. Add the flags down each cohort. Count the members of each cohort.
     6. Divide the sums by the cohort size to get the cumulative share. Then make a second copy with the rows pushed to the left, so column 1 is every cohort's own first year.
+    7. For the repeat-buying rate, mark each cell active or not. For each pair of adjacent years, count the customers active in both years and the customers active in the first year.
+    8. Add the two counts down each cohort and divide. Add the two counts across all customers and divide, to get the firm-level rate.
 
-    **Purpose:** Measure how many of each cohort come back, and how fast.
+    **Purpose:** Measure how many of each cohort come back, how fast, and how many of those active in a year come back the next year.
 
-    **Result:** Five tables to audit: the customer-level `flags`, the `counts` of flagged customers, the cohort `sizes`, and the shares `cum_pct_by_year` and `cum_pct_by_age`.
+    **Result:** Two groups of tables to audit. Second purchase: the customer-level `flags`, the `counts` of flagged customers, the cohort `sizes`, and the shares `cum_pct_by_year` and `cum_pct_by_age`. Repeat buying: the `active` counts, the `rbr_counts` and `rbr_base` that make the ratio, and the rates `rbr`.
 
-    **Watch:** Step 2 does the work of a threshold. Without it, the acquisition year needs **more than one** transaction and every later year needs more than zero, which is two rules instead of one. Cells before a cohort exists stay missing, not zero.
+    **Watch:** Step 3 does the work of a threshold. Without it, the acquisition year needs **more than one** transaction and every later year needs more than zero, which is two rules instead of one. Cells before a cohort exists stay missing, not zero. The cohort acquired in the last year has no repeat-buying rate: that row needs one more year of data.
     """)
     return
 
 
 @app.cell
-def _(cust_data, second_purchase_annual_data):
-    # `sp_annual` holds the audit trail: the customer-level flags, the counts,
-    # the cohort sizes, and the shares (read in two ways: by calendar year and
-    # by age of the cohort).
-    sp_annual = second_purchase_annual_data(cust_data)
-    return (sp_annual,)
+def _(annual_cohort_dynamics_data, cust_data):
+    # `annual_dynamics` holds the audit trail for both analyses: the
+    # customer-level flags, the counts, the cohort sizes and the second-purchase
+    # shares (read by calendar year and by age of the cohort), then the active
+    # counts, the two counts behind the repeat-buying rate, and the rate itself.
+    annual_dynamics = annual_cohort_dynamics_data(cust_data)
+    return (annual_dynamics,)
 
 
 @app.cell
-def _(crosstab_table, sp_annual):
+def _(annual_dynamics, crosstab_table):
     crosstab_table(
-        sp_annual["cum_pct_by_year"],
+        annual_dynamics["cum_pct_by_year"],
         title="Time to Second Purchase by Annual Cohort",
         subtitle="Cumulative % of cohort with a second-ever purchase",
         spanner="By end of",
@@ -4824,9 +4911,9 @@ def _(crosstab_table, sp_annual):
 
 
 @app.cell
-def _(crosstab_table, sp_annual):
+def _(annual_dynamics, crosstab_table):
     crosstab_table(
-        sp_annual["cum_pct_by_age"],
+        annual_dynamics["cum_pct_by_age"],
         title="Time to Second Purchase by Annual Cohort",
         subtitle="Cumulative % of cohort, counted from each cohort's own first year",
         spanner="Years since acquisition",
@@ -4836,9 +4923,9 @@ def _(crosstab_table, sp_annual):
 
 
 @app.cell
-def _(second_purchase_annual_chart, sp_annual):
-    second_purchase_annual_chart(
-        sp_annual["cum_pct_by_age"], x_title="Years Since Acquisition"
+def _(annual_dynamics, cohort_dynamics_chart):
+    cohort_dynamics_chart(
+        annual_dynamics["cum_pct_by_age"], x_title="Years Since Acquisition"
     )
     return
 
@@ -4873,7 +4960,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Two ratios that matter
+    ### Annual repeat-buying rate, by annual cohort
     """)
     return
 
@@ -4881,23 +4968,77 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Annotate the profit-by-cohort stack with two different ratios. They answer
-    different questions.
+    The second-purchase table counts a cohort against its **size**. The
+    repeat-buying rate counts it against the members who were **active**, so it
+    is a conditional measure:
 
-    **(a) Share of a year's profit from that year's new customers.** In 2016,
-    \$1,193,524 of \$1,871,911 (64%) came from the 2016 cohort, so 36% came from
-    customers acquired earlier.
+    $$
+    \text{RBR}(c,\, x \to x{+}1) \;=\; \frac{\#\{c \text{ active in year } x
+    \text{ and in year } x{+}1\}}{\#\{c \text{ active in year } x\}}
+    $$
 
-    **(b) Year-on-year carryover of profit from existing cohorts.** Profit in 2017
-    from cohorts acquired before 2017 was \$988,558, which is 53% of what the same
-    cohorts delivered in 2016. Per cohort: the 2016 cohort delivered \$1,193,524 in
-    2016 and \$451,670 in 2017 (38% carryover); the pre-2016 cohort delivered
-    \$678,387 then \$536,888 (79% carryover).
+    Three differences from the tables above are worth holding on to.
 
-    The pattern generalizes. **New cohorts decay fast; old, self-selected
-    survivors are far stickier.** Each existing cohort's profit falls by roughly
-    half per year, and total growth is bought with acquisition. Survivorship, not
-    superiority, explains why older cohorts look loyal.
+    - The `pre 2016` cohort **is** in this table. The denominator is a count of
+      active customers, not the cohort size, so the unknown size does not matter.
+    - There is no row for the cohort acquired in the last year of the window.
+      Its first pair of years needs one more year of data.
+    - The **Overall** row is every customer, not the average of the rows. It is
+      the firm-level rate, weighted by how many customers each cohort has.
+    """)
+    return
+
+
+@app.cell
+def _(annual_dynamics, bold_totals, crosstab_table, pretty_cohort):
+    crosstab_table(
+        annual_dynamics["rbr"].rename(index=pretty_cohort),
+        title="Annual Repeat-Buying Rate by Annual Cohort",
+        subtitle="% of a cohort's actives in one year who are active again the next year",
+        spanner="Year pair",
+        stubhead="Cohort",
+        decimals=0,
+    ).pipe(bold_totals, "Cohort")
+    return
+
+
+@app.cell
+def _(annual_dynamics, cohort_dynamics_chart):
+    cohort_dynamics_chart(
+        annual_dynamics["rbr"],
+        title="Annual Repeat-Buying Rate by Annual Cohort",
+        x_title="Year Pair",
+        y_title="% of Prior-Year Actives Who Return",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Read each row from left to right and the same story appears in every cohort.
+    A cohort's **first** repeat-buying rate is about 25% to 27%: of everyone
+    active in the acquisition year, a quarter come back the next year. One year
+    later the same cohort runs at about 50%, and the year after that at about
+    55%. The `pre 2016` cohort, the most self-selected group of all, sits at 51%
+    to 57% throughout.
+
+    Nobody became a better customer. The rate rises because the population it is
+    measured on **changes**: each pair of years drops the one-time buyers, and
+    what is left is the customers who were always going to buy again. This is the
+    same sorting effect that lifts the cohort flow charts, seen at the customer
+    level instead of the dollar level.
+
+    The **Overall** row moves the other way, from 34% to 38%, and it moves for a
+    different reason. It is a share-weighted blend of the rows, so it tracks the
+    mix of the base: as the firm ages, a larger part of each year's actives comes
+    from older cohorts with high rates. A firm-level repeat-buying rate that
+    drifts up is a statement about the mix, not about customer quality.
+
+    Note the low first rate of each cohort against the second-purchase table. Both
+    say the same thing in different units — most of a cohort buys once — but the
+    repeat-buying rate is the harsher test, because it asks for a purchase in a
+    **specific** year, while a second-ever purchase can come at any time.
     """)
     return
 
@@ -4905,22 +5046,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### The two percentages that matter
-
-    For the profit-by-cohort stack, annotate two different ratios — they answer different questions.
-
-    **(a) Share of a year's profit from that year's new customers.**
-    2016: \$1,193,524 / \$1,871,911 = **64%** → 36% of 2016 profit came from customers acquired earlier.
-
-    **(b) Year-on-year retention of profit from existing cohorts.**
-    Profit in 2017 from all cohorts acquired *before* 2017 = \$1,953,229 – \$964,671 = \$988,558.
-    That's **53%** of what those same cohorts delivered in 2016 (\$1,871,911).
-
-    And per-cohort:
-    - The 2016 cohort delivered \$1,193,524 in 2016 and \$451,670 in 2017 → **38%** retention of profit.
-    - The pre-2016 cohort delivered \$678,387 in 2016 and \$536,888 in 2017 → **79%** retention.
-
-    **The story:** new cohorts decay fast (38% in year two); old, self-selected surviving cohorts are far stickier (79%). Growth in total profit is being bought with acquisition, while the profit contributed by each existing cohort falls roughly by half annually. Repeat the same annotation for the active-customer stack.
+    ## Full cohort decomposition by
     """)
     return
 
@@ -4928,26 +5054,6 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Annual repeat-buying rate
-
-    ```
-    RBR(cohort, x→x+1) = # cohort members active in BOTH year x and x+1
-                         ÷ # cohort members active in year x
-    ```
-    Build pairwise activity indicators (16/17, 17/18, 18/19) at the customer level, sum by cohort year, then divide by the corresponding column of matrix (1).
-
-    Report per cohort **and** overall (all customers, not split by cohort).
-
-    Rows: pre-2016, 2016, 2017, 2018, Overall. **There is no 2019 row** — you'd need 2020 data. Expect the pre-2016 cohort's RBR to be substantially higher than any new cohort's: survivorship, not superiority.
-    """)
-    return
-
-
-@app.cell(hide_code=True)
-def _(mo):
-    mo.md(r"""
-    ### Full cohort decomposition by
-
     For each annual cohort × year:
 
     | Table | Formula |
@@ -4968,8 +5074,14 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ### Quarterly version
+    ## Quarterly analysis
+    """)
+    return
 
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     Same three pictures, at quarterly granularity using quarterly cohorts (reuse the Lens 4 matrices):
     1. Quarterly revenue and profit (column totals of the spend and profit matrices).
     2. Quarterly profit **stacked by quarterly cohort** — the fine-grained version of §5.1.
@@ -4990,24 +5102,9 @@ def _(mo):
 def _(mo):
     mo.md(r"""
     The following analyses complete Lens 5. They are specified here and left for a
-    later pass. Each reuses grids already built above.
-
-    **Time to second purchase, by annual cohort.** For each customer and year, set
-    the flag to 0 before the cohort year; in the cohort year set it to 1 if
-    transactions exceed 1 (a repeat beyond acquisition); after the cohort year
-    latch it on if the customer is active. Sum by cohort year and divide by cohort
-    size. Exclude `pre 2016`, whose size is unknown. The result is a triangular
-    table, one series per cohort.
-
-    **Annual repeat-buying rate.** For each cohort and adjacent year pair:
-
-    $$
-    \text{RBR}(c,\, x \to x{+}1) \;=\; \frac{\#\{c \text{ active in year } x \text{ and } x{+}1\}}{\#\{c \text{ active in year } x\}}
-    $$
-
-    Report per cohort and overall. There is no 2019 row, because it needs 2020
-    data. Expect the pre-2016 cohort to show the highest rate: survivorship, not
-    superiority.
+    later pass. Each reuses grids already built above. (Time to second purchase
+    and the annual repeat-buying rate are now built, in **Annual cohort
+    dynamics** above.)
 
     **Full cohort decomposition by year.** For each annual cohort and year, tabulate
     % active, average annual profit per active member, annual AOF, annual AOV, and

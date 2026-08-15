@@ -4349,7 +4349,7 @@ def _(mo):
     return
 
 
-@app.cell
+@app.cell(hide_code=True)
 def _(ACCENT2, SEQ, go, pd, pretty_cohort):
     PRE_COHORT = "pre_2016"
 

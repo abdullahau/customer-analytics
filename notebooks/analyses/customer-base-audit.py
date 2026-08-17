@@ -436,6 +436,7 @@ def _(ACCENT, FONT, GT, INK, MUTED, loc, style):
         stubhead=None,
         lead_cols=(),
         percent=True,
+        fmt=None,
         decimals=1,
         font_size="12px",
         row_padding="4px",
@@ -456,11 +457,15 @@ def _(ACCENT, FONT, GT, INK, MUTED, loc, style):
             .sub_missing(missing_text="")
             .cols_align(align="right", columns=vals)
         )
-        out = (
-            out.fmt_percent(columns=vals, decimals=decimals)
-            if percent
-            else out.fmt_number(columns=vals, decimals=decimals)
-        )
+        # `fmt` overrides the legacy `percent` bool: "percent" (default),
+        # "currency", or "number".
+        fmt = fmt or ("percent" if percent else "number")
+        if fmt == "percent":
+            out = out.fmt_percent(columns=vals, decimals=decimals)
+        elif fmt == "currency":
+            out = out.fmt_currency(columns=vals, decimals=decimals)
+        else:
+            out = out.fmt_number(columns=vals, decimals=decimals)
         if spanner:
             out = out.tab_spanner(
                 label=spanner, columns=[c for c in vals if c not in lead_cols]
@@ -685,7 +690,52 @@ def _(ACCENT, ACCENT2, H, W, go):
         fig.update_yaxes(title=y_title, tickformat=tickformat)
         return fig
 
-    return bar_distribution, line_chart, overlay_bar_distribution
+    def dual_line_chart(
+        df,
+        x,
+        series,
+        title,
+        y_title=None,
+        x_title="Quarter",
+        subtitle=None,
+        tickformat="$,.0f",
+        colors=(ACCENT, ACCENT2),
+        width=820,
+        height=380,
+    ):
+        # `series` maps a legend name to the column it plots; two lines share
+        # one categorical x-axis (e.g. quarterly sales vs. profit).
+        fig = go.Figure()
+        for (name, col), color in zip(series.items(), colors):
+            fig.add_scatter(
+                x=df[x],
+                y=df[col],
+                mode="lines+markers",
+                name=name,
+                line=dict(width=1.8, color=color),
+                marker=dict(size=6, color=color),
+                hovertemplate=f"{name} · %{{x}}<br>%{{y:{tickformat}}}<extra></extra>",
+            )
+        fig.update_layout(
+            template="cba",
+            title=_titleblk(title, subtitle),
+            width=width,
+            height=height,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1.0,
+            ),
+        )
+        fig.update_xaxes(title=x_title, type="category", tickangle=-45)
+        fig.update_yaxes(
+            title=y_title, tickformat=tickformat, rangemode="tozero"
+        )
+        return fig
+
+    return bar_distribution, dual_line_chart, line_chart, overlay_bar_distribution
 
 
 @app.cell(hide_code=True)
@@ -4154,9 +4204,11 @@ def _(mo):
 def _(pd):
     ANNUAL_ORDER = ["pre_2016", "2016", "2017", "2018", "2019"]
 
-    def cohort_flow_data(df, metric, scale=1.0, order=tuple(ANNUAL_ORDER)):
+    def cohort_flow_data(
+        df, metric, scale=1.0, order=tuple(ANNUAL_ORDER), level="Year"
+    ):
         order = list(order)
-        P = df[metric].unstack("Year").reindex(order).div(scale)
+        P = df[metric].unstack(level).reindex(order).div(scale)
         P.columns = P.columns.astype(str)
         years = list(P.columns)
         totals = P.sum(axis=0)
@@ -4207,11 +4259,20 @@ def _(SEQ, go, pd, pretty_cohort):
         r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
         return f"rgba({r},{g},{b},{a})"
 
+    def _text_color(hexc):
+        # White reads on the dark end of the ramp; switch to ink once the
+        # band lightens past mid-luminance.
+        h = hexc.lstrip("#")
+        r, g, b = (int(h[i : i + 2], 16) for i in (0, 2, 4))
+        luminance = 0.299 * r + 0.587 * g + 0.114 * b
+        return "white" if luminance < 140 else "#22303f"
+
     def cohort_flow_chart(
         data,
         y_title="",
         total_fmt="{:.2f}",
         flows=True,
+        palette=None,
         width=820,
         height=520,
     ):
@@ -4226,10 +4287,8 @@ def _(SEQ, go, pd, pretty_cohort):
             data["base_carryover"],
         )
         order = list(P.index)
-        colors = dict(zip(order, SEQ[: len(order)]))
-        text_color = {
-            c: ("white" if i < 3 else "#22303f") for i, c in enumerate(order)
-        }
+        colors = dict(zip(order, (palette or SEQ)[: len(order)]))
+        text_color = {c: _text_color(colors[c]) for c in order}
         xpos = list(range(len(years)))
         hw = (1 - 0.45) / 2
         fig = go.Figure()
@@ -4473,6 +4532,9 @@ def _(ACCENT2, SEQ, go, pd, pretty_cohort):
         y_title="Cumulative % of Cohort",
         name_fmt="{} cohort",
         emphasize=("Overall",),
+        tickformat=".0%",
+        hover_fmt=".1%",
+        rangemode="tozero",
         width=740,
         height=380,
     ):
@@ -4503,7 +4565,7 @@ def _(ACCENT2, SEQ, go, pd, pretty_cohort):
                 marker=dict(size=6, color=color),
                 connectgaps=False,
                 hovertemplate=(
-                    f"{name} · %{{x}}<br>%{{y:.1%}}<extra></extra>"
+                    f"{name} · %{{x}}<br>%{{y:{hover_fmt}}}<extra></extra>"
                 ),
             )
         fig.update_layout(
@@ -4525,8 +4587,8 @@ def _(ACCENT2, SEQ, go, pd, pretty_cohort):
         fig.update_xaxes(title=x_title, type="category")
         fig.update_yaxes(
             title=y_title,
-            tickformat=".0%",
-            rangemode="tozero",
+            tickformat=tickformat,
+            rangemode=rangemode,
         )
         return fig
 
@@ -5046,7 +5108,7 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Full cohort decomposition by
+    ## Full cohort decomposition by year
     """)
     return
 
@@ -5054,20 +5116,332 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    For each annual cohort × year:
+    The cohort flow charts above show **how much** value each cohort gives each
+    year. This section applies the profit identity to each cohort × year cell to
+    show **why**: whether a cohort's value moves because more or fewer of its
+    members are active, because they buy more or less often, because their orders
+    are bigger or smaller, or because their margin shifts.
 
     | Table | Formula |
     |---|---|
-    | **% active** | active / cohort size *(2016–2019 cohorts only; NaN for pre-2016)* |
-    | **Avg annual profit per active member** | profit / active |
-    | **Annual AOF** | trans / active |
-    | **Annual AOV** | spend / trans |
-    | **Annual avg margin** | profit / spend |
+    | % active | active / cohort size *(2016–2019 cohorts only — the pre-2016 cohort's size is unknown)* |
+    | Avg annual profit per active member | profit / active |
+    | Annual AOF | trans / active |
+    | Annual AOV | spend / trans |
+    | Annual avg margin | profit / spend |
 
-    Plot each as a line chart, one line per cohort. Add a **Total** row (all customers) to each — the totals row of the last three gives you the **overall AOF, AOV and margin by year**, which is the firm-level summary of whether the business is changing shape.
-
-    **Note on plotting:** cells before a cohort exists must be **missing (NaN), not zero** — a zero will be plotted and will distort the line.
+    Each table below has one row for each cohort and one column for each
+    calendar year; a cell before a cohort's acquisition year is missing, not
+    zero, so its line does not fall to the axis. The AOF, AOV and margin tables
+    also carry a **Total** row — the firm-level ratio for that year, over every
+    active customer regardless of cohort. That row is exactly Table 6.9 of the
+    companion, read off one table at a time instead of assembled separately.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Start from `annual_cohort_combined`. Find each cohort's size from its diagonal cell (`CohortYear == Year`), the same trick `cohort_df` uses in Lens 4.
+    2. Divide active customers by cohort size to get % active. Divide profit, transactions and spend by active customers and by each other to get the four remaining ratios.
+    3. Separately, add `annual_cohort_combined` down each column (across cohorts) to get one row of year totals, then apply the same ratios to that row. This is the **Total** row, weighted by how many customers each cohort has — not an average of the per-cohort rows.
+    4. Pivot each metric to cohort rows and year columns, append the Total row where one applies, and relabel the cohorts for display.
+
+    **Purpose:** Decompose each cohort's annual value into the four factors of the profit identity.
+
+    **Result:** Five cohort-by-year tables, plus a Total row on four of them.
+
+    **Watch:** The pre-2016 cohort has no diagonal cell, so its % active is missing for every year, by design — there is nothing to divide by.
+    """)
+    return
+
+
+@app.cell
+def _(annual_cohort_combined):
+    _idx = annual_cohort_combined.index
+    _csize = (
+        annual_cohort_combined["NumActive"]
+        .loc[
+            _idx.get_level_values("CohortYear").astype(str)
+            == _idx.get_level_values("Year").astype(str)
+        ]
+        .droplevel("Year")
+    )
+    annual_decomp = annual_cohort_combined.assign(
+        PctActive=lambda d: d["NumActive"].div(_csize, level="CohortYear"),
+        AvgProfitPerActive=lambda d: d["TotalProfit"] / d["NumActive"],
+        AOF=lambda d: d["TotalTrans"] / d["NumActive"],
+        AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
+        AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"],
+    )
+    return (annual_decomp,)
+
+
+@app.cell
+def _(annual_cohort_combined):
+    # The firm-level ratio for each year: sum every cohort's totals for that
+    # year, then derive AOF/AOV/margin/profit-per-active from the sums. This is
+    # a share-weighted blend of the cohort rows, not a mean of them.
+    year_totals = annual_cohort_combined.groupby("Year")[
+        ["NumActive", "TotalTrans", "TotalSpend", "TotalProfit"]
+    ].sum()
+    year_totals = year_totals.assign(
+        AOF=lambda d: d["TotalTrans"] / d["NumActive"],
+        AOV=lambda d: d["TotalSpend"] / d["TotalTrans"],
+        AvgProfitPerActive=lambda d: d["TotalProfit"] / d["NumActive"],
+        AvgMargin=lambda d: d["TotalProfit"] / d["TotalSpend"],
+    )
+    year_totals.index = year_totals.index.astype(str)
+    return (year_totals,)
+
+
+@app.cell
+def _(pretty_cohort):
+    def cohort_year_table(decomp, metric, year_totals=None, add_total=False):
+        # Wide cohort-by-year view of one metric from `annual_decomp`, oldest
+        # cohort first, with an optional Total row from `year_totals`.
+        p = decomp[metric].unstack("Year")
+        p.columns = p.columns.astype(str)
+        p.index = p.index.astype(str)
+        p = p.reindex(["pre_2016", "2016", "2017", "2018", "2019"]).dropna(
+            how="all"
+        )
+        if add_total:
+            p.loc["Total"] = year_totals[metric]
+        p.index = p.index.map(pretty_cohort)
+        p.index.name = "Cohort"
+        return p
+
+    return (cohort_year_table,)
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Percent of cohort active
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Every cohort starts at 100% in its own acquisition year, by definition, and
+    falls fast after that: the 2016 cohort is 27% active in 2017, 23% in 2018,
+    21% in 2019. The 2017 and 2018 cohorts fall along the same path. This is the
+    per-cohort mechanism behind the cohort flow charts above — a band shrinks
+    from year to year mostly because fewer of its members buy, not because the
+    ones who do buy spend less (see AOV and margin below, which are close to
+    flat).
+    """)
+    return
+
+
+@app.cell
+def _(annual_decomp, cohort_year_table, crosstab_table):
+    pct_active_tbl = cohort_year_table(annual_decomp, "PctActive")
+    crosstab_table(
+        pct_active_tbl,
+        title="Percent of Annual Cohort Active",
+        subtitle="Share of cohort members buying in each calendar year",
+        spanner="Calendar year",
+        stubhead="Cohort",
+        decimals=0,
+    )
+    return (pct_active_tbl,)
+
+
+@app.cell
+def _(cohort_dynamics_chart, pct_active_tbl):
+    cohort_dynamics_chart(
+        pct_active_tbl,
+        title="Percent of Annual Cohort Active by Year",
+        x_title="Year",
+        y_title="% of Cohort Active",
+        emphasize=(),
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Average annual profit per active cohort member
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Divide each cohort's profit in a year by the number of its members active
+    that year. A cohort's own acquisition year is its weakest: the 2016 cohort
+    gives \$80 per active member in 2016, then \$110, \$106, \$107 in the years
+    after. The pre-2016 cohort — the oldest, most self-selected group — sits
+    highest throughout, \$115–\$120. **The customers who come back are worth
+    more, on average, than the ones acquired that year**, because the
+    acquisition-year figure is dragged down by the one-time buyers who never
+    return. The Total row is Table 6.9's missing fourth ratio: firm-level profit
+    per active customer holds close to \$87–\$91 across all four years, far
+    steadier than any single cohort's own trajectory.
+    """)
+    return
+
+
+@app.cell
+def _(annual_decomp, cohort_year_table, year_totals):
+    avg_profit_tbl = cohort_year_table(
+        annual_decomp, "AvgProfitPerActive", year_totals, add_total=True
+    )
+    return (avg_profit_tbl,)
+
+
+@app.cell
+def _(avg_profit_tbl, bold_totals, crosstab_table):
+    crosstab_table(
+        avg_profit_tbl,
+        title="Average Annual Profit per Active Cohort Member",
+        spanner="Calendar year",
+        stubhead="Cohort",
+        fmt="currency",
+        decimals=0,
+    ).pipe(bold_totals, "Cohort")
+    return
+
+
+@app.cell
+def _(avg_profit_tbl, cohort_dynamics_chart):
+    cohort_dynamics_chart(
+        avg_profit_tbl,
+        title="Average Annual Profit per Active Cohort Member",
+        x_title="Year",
+        y_title="Avg. Annual Profit ($)",
+        emphasize=("Total",),
+        tickformat="$,.0f",
+        hover_fmt="$,.2f",
+        rangemode="normal",
+    )
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Annual AOF, AOV and margin by cohort
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    The three factors behind average profit per active member. Read them
+    together: a cohort's AOF **rises** with age (the 2016 cohort: 1.55 orders in
+    its acquisition year, then 2.40, 2.50, 2.48), while its AOV and margin stay
+    close to flat or drift down slightly (AOV \$104 → \$94 → \$89 → \$90; margin
+    50% → 49% → 47% → 48%). The same story repeats for every cohort. This
+    confirms the % active finding: **a cohort's fall in value is a story about
+    fewer buyers, not smaller or lower-margin orders** — order frequency among
+    survivors is stable to rising, and basket size and margin barely move. The
+    Total row of each table gives the firm-level AOF, AOV and margin by year
+    (Table 6.9): AOF rises from 1.77 to 1.91 as the base ages and the mix shifts
+    toward higher-frequency returning customers, while AOV and margin drift down
+    slightly as the firm adds cohorts of new, lower-spending customers each year.
+    """)
+    return
+
+
+@app.cell
+def _(annual_decomp, bold_totals, cohort_year_table, crosstab_table, year_totals):
+    aof_tbl = cohort_year_table(
+        annual_decomp, "AOF", year_totals, add_total=True
+    )
+    crosstab_table(
+        aof_tbl,
+        title="Annual AOF by Cohort",
+        subtitle="Average order frequency — transactions per active member",
+        spanner="Calendar year",
+        stubhead="Cohort",
+        fmt="number",
+        decimals=2,
+    ).pipe(bold_totals, "Cohort")
+    return (aof_tbl,)
+
+
+@app.cell
+def _(aof_tbl, cohort_dynamics_chart):
+    cohort_dynamics_chart(
+        aof_tbl,
+        title="Annual AOF by Cohort",
+        x_title="Year",
+        y_title="AOF (Transactions per Active Member)",
+        emphasize=("Total",),
+        tickformat=",.2f",
+        hover_fmt=",.2f",
+        rangemode="normal",
+    )
+    return
+
+
+@app.cell
+def _(annual_decomp, bold_totals, cohort_year_table, crosstab_table, year_totals):
+    aov_tbl = cohort_year_table(
+        annual_decomp, "AOV", year_totals, add_total=True
+    )
+    crosstab_table(
+        aov_tbl,
+        title="Annual AOV by Cohort",
+        subtitle="Average order value — spend per transaction",
+        spanner="Calendar year",
+        stubhead="Cohort",
+        fmt="currency",
+        decimals=2,
+    ).pipe(bold_totals, "Cohort")
+    return (aov_tbl,)
+
+
+@app.cell
+def _(aov_tbl, cohort_dynamics_chart):
+    cohort_dynamics_chart(
+        aov_tbl,
+        title="Annual AOV by Cohort",
+        x_title="Year",
+        y_title="AOV ($ per Transaction)",
+        emphasize=("Total",),
+        tickformat="$,.0f",
+        hover_fmt="$,.2f",
+        rangemode="normal",
+    )
+    return
+
+
+@app.cell
+def _(annual_decomp, bold_totals, cohort_year_table, crosstab_table, year_totals):
+    margin_tbl = cohort_year_table(
+        annual_decomp, "AvgMargin", year_totals, add_total=True
+    )
+    crosstab_table(
+        margin_tbl,
+        title="Annual Average Margin by Cohort",
+        spanner="Calendar year",
+        stubhead="Cohort",
+        fmt="percent",
+        decimals=0,
+    ).pipe(bold_totals, "Cohort")
+    return (margin_tbl,)
+
+
+@app.cell
+def _(cohort_dynamics_chart, margin_tbl):
+    cohort_dynamics_chart(
+        margin_tbl,
+        title="Annual Average Margin by Cohort",
+        x_title="Year",
+        y_title="Average Margin (%)",
+        emphasize=("Total",),
+        rangemode="normal",
+    )
     return
 
 
@@ -5082,39 +5456,188 @@ def _(mo):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    Same three pictures, at quarterly granularity using quarterly cohorts (reuse the Lens 4 matrices):
-    1. Quarterly revenue and profit (column totals of the spend and profit matrices).
-    2. Quarterly profit **stacked by quarterly cohort** — the fine-grained version of §5.1.
-    3. Number of customers acquired each quarter (the diagonal).
+    The annual pictures above trade resolution for readability: a year is long
+    enough to smooth over the seasonal pattern in the business. This section
+    repeats three of them at quarterly granularity, reusing `cust_data` directly
+    and the `cohort_df` cohort-by-quarter grid built in Lens 4.
+
+    1. **Quarterly revenue and profit** — the same headline as the annual bars,
+       one point per quarter instead of per year.
+    2. **Quarterly profit, stacked by quarterly acquisition cohort** — the
+       fine-grained version of the annual cohort-flow chart, with 17 cohorts
+       instead of 5.
+    3. **Customers acquired each quarter** — the diagonal of the quarterly grid.
     """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(how):
+    how(r"""
+    1. Group `cust_data` by `YearQuarter` and add spend and profit, in dollars, for Figure 6.11.
+    2. Reuse `cohort_df` from Lens 4 for the quarterly cohort grid: it already has one row for each cohort × quarter with total profit. Unstack it to cohort rows and quarter columns, in chronological order, for Figure 6.12. `pre y2016` sorts first because the string `"pre_y2016"` is alphabetically before every `"yYYYY_qQ"` key — no manual ordering list is needed.
+    3. Turn off the ribbons on the flow chart. With 17 cohorts the ribbons would overlap into noise; the stacked bars and their share labels carry the picture on their own.
+    4. Count the distinct customers in each quarterly cohort (excluding `pre y2016`, which is not a quarter of acquisition) for Figure 6.13.
+
+    **Purpose:** Show the within-year seasonal pattern that the annual view smooths away.
+
+    **Result:** Three figures at quarterly grain, built from data already on hand.
+    """)
+    return
+
+
+@app.cell
+def _(cust_data):
+    quarterly_totals = (
+        cust_data.groupby("YearQuarter", as_index=False)
+        .agg(
+            TotalSpend=("Spend", lambda s: s.sum() / 100),
+            TotalProfit=("Profit", lambda s: s.sum() / 100),
+        )
+        .sort_values("YearQuarter")
+        .assign(
+            Label=lambda d: "Q"
+            + d["YearQuarter"].str[-1]
+            + "/"
+            + d["YearQuarter"].str[1:5].str[-2:]
+        )
+    )
+    return (quarterly_totals,)
+
+
+@app.cell
+def _(dual_line_chart, quarterly_totals):
+    dual_line_chart(
+        quarterly_totals,
+        x="Label",
+        series={"Sales": "TotalSpend", "Profit": "TotalProfit"},
+        title="Summary of Quarterly Performance",
+        y_title="$",
+        tickformat="$,.0f",
+    )
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    ## Further Lens 5 analyses (specifications)
+    Both series spike every fourth quarter and reset lower in Q1, then climb
+    again — Madrigal's demand is seasonal, and each year's Q4 peak sits above
+    the Q4 peak before it. The annual bars (Figure 6.1's cousin, above) show a
+    steady climb because a calendar year always contains one full cycle of this
+    pattern; the quarterly view shows the cycle itself.
     """)
+    return
+
+
+@app.cell
+def _(cohort_df, cohort_flow_data):
+    _order = sorted(cohort_df.index.get_level_values("Cohort").unique())
+    flow_quarterly_profit = cohort_flow_data(
+        cohort_df, "TotalProfit", scale=1e3, order=_order, level="YearQuarter"
+    )
+    return (flow_quarterly_profit,)
+
+
+@app.cell
+def _(flow_quarterly_profit):
+    def _blue_ramp(n, c0="0d3b66", c1="a3c7e8"):
+        # A dark-navy-to-light-blue ramp long enough for all 17 quarterly
+        # cohorts, in the same family as the 5-stop `SEQ` palette.
+        r0, g0, b0 = int(c0[0:2], 16), int(c0[2:4], 16), int(c0[4:6], 16)
+        r1, g1, b1 = int(c1[0:2], 16), int(c1[2:4], 16), int(c1[4:6], 16)
+        steps = [i / (n - 1) for i in range(n)] if n > 1 else [0.0]
+        return [
+            f"#{round(r0 + (r1 - r0) * t):02x}"
+            f"{round(g0 + (g1 - g0) * t):02x}"
+            f"{round(b0 + (b1 - b0) * t):02x}"
+            for t in steps
+        ]
+
+    quarterly_palette = _blue_ramp(len(flow_quarterly_profit["values"].index))
+    return (quarterly_palette,)
+
+
+@app.cell
+def _(cohort_flow_chart, flow_quarterly_profit, quarterly_palette):
+    cohort_flow_chart(
+        flow_quarterly_profit,
+        y_title="Quarterly Profit ($ 000s)",
+        total_fmt="{:.0f}",
+        flows=False,
+        palette=quarterly_palette,
+        width=900,
+        height=540,
+    )
     return
 
 
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
-    The following analyses complete Lens 5. They are specified here and left for a
-    later pass. Each reuses grids already built above. (Time to second purchase
-    and the annual repeat-buying rate are now built, in **Annual cohort
-    dynamics** above.)
+    The annual flow chart above folds 16 quarters of history into 5 broad bands.
+    Here each band is one acquisition **quarter**, so the picture shows what the
+    annual version cannot: within-year seasonality is itself acquisition-driven.
+    The bottom-most, oldest slice (`pre y2016`) thins from bar to bar exactly as
+    the annual pre-2016 band does; each subsequent Q4 bar carries a thick new
+    band from that quarter's own (large) acquisition cohort, which is why every
+    Q4 profit spike in Figure 6.11 is partly a spike in new customers, not just
+    in existing customers buying more.
+    """)
+    return
 
-    **Full cohort decomposition by year.** For each annual cohort and year, tabulate
-    % active, average annual profit per active member, annual AOF, annual AOV, and
-    annual margin. Plot each as a line chart with one line per cohort, and add a
-    firm-level total line. Use missing (not zero) for years before a cohort exists,
-    so the lines do not dip to zero.
 
-    **Quarterly version.** Repeat the annual pictures at quarterly granularity,
-    reusing the Lens 4 grids: quarterly revenue and profit, quarterly profit
-    stacked by quarterly cohort, and customers acquired per quarter.
+@app.cell
+def _(cust_data, pretty_cohort):
+    quarterly_cohort_sizes = (
+        cust_data.query("Cohort != 'pre_y2016'")
+        .groupby("Cohort")["CustomerID"]
+        .nunique()
+        .sort_index()
+        .rename("Customers")
+        .reset_index()
+        .assign(CohortLabel=lambda d: d["Cohort"].map(pretty_cohort))
+    )
+    return (quarterly_cohort_sizes,)
+
+
+@app.cell
+def _(ACCENT, go, quarterly_cohort_sizes):
+    def _quarterly_acquisitions_chart(df, width=860, height=360):
+        fig = go.Figure(
+            go.Bar(
+                x=df["CohortLabel"],
+                y=df["Customers"],
+                marker_color=ACCENT,
+                marker_line_width=0,
+                hovertemplate="%{x}<br>Customers acquired: %{y:,}<extra></extra>",
+            )
+        )
+        fig.update_layout(
+            template="cba",
+            title="Number of Customers Acquired Each Quarter",
+            width=width,
+            height=height,
+            bargap=0.25,
+        )
+        fig.update_xaxes(type="category", tickangle=-45)
+        fig.update_yaxes(title="Customers Acquired", tickformat=",.0f")
+        return fig
+
+    _quarterly_acquisitions_chart(quarterly_cohort_sizes)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    Every Q4 dwarfs the three quarters before it. Q4 2019 alone acquires 8,601
+    customers — nearly as many as Q1, Q2 and Q3 2019 combined (3,485 + 3,023 +
+    3,208 = 9,716) — and each year's Q4 bar sits above the Q4 bar before it.
+    Acquisition itself is seasonal, and it is growing. This is the source
+    figure for both charts above: it is the diagonal that the profit-by-cohort
+    stack builds on, and the reason Figure 6.11's profit line spikes hardest
+    exactly where new customers arrive fastest.
     """)
     return
 
